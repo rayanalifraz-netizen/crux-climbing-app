@@ -60,7 +60,7 @@ function getWeeklySummary(sessions, checkIns) {
     if (checkIns[dateStr]?.isRestDay) restDays++;
   }
   const avgRes = sessionCount > 0 ? Math.round(totalRes / sessionCount) : null;
-  return { sessionCount, avgRes, restDays, hardSessions };
+  return { sessionCount, avgRes, restDays, hardSessions, totalRes  };
 }
 
 function GradeModal({ visible, onClose, onSave }) {
@@ -226,16 +226,16 @@ export default function ProfileScreen() {
         ) : (
           <>
             {/* Alert Banners */}
-            {highIntensityDays >= 3 && (
-              <View style={styles.alertBanner}>
-                <View style={styles.alertIconWrap}>
-                  <Ionicons name="warning-outline" size={18} color="#f4a261" />
+           {weeklySummary?.totalRes >= 280 && (
+            <View style={styles.alertBanner}>
+               <View style={styles.alertIconWrap}>
+                 <Ionicons name="warning-outline" size={18} color="#f4a261" />
                 </View>
-                <View style={styles.alertContent}>
-                  <Text style={styles.alertTitle}>Rest Day Recommended</Text>
-                  <Text style={styles.alertText}>{highIntensityDays} hard sessions in a row — your body needs recovery time.</Text>
-                </View>
+               <View style={styles.alertContent}>
+                <Text style={styles.alertTitle}>Rest Day Recommended</Text>
+                <Text style={styles.alertText}>Your weekly load is {weeklySummary.totalRes} RES — your body needs recovery time.</Text>
               </View>
+             </View>
             )}
 
             {injuryAlerts.length > 0 && (
