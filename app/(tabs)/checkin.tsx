@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -6,27 +5,61 @@ import { getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } 
 
 const today = getTodayDate();
 
-// ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  bg:         '#1a1510',
-  surface:    '#221e18',
-  surfaceAlt: '#2a2420',
-  border:     '#36302a',
-  borderFaint:'#2a2520',
-  chalk:      '#f0ebe3',
-  sand:       '#a89880',
-  dust:       '#6a5e52',
+  bg:         '#e8e0d0',
+  surface:    '#f5f0e8',
+  surfaceAlt: '#ede8dc',
+  border:     '#8a7a6a',
+  borderLight:'#c8bfaa',
+  ink:        '#2a2018',
+  inkLight:   '#4a3e32',
+  sand:       '#7a6e60',
+  dust:       '#a89880',
   terra:      '#c4734a',
-  terraLight: '#d4896a',
-  terraDark:  '#8a4a2a',
-  terraBg:    '#2a1e16',
-  amber:      '#d4943a',
-  amberBg:    '#261e10',
+  terraBg:    '#faf0e8',
+  terraBorder:'#c4734a',
+  amber:      '#c4843a',
+  amberBg:    '#fef8ee',
+  amberBorder:'#c4843a',
   red:        '#c44a3a',
-  redBg:      '#241410',
-  green:      '#6a9a5a',
-  greenBg:    '#16201a',
+  redBg:      '#fef5f4',
+  redBorder:  '#c44a3a',
+  green:      '#5a8a4a',
+  greenBg:    '#f4faf0',
+  greenBorder:'#5a8a4a',
 };
+
+function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+  return (
+    <View style={[{
+      borderWidth: 1.5,
+      borderColor: borderColor || C.border,
+      backgroundColor: bgColor || C.surface,
+      borderRadius: 4,
+      marginHorizontal: 16,
+      marginBottom: 12,
+    }, style]}>
+      {label && (
+        <View style={{
+          position: 'absolute',
+          top: -10,
+          left: 12,
+          backgroundColor: bgColor || C.surface,
+          paddingHorizontal: 6,
+        }}>
+          <Text style={{
+            fontSize: 9,
+            fontWeight: '800',
+            color: labelColor || C.sand,
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
+          }}>{label}</Text>
+        </View>
+      )}
+      {children}
+    </View>
+  );
+}
 
 const SORENESS_LEVELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 
@@ -69,9 +102,9 @@ function calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRe
 }
 
 function getDRSVerdict(score) {
-  if (score >= 70) return { label: 'Train Hard', color: C.terra, bg: C.terraBg };
-  if (score >= 40) return { label: 'Take it Easy', color: C.amber, bg: C.amberBg };
-  return { label: 'Rest Day', color: C.red, bg: C.redBg };
+  if (score >= 70) return { label: 'Train Hard', color: C.terra, bg: C.terraBg, border: C.terraBorder };
+  if (score >= 40) return { label: 'Take it Easy', color: C.amber, bg: C.amberBg, border: C.amberBorder };
+  return { label: 'Rest Day', color: C.red, bg: C.redBg, border: C.redBorder };
 }
 
 function getLast7Days() {
@@ -167,189 +200,208 @@ export default function CheckInScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </Text>
-            <Text style={styles.title}>Daily Check-in</Text>
-            <View style={styles.headerRule} />
+          <Text style={styles.greeting}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>Check-in</Text>
+            {alreadyCheckedIn && (
+              <View style={styles.doneBadge}>
+                <Text style={styles.doneBadgeText}>✓ Done</Text>
+              </View>
+            )}
           </View>
-          {alreadyCheckedIn && (
-            <View style={styles.checkedBadge}>
-              <Ionicons name="checkmark" size={12} color={C.green} />
-              <Text style={styles.checkedBadgeText}>Done</Text>
-            </View>
-          )}
         </View>
 
-        {/* Injury Alerts */}
+        {/* Injury Alert */}
         {injuryAlerts.length > 0 && (
-          <View style={styles.alertBanner}>
-            <View style={styles.alertIconWrap}>
-              <Ionicons name="fitness-outline" size={16} color={C.red} />
-            </View>
-            <View style={styles.alertContent}>
-              <Text style={styles.alertTitle}>Overload Warning</Text>
+          <WindowBox
+            label="⚠ Overload Warning"
+            borderColor={C.redBorder}
+            bgColor={C.redBg}
+            labelColor={C.red}
+            style={{ marginTop: 0 }}
+          >
+            <View style={styles.alertInner}>
               {injuryAlerts.map(alert => (
-                <Text key={alert.partId} style={styles.alertText}>{alert.partName} — {alert.suggestion}</Text>
+                <Text key={alert.partId} style={styles.alertText}>
+                  · {alert.partName} — {alert.suggestion}
+                </Text>
               ))}
             </View>
-          </View>
+          </WindowBox>
         )}
 
         {/* Rest Day Button */}
         {!alreadyCheckedIn && (
-          <TouchableOpacity style={styles.restDayButton} onPress={handleRestDay}>
-            <View style={styles.restDayIconWrap}>
-              <Ionicons name="bed-outline" size={20} color={C.green} />
-            </View>
-            <View style={styles.restDayContent}>
-              <Text style={styles.restDayTitle}>Log Rest Day</Text>
-              <Text style={styles.restDaySubtitle}>Skip the session and recover</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={C.dust} />
-          </TouchableOpacity>
+          <WindowBox
+            label="Rest Day"
+            borderColor={C.greenBorder}
+            bgColor={C.greenBg}
+            labelColor={C.green}
+          >
+            <TouchableOpacity style={styles.restDayBtn} onPress={handleRestDay}>
+              <View style={styles.restDayBtnLeft}>
+                <Text style={styles.restDayBtnTitle}>Log Rest Day</Text>
+                <Text style={styles.restDayBtnSub}>Skip the session and recover</Text>
+              </View>
+              <Text style={[styles.restDayBtnArrow, { color: C.green }]}>→</Text>
+            </TouchableOpacity>
+          </WindowBox>
         )}
 
         {/* Rest Day Confirmed */}
         {isRestDay && alreadyCheckedIn ? (
-          <View style={styles.restDayCard}>
-            <View style={styles.restDayCardIcon}>
-              <Ionicons name="bed-outline" size={28} color={C.green} />
+          <WindowBox
+            label="Today"
+            borderColor={C.greenBorder}
+            bgColor={C.greenBg}
+            labelColor={C.green}
+          >
+            <View style={styles.restDayConfirmed}>
+              <Text style={styles.restDayConfirmedTitle}>Rest Day</Text>
+              <Text style={styles.restDayConfirmedSub}>Recovery mode — your body is thanking you</Text>
+              <View style={styles.restDayDRS}>
+                <Text style={styles.restDayDRSLabel}>DRS</Text>
+                <Text style={styles.restDayDRSScore}>100</Text>
+              </View>
             </View>
-            <Text style={styles.restDayCardEyebrow}>TODAY</Text>
-            <Text style={styles.restDayCardTitle}>Rest Day</Text>
-            <Text style={styles.restDayCardSub}>Recovery mode — your body is thanking you</Text>
-            <View style={styles.restDayBadge}>
-              <Text style={styles.restDayBadgeText}>DRS 100</Text>
-            </View>
-          </View>
+          </WindowBox>
         ) : (
           <>
             {/* Soreness */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionEyebrow}>Overall Soreness</Text>
-              <View style={styles.sorenessRow}>
-                {SORENESS_LEVELS.map((level) => {
-                  const selected = soreness === level;
-                  const color = getSorenessColor(level);
-                  return (
-                    <TouchableOpacity
-                      key={level}
-                      style={[
-                        styles.sorenessButton,
-                        selected && { backgroundColor: color, borderColor: color }
-                      ]}
-                      onPress={() => !alreadyCheckedIn && setSoreness(level)}
-                    >
-                      <Text style={[styles.sorenessText, selected && { color: C.chalk }]}>{level}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+            <WindowBox label="Overall Soreness">
+              <View style={styles.sectionInner}>
+                <View style={styles.sorenessRow}>
+                  {SORENESS_LEVELS.map((level) => {
+                    const selected = soreness === level;
+                    const color = getSorenessColor(level);
+                    return (
+                      <TouchableOpacity
+                        key={level}
+                        style={[styles.sorenessBtn, selected && { backgroundColor: color, borderColor: color }]}
+                        onPress={() => !alreadyCheckedIn && setSoreness(level)}
+                      >
+                        <Text style={[styles.sorenessBtnText, selected && { color: '#fff' }]}>{level}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {soreness && (
+                  <Text style={styles.sorenessHint}>
+                    {parseInt(soreness) <= 3 ? '→ Feeling good' :
+                     parseInt(soreness) <= 6 ? '→ Some fatigue present' :
+                     '→ High soreness — consider resting'}
+                  </Text>
+                )}
               </View>
-              {soreness && (
-                <Text style={styles.sorenessHint}>
-                  {parseInt(soreness) <= 3 ? '— Feeling good' :
-                   parseInt(soreness) <= 6 ? '— Some fatigue present' :
-                   '— High soreness, consider resting'}
-                </Text>
-              )}
-            </View>
+            </WindowBox>
 
             {/* Finger Condition */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionEyebrow}>Finger Condition</Text>
-              <Text style={styles.sectionHint}>Tap any fingers that feel sore or tweaked</Text>
-              <View style={styles.chipRow}>
-                {FINGER_ZONES.map((finger) => {
-                  const selected = affectedFingers.includes(finger.id);
-                  return (
-                    <TouchableOpacity
-                      key={finger.id}
-                      style={[styles.chip, selected && styles.chipSelected]}
-                      onPress={() => toggleFinger(finger.id)}
-                    >
-                      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                        {finger.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+            <WindowBox label="Finger Condition">
+              <View style={styles.sectionInner}>
+                <Text style={styles.sectionHint}>Tap any fingers that feel sore or tweaked</Text>
+                <View style={styles.chipRow}>
+                  {FINGER_ZONES.map((finger) => {
+                    const selected = affectedFingers.includes(finger.id);
+                    return (
+                      <TouchableOpacity
+                        key={finger.id}
+                        style={[styles.chip, selected && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
+                        onPress={() => toggleFinger(finger.id)}
+                      >
+                        <Text style={[styles.chipText, selected && { color: C.red }]}>
+                          {finger.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
+            </WindowBox>
 
             {/* Pain Areas */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionEyebrow}>Pain or Strain</Text>
-              <Text style={styles.sectionHint}>Select all areas that feel off today</Text>
-              <View style={styles.chipRow}>
-                {PAIN_AREAS.map((area) => {
-                  const selected = painAreas.includes(area.id);
-                  return (
-                    <TouchableOpacity
-                      key={area.id}
-                      style={[styles.chip, selected && styles.chipSelected]}
-                      onPress={() => togglePain(area.id)}
-                    >
-                      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                        {area.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* DRS Card */}
-            {displayVerdict && displayScore !== null && (
-              <View style={[styles.drsCard, { backgroundColor: displayVerdict.bg, borderColor: displayVerdict.color + '50' }]}>
-                <Text style={styles.drsEyebrow}>
-                  {alreadyCheckedIn ? 'Daily Readiness Score' : 'Readiness Preview'}
-                </Text>
-                <View style={styles.drsTop}>
-                  <Text style={[styles.drsVerdict, { color: displayVerdict.color }]}>
-                    {displayVerdict.label}
-                  </Text>
-                  <View style={[styles.drsScoreCircle, { borderColor: displayVerdict.color + '60' }]}>
-                    <Text style={[styles.drsScore, { color: displayVerdict.color }]}>{displayScore}</Text>
-                  </View>
+            <WindowBox label="Pain or Strain">
+              <View style={styles.sectionInner}>
+                <Text style={styles.sectionHint}>Select all areas that feel off today</Text>
+                <View style={styles.chipRow}>
+                  {PAIN_AREAS.map((area) => {
+                    const selected = painAreas.includes(area.id);
+                    return (
+                      <TouchableOpacity
+                        key={area.id}
+                        style={[styles.chip, selected && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
+                        onPress={() => togglePain(area.id)}
+                      >
+                        <Text style={[styles.chipText, selected && { color: C.red }]}>
+                          {area.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
+              </View>
+            </WindowBox>
 
-                {alreadyCheckedIn && (
-                  <View style={styles.drsBreakdown}>
-                    <View style={styles.drsBreakdownItem}>
-                      <Text style={styles.drsBreakdownLabel}>Soreness</Text>
-                      <Text style={[styles.drsBreakdownValue, { color: C.chalk }]}>{soreness}/10</Text>
-                    </View>
-                    <View style={styles.drsBreakdownDivider} />
-                    <View style={styles.drsBreakdownItem}>
-                      <Text style={styles.drsBreakdownLabel}>Pain Areas</Text>
-                      <Text style={[styles.drsBreakdownValue, { color: C.chalk }]}>{painAreas.length}</Text>
-                    </View>
-                    <View style={styles.drsBreakdownDivider} />
-                    <View style={styles.drsBreakdownItem}>
-                      <Text style={styles.drsBreakdownLabel}>Sessions (7d)</Text>
-                      <Text style={[styles.drsBreakdownValue, { color: C.chalk }]}>{recentSessions.filter(s => s !== null).length}</Text>
+            {/* DRS */}
+            {displayVerdict && displayScore !== null && (
+              <WindowBox
+                label={alreadyCheckedIn ? 'Daily Readiness Score' : 'Readiness Preview'}
+                borderColor={displayVerdict.border}
+                bgColor={displayVerdict.bg}
+                labelColor={displayVerdict.color}
+              >
+                <View style={styles.drsInner}>
+                  <View style={styles.drsTopRow}>
+                    <Text style={[styles.drsVerdict, { color: displayVerdict.color }]}>
+                      {displayVerdict.label}
+                    </Text>
+                    <View style={[styles.drsScoreBox, { borderColor: displayVerdict.border }]}>
+                      <Text style={[styles.drsScoreNum, { color: displayVerdict.color }]}>{displayScore}</Text>
                     </View>
                   </View>
-                )}
 
-                {!alreadyCheckedIn && (
-                  <Text style={[styles.drsHint, { color: displayVerdict.color + 'aa' }]}>
-                    — Save your check-in to confirm —
-                  </Text>
-                )}
-              </View>
+                  {alreadyCheckedIn && (
+                    <View style={[styles.drsBreakdown, { borderTopColor: displayVerdict.border + '60' }]}>
+                      {[
+                        { label: 'Soreness', val: `${soreness}/10` },
+                        { label: 'Pain Areas', val: painAreas.length },
+                        { label: '7d Sessions', val: recentSessions.filter(s => s !== null).length },
+                      ].map((item, i, arr) => (
+                        <View key={item.label} style={styles.drsBreakdownGroup}>
+                          <Text style={[styles.drsBreakdownLabel, { color: displayVerdict.color + 'aa' }]}>
+                            {item.label}
+                          </Text>
+                          <Text style={[styles.drsBreakdownVal, { color: displayVerdict.color }]}>
+                            {item.val}
+                          </Text>
+                          {i < arr.length - 1 && (
+                            <View style={[styles.drsBreakdownTick, { backgroundColor: displayVerdict.border + '40' }]} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {!alreadyCheckedIn && (
+                    <Text style={[styles.drsHint, { color: displayVerdict.color + 'aa' }]}>
+                      → Save check-in to confirm
+                    </Text>
+                  )}
+                </View>
+              </WindowBox>
             )}
 
             {/* Save Button */}
             {soreness && !alreadyCheckedIn && (
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Save Check-in</Text>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+                <Text style={styles.saveBtnText}>Save Check-in →</Text>
               </TouchableOpacity>
             )}
           </>
         )}
+
+        <View style={{ height: 20 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -357,63 +409,55 @@ export default function CheckInScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
-  scrollContent: { padding: 20, paddingBottom: 48 },
+  scrollContent: { paddingBottom: 48 },
 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 16, marginBottom: 24 },
-  greeting: { fontSize: 12, color: C.dust, fontWeight: '600', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
-  title: { fontSize: 36, fontWeight: '800', color: C.chalk, letterSpacing: -1, lineHeight: 40 },
-  headerRule: { height: 1, backgroundColor: C.border, marginTop: 14 },
-  checkedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.greenBg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: C.green + '40', marginTop: 8 },
-  checkedBadgeText: { color: C.green, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+  greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+  doneBadge: { backgroundColor: C.greenBg, borderWidth: 1.5, borderColor: C.greenBorder, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
+  doneBadgeText: { color: C.green, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 
-  alertBanner: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: C.redBg, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.red + '40', gap: 12 },
-  alertIconWrap: { width: 28, height: 28, borderRadius: 8, backgroundColor: C.red + '20', justifyContent: 'center', alignItems: 'center' },
-  alertContent: { flex: 1 },
-  alertTitle: { color: C.red, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 },
-  alertText: { color: C.red + '99', fontSize: 12, lineHeight: 17 },
+  alertInner: { padding: 14, gap: 4 },
+  alertText: { color: C.red, fontSize: 12, lineHeight: 18 },
 
-  restDayButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.greenBg, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: C.green + '30', gap: 14 },
-  restDayIconWrap: { width: 38, height: 38, borderRadius: 10, backgroundColor: C.green + '20', justifyContent: 'center', alignItems: 'center' },
-  restDayContent: { flex: 1 },
-  restDayTitle: { color: C.green, fontSize: 14, fontWeight: '700', letterSpacing: 0.3 },
-  restDaySubtitle: { color: C.dust, fontSize: 12, marginTop: 2 },
+  restDayBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  restDayBtnLeft: { flex: 1 },
+  restDayBtnTitle: { color: C.green, fontSize: 14, fontWeight: '800' },
+  restDayBtnSub: { color: C.sand, fontSize: 12, marginTop: 2 },
+  restDayBtnArrow: { fontSize: 18, fontWeight: '700' },
 
-  restDayCard: { backgroundColor: C.greenBg, borderRadius: 16, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: C.green + '30', marginBottom: 12, gap: 6 },
-  restDayCardIcon: { width: 56, height: 56, borderRadius: 16, backgroundColor: C.green + '20', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  restDayCardEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 2, textTransform: 'uppercase' },
-  restDayCardTitle: { color: C.green, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  restDayCardSub: { color: C.dust, fontSize: 13, textAlign: 'center' },
-  restDayBadge: { backgroundColor: C.green + '20', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginTop: 8, borderWidth: 1, borderColor: C.green + '30' },
-  restDayBadgeText: { color: C.green, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  restDayConfirmed: { padding: 24, alignItems: 'center', gap: 6 },
+  restDayConfirmedTitle: { fontSize: 32, fontWeight: '800', color: C.green, letterSpacing: -1 },
+  restDayConfirmedSub: { color: C.sand, fontSize: 12, textAlign: 'center' },
+  restDayDRS: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 8 },
+  restDayDRSLabel: { fontSize: 10, fontWeight: '800', color: C.green, letterSpacing: 2, textTransform: 'uppercase' },
+  restDayDRSScore: { fontSize: 28, fontWeight: '800', color: C.green, letterSpacing: -1 },
 
-  sectionCard: { backgroundColor: C.surface, borderRadius: 14, padding: 18, marginBottom: 10, borderWidth: 1, borderColor: C.border },
-  sectionEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 },
-  sectionHint: { color: C.dust, fontSize: 12, marginBottom: 12, marginTop: -6 },
+  sectionInner: { padding: 16, paddingTop: 20 },
+  sectionHint: { color: C.dust, fontSize: 12, marginBottom: 12 },
 
   sorenessRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  sorenessButton: { width: 40, height: 40, backgroundColor: C.surfaceAlt, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border },
-  sorenessText: { color: C.dust, fontSize: 14, fontWeight: '700' },
-  sorenessHint: { color: C.dust, fontSize: 11, marginTop: 12, letterSpacing: 0.3 },
+  sorenessBtn: { width: 40, height: 40, backgroundColor: C.surfaceAlt, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
+  sorenessBtnText: { color: C.sand, fontSize: 13, fontWeight: '800' },
+  sorenessHint: { color: C.sand, fontSize: 11, marginTop: 12, fontWeight: '600' },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 8, borderWidth: 1, borderColor: C.border },
-  chipSelected: { backgroundColor: C.redBg, borderColor: C.red + '60' },
-  chipText: { color: C.dust, fontSize: 13, fontWeight: '600' },
-  chipTextSelected: { color: C.red },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 4, borderWidth: 1, borderColor: C.borderLight },
+  chipText: { color: C.sand, fontSize: 12, fontWeight: '700' },
 
-  drsCard: { borderRadius: 14, padding: 20, marginBottom: 12, borderWidth: 1 },
-  drsEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 },
-  drsTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  drsInner: { padding: 18, paddingTop: 22 },
+  drsTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   drsVerdict: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  drsScoreCircle: { width: 60, height: 60, borderRadius: 30, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  drsScore: { fontSize: 22, fontWeight: '800' },
-  drsBreakdown: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 16, borderTopWidth: 1, borderTopColor: C.border },
-  drsBreakdownItem: { alignItems: 'center' },
-  drsBreakdownLabel: { color: C.dust, fontSize: 10, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 },
-  drsBreakdownValue: { fontSize: 18, fontWeight: '800' },
-  drsBreakdownDivider: { width: 1, backgroundColor: C.border },
-  drsHint: { fontSize: 11, textAlign: 'center', letterSpacing: 0.5 },
+  drsScoreBox: { width: 56, height: 56, borderWidth: 1.5, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+  drsScoreNum: { fontSize: 22, fontWeight: '800' },
+  drsBreakdown: { flexDirection: 'row', paddingTop: 14, borderTopWidth: 1 },
+  drsBreakdownGroup: { flex: 1, alignItems: 'center', position: 'relative' },
+  drsBreakdownLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  drsBreakdownVal: { fontSize: 18, fontWeight: '800' },
+  drsBreakdownTick: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 1 },
+  drsHint: { fontSize: 11, fontWeight: '600' },
 
-  saveButton: { backgroundColor: C.terra, padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 8, marginBottom: 8 },
-  saveButtonText: { color: C.chalk, fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
+  saveBtn: { marginHorizontal: 16, backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center', marginTop: 4 },
+  saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
 });
