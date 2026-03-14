@@ -1,11 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { getProfile, saveProfile } from '../../storage';
+import { clearAllData, deleteCheckInByKey, deleteSessionsByKey, getProfile, getTodayDate, saveProfile } from '../../storage';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
+
+// ─── Palette ──────────────────────────────────────────────────────────────────
+const C = {
+  bg:         '#1a1510',
+  surface:    '#221e18',
+  surfaceAlt: '#2a2420',
+  border:     '#36302a',
+  chalk:      '#f0ebe3',
+  sand:       '#a89880',
+  dust:       '#6a5e52',
+  terra:      '#c4734a',
+  terraLight: '#d4896a',
+  terraBg:    '#2a1e16',
+  terraDark:  '#8a4a2a',
+  amber:      '#d4943a',
+  amberBg:    '#261e10',
+  red:        '#c44a3a',
+  redBg:      '#241410',
+  green:      '#6a9a5a',
+  greenBg:    '#16201a',
+};
 
 function GradeModal({ visible, onClose, onSave }) {
   const [step, setStep] = useState(1);
@@ -24,7 +44,7 @@ function GradeModal({ visible, onClose, onSave }) {
         <View style={modalStyles.container}>
           <View style={modalStyles.handle} />
           <TouchableOpacity onPress={handleClose} style={modalStyles.closeBtn}>
-            <Ionicons name="close" size={20} color="#888" />
+            <Ionicons name="close" size={18} color={C.dust} />
           </TouchableOpacity>
           {step === 1 ? (
             <>
@@ -79,17 +99,17 @@ function GradeModal({ visible, onClose, onSave }) {
   );
 }
 
-function SettingsRow({ icon, iconColor = '#888', iconBg = '#1e1e22', label, sublabel, onPress, chevron = true, destructive = false }) {
+function SettingsRow({ icon, iconColor, iconBg, label, sublabel, onPress, chevron = true, destructive = false }) {
   return (
     <TouchableOpacity style={styles.row} onPress={onPress}>
-      <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={17} color={iconColor} />
+      <View style={[styles.rowIcon, { backgroundColor: iconBg || C.surfaceAlt }]}>
+        <Ionicons name={icon} size={16} color={iconColor || C.dust} />
       </View>
       <View style={styles.rowContent}>
-        <Text style={[styles.rowLabel, destructive && styles.rowLabelDestructive]}>{label}</Text>
+        <Text style={[styles.rowLabel, destructive && { color: C.red }]}>{label}</Text>
         {sublabel && <Text style={styles.rowSublabel}>{sublabel}</Text>}
       </View>
-      {chevron && <Ionicons name="chevron-forward" size={16} color="#333" />}
+      {chevron && <Ionicons name="chevron-forward" size={14} color={C.dust} />}
     </TouchableOpacity>
   );
 }
@@ -99,6 +119,7 @@ export default function SettingsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+
   useFocusEffect(useCallback(() => { loadProfile(); }, []));
 
   const loadProfile = async () => {
@@ -115,7 +136,8 @@ export default function SettingsScreen() {
   };
 
   const handleGradeSave = async (maxGrade, projectGrade) => {
-    await saveProfile({ maxGrade, projectGrade });
+    const updated = { ...profile, maxGrade, projectGrade };
+    await saveProfile(updated);
     setModalVisible(false);
     await loadProfile();
   };
@@ -123,45 +145,24 @@ export default function SettingsScreen() {
   const clearTodaySession = () => {
     Alert.alert("Clear Today's Session", "This will delete today's session so you can re-log it.", [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Clear', style: 'destructive', onPress: async () => {
-          const today = new Date().toISOString().split('T')[0];
-          const data = await AsyncStorage.getItem('sessions');
-          const sessions = data ? JSON.parse(data) : {};
-          delete sessions[today];
-          await AsyncStorage.setItem('sessions', JSON.stringify(sessions));
-        }
-      }
+      { text: 'Clear', style: 'destructive', onPress: async () => { await deleteSessionsByKey(getTodayDate()); } }
     ]);
   };
 
   const clearTodayCheckIn = () => {
     Alert.alert("Clear Today's Check-in", "This will delete today's check-in so you can re-log it.", [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Clear', style: 'destructive', onPress: async () => {
-          const today = new Date().toISOString().split('T')[0];
-          const data = await AsyncStorage.getItem('checkins');
-          const checkIns = data ? JSON.parse(data) : {};
-          delete checkIns[today];
-          await AsyncStorage.setItem('checkins', JSON.stringify(checkIns));
-        }
-      }
+      { text: 'Clear', style: 'destructive', onPress: async () => { await deleteCheckInByKey(getTodayDate()); } }
     ]);
   };
 
-  const clearAllData = () => {
+  const handleClearAllData = () => {
     Alert.alert(
       'Clear All Data',
       'This permanently deletes all sessions, check-ins, and your profile. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Everything', style: 'destructive', onPress: async () => {
-            await AsyncStorage.clear();
-            setProfile(null);
-          }
-        }
+        { text: 'Delete Everything', style: 'destructive', onPress: async () => { await clearAllData(); setProfile(null); } }
       ]
     );
   };
@@ -176,64 +177,63 @@ export default function SettingsScreen() {
         <View style={styles.header}>
           <Text style={styles.greeting}>App</Text>
           <Text style={styles.title}>Settings</Text>
+          <View style={styles.headerRule} />
         </View>
 
         {/* Profile Card */}
         <View style={styles.profileCard}>
-            <View style={styles.profileAvatar}>
-                <Ionicons name="person-outline" size={28} color="#00b4d8" />
-            </View>
-            <View style={styles.profileInfo}>
-                {editingName ? (
-                    <TextInput
-                    style={styles.nameInput}
-                    value={nameInput}
-                    onChangeText={setNameInput}
-                    placeholder="Enter your name"
-                    placeholderTextColor="#333"
-                    autoFocus
-                    onSubmitEditing={saveName}
-                    returnKeyType="done"
-                 />
-             ) : (
-      <Text style={styles.profileName}>{profile?.name || 'Climber'}</Text>
-    )}
-    <Text style={styles.profileGrades}>
-      {profile ? `${profile.maxGrade} · Projecting ${profile.projectGrade}` : 'No grades set'}
-    </Text>
-  </View>
-  {editingName ? (
-    <TouchableOpacity style={styles.profileEditBtn} onPress={saveName}>
-      <Text style={[styles.profileEditBtnText, { color: '#00b4d8' }]}>Save</Text>
-    </TouchableOpacity>
-  ) : (
-    <TouchableOpacity style={styles.profileEditBtn} onPress={() => { setNameInput(profile?.name || ''); setEditingName(true); }}>
-      <Text style={styles.profileEditBtnText}>Edit</Text>
-    </TouchableOpacity>
-  )}
-</View>
+          <View style={styles.profileAvatar}>
+            <Ionicons name="person-outline" size={24} color={C.terra} />
+          </View>
+          <View style={styles.profileInfo}>
+            {editingName ? (
+              <TextInput
+                style={styles.nameInput}
+                value={nameInput}
+                onChangeText={setNameInput}
+                placeholder="Enter your name"
+                placeholderTextColor={C.dust}
+                autoFocus
+                onSubmitEditing={saveName}
+                returnKeyType="done"
+              />
+            ) : (
+              <Text style={styles.profileName}>{profile?.name || 'Climber'}</Text>
+            )}
+            <Text style={styles.profileGrades}>
+              {profile ? `${profile.maxGrade} · Projecting ${profile.projectGrade}` : 'No grades set'}
+            </Text>
+          </View>
+          {editingName ? (
+            <TouchableOpacity style={styles.profileEditBtn} onPress={saveName}>
+              <Text style={[styles.profileEditBtnText, { color: C.terra }]}>Save</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.profileEditBtn} onPress={() => { setNameInput(profile?.name || ''); setEditingName(true); }}>
+              <Text style={styles.profileEditBtnText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Grades Section */}
         <Text style={styles.sectionLabel}>Grades</Text>
         <View style={styles.card}>
           <View style={styles.gradeDisplay}>
             <View style={styles.gradeDisplayItem}>
-              <Text style={styles.gradeDisplayLabel}>LEVEL</Text>
+              <Text style={styles.gradeDisplayEyebrow}>Level</Text>
               <Text style={styles.gradeDisplayValue}>{profile?.maxGrade ?? '—'}</Text>
             </View>
-            <View style={styles.gradeDisplayArrow}>
-              <Ionicons name="arrow-forward" size={16} color="#2a2a2e" />
-            </View>
+            <View style={styles.gradeDisplayDivider} />
             <View style={styles.gradeDisplayItem}>
-              <Text style={styles.gradeDisplayLabel}>PROJECT</Text>
-              <Text style={[styles.gradeDisplayValue, { color: '#00b4d8' }]}>{profile?.projectGrade ?? '—'}</Text>
+              <Text style={styles.gradeDisplayEyebrow}>Project</Text>
+              <Text style={[styles.gradeDisplayValue, { color: C.terra }]}>{profile?.projectGrade ?? '—'}</Text>
             </View>
           </View>
           <View style={styles.cardDivider} />
           <SettingsRow
             icon="pencil-outline"
-            iconColor="#00b4d8"
-            iconBg="#001e2e"
+            iconColor={C.terra}
+            iconBg={C.terraBg}
             label="Edit Grades"
             sublabel="Update your climbing level and project"
             onPress={() => setModalVisible(true)}
@@ -245,8 +245,8 @@ export default function SettingsScreen() {
         <View style={styles.card}>
           <SettingsRow
             icon="refresh-outline"
-            iconColor="#f4a261"
-            iconBg="#2a1800"
+            iconColor={C.amber}
+            iconBg={C.amberBg}
             label="Clear Today's Session"
             sublabel="Re-log today's climbing session"
             onPress={clearTodaySession}
@@ -254,8 +254,8 @@ export default function SettingsScreen() {
           <View style={styles.cardDivider} />
           <SettingsRow
             icon="refresh-outline"
-            iconColor="#f4a261"
-            iconBg="#2a1800"
+            iconColor={C.amber}
+            iconBg={C.amberBg}
             label="Clear Today's Check-in"
             sublabel="Re-do today's body check-in"
             onPress={clearTodayCheckIn}
@@ -267,11 +267,11 @@ export default function SettingsScreen() {
         <View style={[styles.card, styles.dangerCard]}>
           <SettingsRow
             icon="trash-outline"
-            iconColor="#e63946"
-            iconBg="#2a0808"
+            iconColor={C.red}
+            iconBg={C.redBg}
             label="Clear All Data"
             sublabel="Permanently delete everything"
-            onPress={clearAllData}
+            onPress={handleClearAllData}
             destructive
           />
         </View>
@@ -279,7 +279,7 @@ export default function SettingsScreen() {
         {/* App Info */}
         <View style={styles.appInfo}>
           <View style={styles.appInfoLogo}>
-            <Ionicons name="trending-up-outline" size={20} color="#333" />
+            <Ionicons name="trending-up-outline" size={18} color={C.dust} />
           </View>
           <Text style={styles.appInfoName}>Crux</Text>
           <Text style={styles.appInfoTagline}>Bouldering Recovery Tracker</Text>
@@ -292,60 +292,60 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0d0d0f' },
+  container: { flex: 1, backgroundColor: C.bg },
   scrollContent: { padding: 20, paddingBottom: 48 },
 
   header: { marginTop: 16, marginBottom: 28 },
-  greeting: { fontSize: 13, color: '#555', fontWeight: '500', letterSpacing: 0.3, marginBottom: 4 },
-  title: { fontSize: 30, fontWeight: '800', color: '#ffffff', letterSpacing: -0.5 },
+  greeting: { fontSize: 12, color: C.dust, fontWeight: '600', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
+  title: { fontSize: 36, fontWeight: '800', color: C.chalk, letterSpacing: -1, lineHeight: 40 },
+  headerRule: { height: 1, backgroundColor: C.border, marginTop: 14 },
 
-  profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#141416', borderRadius: 20, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#1e1e22', gap: 14 },
-  profileAvatar: { width: 52, height: 52, borderRadius: 16, backgroundColor: '#001e2e', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#003d4d' },
+  profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: 14, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: C.border, gap: 14 },
+  profileAvatar: { width: 48, height: 48, borderRadius: 14, backgroundColor: C.terraBg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.terra + '40' },
   profileInfo: { flex: 1 },
-  profileName: { color: '#ffffff', fontSize: 16, fontWeight: '700', marginBottom: 3 },
-  profileGrades: { color: '#444', fontSize: 13 },
-  profileEditBtn: { backgroundColor: '#1e1e22', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
-  profileEditBtnText: { color: '#888', fontSize: 13, fontWeight: '600' },
+  profileName: { color: C.chalk, fontSize: 16, fontWeight: '700', marginBottom: 3 },
+  profileGrades: { color: C.dust, fontSize: 12 },
+  profileEditBtn: { backgroundColor: C.surfaceAlt, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: C.border },
+  profileEditBtnText: { color: C.dust, fontSize: 12, fontWeight: '600' },
+  nameInput: { color: C.chalk, fontSize: 15, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: C.terra, paddingBottom: 2, minWidth: 120 },
 
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#333', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8, marginLeft: 4 },
+  sectionLabel: { fontSize: 9, fontWeight: '700', color: C.dust, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8, marginLeft: 2 },
 
-  card: { backgroundColor: '#141416', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 4, marginBottom: 24, borderWidth: 1, borderColor: '#1e1e22' },
-  dangerCard: { borderColor: '#2a0808' },
+  card: { backgroundColor: C.surface, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 4, marginBottom: 20, borderWidth: 1, borderColor: C.border },
+  dangerCard: { borderColor: C.red + '40' },
 
-  gradeDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 20, gap: 24 },
-  gradeDisplayItem: { alignItems: 'center' },
-  gradeDisplayLabel: { fontSize: 10, fontWeight: '700', color: '#333', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
-  gradeDisplayValue: { fontSize: 36, fontWeight: '800', color: '#ffffff' },
-  gradeDisplayArrow: { paddingTop: 8 },
-  cardDivider: { height: 1, backgroundColor: '#1e1e22', marginHorizontal: -16 },
+  gradeDisplay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 20, gap: 0 },
+  gradeDisplayItem: { flex: 1, alignItems: 'center' },
+  gradeDisplayEyebrow: { fontSize: 9, fontWeight: '700', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
+  gradeDisplayValue: { fontSize: 40, fontWeight: '800', color: C.chalk, letterSpacing: -1 },
+  gradeDisplayDivider: { width: 1, height: 50, backgroundColor: C.border },
+  cardDivider: { height: 1, backgroundColor: C.border, marginHorizontal: -16 },
 
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
-  rowIcon: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  rowIcon: { width: 32, height: 32, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
   rowContent: { flex: 1 },
-  rowLabel: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
-  rowLabelDestructive: { color: '#e63946' },
-  rowSublabel: { color: '#444', fontSize: 12, marginTop: 2 },
+  rowLabel: { color: C.chalk, fontSize: 14, fontWeight: '600' },
+  rowSublabel: { color: C.dust, fontSize: 11, marginTop: 2 },
 
-  appInfo: { alignItems: 'center', gap: 4, paddingTop: 8 },
-  appInfoLogo: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#141416', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#1e1e22', marginBottom: 8 },
-  appInfoName: { color: '#333', fontSize: 15, fontWeight: '800' },
-  appInfoTagline: { color: '#2a2a2e', fontSize: 12 },
-  appInfoVersion: { color: '#222', fontSize: 11, marginTop: 2 },
-  nameInput: { color: '#ffffff', fontSize: 16, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: '#00b4d8', paddingBottom: 2, minWidth: 120 },
+  appInfo: { alignItems: 'center', gap: 4, paddingTop: 16 },
+  appInfoLogo: { width: 40, height: 40, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, marginBottom: 8 },
+  appInfoName: { color: C.dust, fontSize: 14, fontWeight: '800', letterSpacing: 2 },
+  appInfoTagline: { color: C.dust, fontSize: 11, opacity: 0.6 },
+  appInfoVersion: { color: C.dust, fontSize: 10, marginTop: 2, opacity: 0.4 },
 });
 
 const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
-  container: { backgroundColor: '#141416', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 },
-  handle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  closeBtn: { position: 'absolute', top: 20, right: 24, width: 32, height: 32, borderRadius: 16, backgroundColor: '#1e1e22', justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: '800', color: '#ffffff', marginBottom: 6 },
-  subtitle: { fontSize: 13, color: '#555', marginBottom: 24 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
+  container: { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48, borderTopWidth: 1, borderColor: C.border },
+  handle: { width: 36, height: 3, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 24 },
+  closeBtn: { position: 'absolute', top: 20, right: 24, width: 30, height: 30, borderRadius: 8, backgroundColor: C.surfaceAlt, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  title: { fontSize: 20, fontWeight: '800', color: C.chalk, marginBottom: 4, letterSpacing: -0.5 },
+  subtitle: { fontSize: 12, color: C.dust, marginBottom: 24 },
   gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: '#1e1e22', borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2a2a2e' },
-  selectedButton: { backgroundColor: '#00b4d8', borderColor: '#00b4d8' },
-  gradeText: { color: '#888', fontSize: 16, fontWeight: '700' },
-  selectedText: { color: '#ffffff' },
-  continueButton: { backgroundColor: '#00b4d8', padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 24 },
-  continueText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
+  gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
+  gradeText: { color: C.dust, fontSize: 15, fontWeight: '700' },
+  selectedText: { color: C.chalk },
+  continueButton: { backgroundColor: C.terra, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 },
+  continueText: { color: C.chalk, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });

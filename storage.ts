@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export type Session = {
   date: string;
@@ -6,6 +6,7 @@ export type Session = {
   holdTypes: string[];
   movementTypes: string[];
   res: number;
+  notes?: string;
 };
 
 export type CheckIn = {
@@ -19,69 +20,7 @@ export type CheckIn = {
 export type UserProfile = {
   maxGrade: string;
   projectGrade: string;
-};
-
-export const saveSession = async (session: Session) => {
-  try {
-    const existing = await getSessions();
-    const updated = { ...existing, [session.date]: session };
-    await AsyncStorage.setItem('sessions', JSON.stringify(updated));
-  } catch (e) {
-    console.error('Error saving session', e);
-  }
-};
-
-export const getSessions = async (): Promise<Record<string, Session>> => {
-  try {
-    const data = await AsyncStorage.getItem('sessions');
-    return data ? JSON.parse(data) : {};
-  } catch (e) {
-    return {};
-  }
-};
-
-export const saveCheckIn = async (checkIn: CheckIn) => {
-  try {
-    const existing = await getCheckIns();
-    const updated = { ...existing, [checkIn.date]: checkIn };
-    await AsyncStorage.setItem('checkins', JSON.stringify(updated));
-  } catch (e) {
-    console.error('Error saving checkin', e);
-  }
-};
-
-export const getCheckIns = async (): Promise<Record<string, CheckIn>> => {
-  try {
-    const data = await AsyncStorage.getItem('checkins');
-    return data ? JSON.parse(data) : {};
-  } catch (e) {
-    return {};
-  }
-};
-
-export const saveProfile = async (profile: UserProfile) => {
-  try {
-    await AsyncStorage.setItem('profile', JSON.stringify(profile));
-  } catch (e) {
-    console.error('Error saving profile', e);
-  }
-};
-
-export const getProfile = async (): Promise<UserProfile | null> => {
-  try {
-    const data = await AsyncStorage.getItem('profile');
-    return data ? JSON.parse(data) : null;
-  } catch (e) {
-    return null;
-  }
-};
-
-export const getTodayDate = () => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  name?: string;
 };
 
 export type BodyPartCounts = Record<string, number>;
@@ -94,31 +33,186 @@ export type BodyAlert = {
   suggestion: string;
 };
 
+// ─── SecureStore helpers (handles >2KB by chunking) ──────────────────────────
+
+const CHUNK_SIZE = 1800;
+
+const secureSetLarge = async (key: string, value: string): Promise<void> => {
+  try {
+    const chunks = Math.ceil(value.length / CHUNK_SIZE);
+    await SecureStore.setItemAsync(`${key}__count`, String(chunks));
+    for (let i = 0; i < chunks; i++) {
+      await SecureStore.setItemAsync(`${key}__${i}`, value.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
+    }
+  } catch (e) {
+    console.error(`secureSetLarge error [${key}]`, e);
+  }
+};
+
+const secureGetLarge = async (key: string): Promise<string | null> => {
+  try {
+    const countStr = await SecureStore.getItemAsync(`${key}__count`);
+    if (!countStr) return null;
+    const count = parseInt(countStr);
+    let result = '';
+    for (let i = 0; i < count; i++) {
+      const chunk = await SecureStore.getItemAsync(`${key}__${i}`);
+      result += chunk || '';
+    }
+    return result;
+  } catch {
+    return null;
+  }
+};
+
+const secureDeleteLarge = async (key: string): Promise<void> => {
+  try {
+    const countStr = await SecureStore.getItemAsync(`${key}__count`);
+    if (!countStr) return;
+    const count = parseInt(countStr);
+    await SecureStore.deleteItemAsync(`${key}__count`);
+    for (let i = 0; i < count; i++) {
+      await SecureStore.deleteItemAsync(`${key}__${i}`);
+    }
+  } catch {}
+};
+
+const secureGet = async (key: string): Promise<string | null> => {
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch {
+    return null;
+  }
+};
+
+const secureSet = async (key: string, value: string): Promise<void> => {
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch (e) {
+    console.error(`SecureStore set error [${key}]`, e);
+  }
+};
+
+const secureDelete = async (key: string): Promise<void> => {
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch {}
+};
+
+// ─── Profile (small — direct SecureStore) ────────────────────────────────────
+
+export const saveProfile = async (profile: UserProfile): Promise<void> => {
+  await secureSet('profile', JSON.stringify(profile));
+};
+
+export const getProfile = async (): Promise<UserProfile | null> => {
+  const data = await secureGet('profile');
+  return data ? JSON.parse(data) : null;
+};
+
+// ─── Sessions (large — chunked SecureStore) ───────────────────────────────────
+
+export const saveSession = async (session: Session): Promise<void> => {
+  const existing = await getSessions();
+  const updated = { ...existing, [session.date]: session };
+  await secureSetLarge('sessions', JSON.stringify(updated));
+};
+
+export const getSessions = async (): Promise<Record<string, Session>> => {
+  const data = await secureGetLarge('sessions');
+  return data ? JSON.parse(data) : {};
+};
+
+export const deleteSessionsByKey = async (dateKey: string): Promise<void> => {
+  const existing = await getSessions();
+  delete existing[dateKey];
+  await secureSetLarge('sessions', JSON.stringify(existing));
+};
+
+// ─── Check-ins (large — chunked SecureStore) ──────────────────────────────────
+
+export const saveCheckIn = async (checkIn: CheckIn): Promise<void> => {
+  const existing = await getCheckIns();
+  const updated = { ...existing, [checkIn.date]: checkIn };
+  await secureSetLarge('checkins', JSON.stringify(updated));
+};
+
+export const getCheckIns = async (): Promise<Record<string, CheckIn>> => {
+  const data = await secureGetLarge('checkins');
+  return data ? JSON.parse(data) : {};
+};
+
+export const deleteCheckInByKey = async (dateKey: string): Promise<void> => {
+  const existing = await getCheckIns();
+  delete existing[dateKey];
+  await secureSetLarge('checkins', JSON.stringify(existing));
+};
+
+// ─── Goal Date (small — direct SecureStore) ───────────────────────────────────
+
+export const saveGoalDate = async (dateStr: string): Promise<void> => {
+  await secureSet('goalDate', dateStr);
+};
+
+export const getGoalDate = async (): Promise<string | null> => {
+  return await secureGet('goalDate');
+};
+
+export const deleteGoalDate = async (): Promise<void> => {
+  await secureDelete('goalDate');
+};
+
+// ─── Clear all ────────────────────────────────────────────────────────────────
+
+export const clearAllData = async (): Promise<void> => {
+  await Promise.all([
+    secureDelete('profile'),
+    secureDelete('goalDate'),
+    secureDeleteLarge('sessions'),
+    secureDeleteLarge('checkins'),
+  ]);
+};
+
+// ─── Date helper ──────────────────────────────────────────────────────────────
+
+export const getTodayDate = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// ─── Injury tracking ──────────────────────────────────────────────────────────
+
 const ID_TO_PART: Record<string, { id: string; name: string }> = {
-  crimps: { id: 'finger', name: 'Fingers / A2 Pulley' },
-  pockets: { id: 'finger', name: 'Fingers / A2 Pulley' },
-  pinches: { id: 'thumb', name: 'Thumb' },
-  slopers: { id: 'shoulder', name: 'Shoulder' },
-  jugs: { id: 'low', name: 'Low risk / General' },
-  dynos: { id: 'shoulder', name: 'Shoulder' },
-  heelhooks: { id: 'knee', name: 'Knee' },
-  toehooks: { id: 'ankle', name: 'Ankle' },
-  compression: { id: 'hip', name: 'Hip' },
-  mantles: { id: 'wrist', name: 'Wrist' },
+  crimps:      { id: 'finger',   name: 'Fingers / A2 Pulley' },
+  pockets:     { id: 'finger',   name: 'Fingers / A2 Pulley' },
+  pinches:     { id: 'thumb',    name: 'Thumb' },
+  slopers:     { id: 'shoulder', name: 'Shoulder' },
+  jugs:        { id: 'low',      name: 'Low risk / General' },
+  dynos:       { id: 'shoulder', name: 'Shoulder' },
+  heelhooks:   { id: 'knee',     name: 'Knee' },
+  toehooks:    { id: 'ankle',    name: 'Ankle' },
+  compression: { id: 'hip',      name: 'Hip' },
+  mantles:     { id: 'wrist',    name: 'Wrist' },
 };
 
 const DEFAULT_THRESHOLDS: Record<string, number> = {
-  finger: 6,
+  finger:   6,
   shoulder: 8,
-  thumb: 6,
-  knee: 8,
-  ankle: 8,
-  hip: 8,
-  wrist: 8,
-  low: 12,
+  thumb:    6,
+  knee:     8,
+  ankle:    8,
+  hip:      8,
+  wrist:    8,
+  low:      12,
 };
 
-export const computeBodyLoads = (sessions: Record<string, Session>, windowDays = 14): BodyPartCounts => {
+export const computeBodyLoads = (
+  sessions: Record<string, Session>,
+  windowDays = 14
+): BodyPartCounts => {
   const counts: BodyPartCounts = {};
   const today = new Date();
 
@@ -128,13 +222,11 @@ export const computeBodyLoads = (sessions: Record<string, Session>, windowDays =
     if (diffDays < 0 || diffDays >= windowDays) return;
 
     sess.holdTypes?.forEach((hid) => {
-      const map = ID_TO_PART[hid];
-      const key = map ? map.id : 'low';
+      const key = ID_TO_PART[hid]?.id ?? 'low';
       counts[key] = (counts[key] || 0) + 1;
     });
     sess.movementTypes?.forEach((mid) => {
-      const map = ID_TO_PART[mid];
-      const key = map ? map.id : 'low';
+      const key = ID_TO_PART[mid]?.id ?? 'low';
       counts[key] = (counts[key] || 0) + 1;
     });
   });

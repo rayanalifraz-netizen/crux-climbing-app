@@ -1,26 +1,46 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { getCheckIns, getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 const today = getTodayDate();
 
+// ─── Palette ──────────────────────────────────────────────────────────────────
+const C = {
+  bg:         '#1a1510',
+  surface:    '#221e18',
+  surfaceAlt: '#2a2420',
+  border:     '#36302a',
+  chalk:      '#f0ebe3',
+  sand:       '#a89880',
+  dust:       '#6a5e52',
+  terra:      '#c4734a',
+  terraLight: '#d4896a',
+  terraBg:    '#2a1e16',
+  amber:      '#d4943a',
+  amberBg:    '#261e10',
+  red:        '#c44a3a',
+  redBg:      '#241410',
+  green:      '#6a9a5a',
+  greenBg:    '#16201a',
+};
+
 const HOLD_TYPES = [
-  { id: 'crimps', label: 'Crimps', risk: 'A2 Pulley', icon: 'hand-right-outline' },
-  { id: 'slopers', label: 'Slopers', risk: 'Shoulder', icon: 'radio-button-off-outline' },
-  { id: 'pinches', label: 'Pinches', risk: 'Thumb', icon: 'git-merge-outline' },
-  { id: 'pockets', label: 'Pockets', risk: 'Finger Tendons', icon: 'ellipse-outline' },
-  { id: 'jugs', label: 'Jugs', risk: 'Low Risk', icon: 'thumbs-up-outline' },
+  { id: 'crimps', label: 'Crimps', risk: 'A2 Pulley' },
+  { id: 'slopers', label: 'Slopers', risk: 'Shoulder' },
+  { id: 'pinches', label: 'Pinches', risk: 'Thumb' },
+  { id: 'pockets', label: 'Pockets', risk: 'Finger Tendons' },
+  { id: 'jugs', label: 'Jugs', risk: 'Low Risk' },
 ];
 
 const MOVEMENT_TYPES = [
-  { id: 'dynos', label: 'Dynos', risk: 'Shoulder', icon: 'arrow-up-outline' },
-  { id: 'heelhooks', label: 'Heel Hooks', risk: 'Knee', icon: 'return-down-back-outline' },
-  { id: 'toehooks', label: 'Toe Hooks', risk: 'Ankle', icon: 'footsteps-outline' },
-  { id: 'compression', label: 'Compression', risk: 'Hip', icon: 'contract-outline' },
-  { id: 'mantles', label: 'Mantles', risk: 'Wrist', icon: 'trending-up-outline' },
+  { id: 'dynos', label: 'Dynos', risk: 'Shoulder' },
+  { id: 'heelhooks', label: 'Heel Hooks', risk: 'Knee' },
+  { id: 'toehooks', label: 'Toe Hooks', risk: 'Ankle' },
+  { id: 'compression', label: 'Compression', risk: 'Hip' },
+  { id: 'mantles', label: 'Mantles', risk: 'Wrist' },
 ];
 
 const HOLD_INJURY_WEIGHT = {
@@ -60,9 +80,11 @@ export default function SessionScreen() {
   const [gradeCounts, setGradeCounts] = useState({});
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
+  const [notes, setNotes] = useState('');
   const [maxGrade, setMaxGrade] = useState('');
   const [alreadySaved, setAlreadySaved] = useState(false);
   const [savedSession, setSavedSession] = useState(null);
+  const [isRestDay, setIsRestDay] = useState(false);
 
   useEffect(() => { loadProfile(); checkTodaySession(); }, []);
   useFocusEffect(useCallback(() => { loadProfile(); checkTodaySession(); }, []));
@@ -73,10 +95,12 @@ export default function SessionScreen() {
   };
 
   const checkTodaySession = async () => {
-    const sessions = await getSessions();
+    const [sessions, checkIns] = await Promise.all([getSessions(), getCheckIns()]);
     const todaySession = sessions[today];
+    const todayCheckIn = checkIns[today];
     setAlreadySaved(!!todaySession);
     setSavedSession(todaySession || null);
+    setIsRestDay(todayCheckIn?.isRestDay || false);
   };
 
   const incrementGrade = (grade) =>
@@ -96,12 +120,13 @@ export default function SessionScreen() {
     setMovementTypes(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
 
   const handleSave = async () => {
-    await saveSession({ date: today, gradeCounts, holdTypes, movementTypes, res });
+    await saveSession({ date: today, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim() });
     setAlreadySaved(true);
-    setSavedSession({ gradeCounts, holdTypes, movementTypes, res });
+    setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim() });
     setGradeCounts({});
     setHoldTypes([]);
     setMovementTypes([]);
+    setNotes('');
   };
 
   const hasGrades = Object.keys(gradeCounts).length > 0;
@@ -109,15 +134,15 @@ export default function SessionScreen() {
   const res = maxGrade ? calculateRES(gradeCounts, maxGrade, holdTypes) : 0;
 
   const getResColor = (val) => {
-    if (val <= 40) return '#00b4d8';
-    if (val <= 70) return '#f4a261';
-    return '#e63946';
+    if (val <= 40) return C.terra;
+    if (val <= 70) return C.amber;
+    return C.red;
   };
 
   const getResBg = (val) => {
-    if (val <= 40) return '#001e2e';
-    if (val <= 70) return '#2a1800';
-    return '#2a0000';
+    if (val <= 40) return C.terraBg;
+    if (val <= 70) return C.amberBg;
+    return C.redBg;
   };
 
   const getResLabel = (val) => {
@@ -132,31 +157,52 @@ export default function SessionScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </Text>
             <Text style={styles.title}>Log Session</Text>
+            <View style={styles.headerRule} />
           </View>
           {alreadySaved && (
             <View style={styles.savedBadge}>
-              <Ionicons name="checkmark" size={14} color="#00b4d8" />
+              <Ionicons name="checkmark" size={12} color={C.terra} />
               <Text style={styles.savedBadgeText}>Logged</Text>
+            </View>
+          )}
+          {isRestDay && !alreadySaved && (
+            <View style={styles.restBadge}>
+              <Ionicons name="bed-outline" size={12} color={C.green} />
+              <Text style={styles.restBadgeText}>Rest Day</Text>
             </View>
           )}
         </View>
 
+        {/* Rest day block */}
+        {isRestDay && !alreadySaved && (
+          <View style={styles.restDayBlock}>
+            <View style={styles.restDayBlockIcon}>
+              <Ionicons name="bed-outline" size={26} color={C.green} />
+            </View>
+            <Text style={styles.restDayBlockEyebrow}>Today</Text>
+            <Text style={styles.restDayBlockTitle}>Rest Day</Text>
+            <Text style={styles.restDayBlockText}>
+              You logged a rest day — no session can be recorded. Clear your check-in from Settings to override.
+            </Text>
+          </View>
+        )}
+
         {/* Already saved state */}
         {alreadySaved && savedSession && (
           <View style={styles.savedCard}>
+            <Text style={styles.savedCardEyebrow}>Today's Session</Text>
             <View style={styles.savedCardTop}>
-              <View>
-                <Text style={styles.savedCardLabel}>Today's Session</Text>
-                <Text style={styles.savedCardSub}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.savedCardAttempts}>
                   {Object.values(savedSession.gradeCounts || {}).reduce((a, b) => a + b, 0)} attempts logged
                 </Text>
               </View>
-              <View style={[styles.resBadge, { backgroundColor: getResBg(savedSession.res), borderColor: getResColor(savedSession.res) + '60' }]}>
+              <View style={[styles.resBadge, { backgroundColor: getResBg(savedSession.res), borderColor: getResColor(savedSession.res) + '50' }]}>
                 <Text style={[styles.resBadgeScore, { color: getResColor(savedSession.res) }]}>{savedSession.res}</Text>
                 <Text style={[styles.resBadgeLabel, { color: getResColor(savedSession.res) + 'aa' }]}>RES</Text>
               </View>
@@ -171,29 +217,32 @@ export default function SessionScreen() {
                 ))}
               </View>
             )}
-            <Text style={styles.savedHint}>Clear from Settings to re-log today</Text>
+            {savedSession.notes ? (
+              <View style={styles.savedNotes}>
+                <Ionicons name="document-text-outline" size={12} color={C.dust} />
+                <Text style={styles.savedNotesText}>{savedSession.notes}</Text>
+              </View>
+            ) : null}
+            <Text style={styles.savedHint}>— Clear from Settings to re-log today —</Text>
           </View>
         )}
 
-        {!alreadySaved && (
+        {/* Main form */}
+        {!alreadySaved && !isRestDay && (
           <>
-            {/* No profile warning */}
             {!maxGrade && (
               <View style={styles.warningBanner}>
-                <Ionicons name="information-circle-outline" size={18} color="#f4a261" />
-                <Text style={styles.warningText}>Set your climbing level in the Profile tab for accurate RES</Text>
+                <Ionicons name="information-circle-outline" size={16} color={C.amber} />
+                <Text style={styles.warningText}>Set your climbing level in Profile for accurate RES</Text>
               </View>
             )}
 
             {/* Grade Grid */}
             <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="trending-up-outline" size={16} color="#888" />
-                <Text style={styles.sectionTitle}>Grades Climbed</Text>
+              <View style={styles.sectionTop}>
+                <Text style={styles.sectionEyebrow}>Grades Climbed</Text>
                 {hasGrades && (
-                  <View style={styles.attemptsBadge}>
-                    <Text style={styles.attemptsBadgeText}>{totalAttempts} attempts</Text>
-                  </View>
+                  <Text style={styles.attemptsLabel}>{totalAttempts} attempts</Text>
                 )}
               </View>
               <Text style={styles.sectionHint}>Tap + to log attempts at each grade</Text>
@@ -210,9 +259,7 @@ export default function SessionScreen() {
                             <Text style={styles.counterBtnText}>−</Text>
                           </TouchableOpacity>
                         )}
-                        {isActive && (
-                          <Text style={styles.countText}>{count}</Text>
-                        )}
+                        {isActive && <Text style={styles.countText}>{count}</Text>}
                         <TouchableOpacity
                           onPress={() => incrementGrade(grade)}
                           style={[styles.counterBtn, isActive && styles.counterBtnActive]}
@@ -229,12 +276,10 @@ export default function SessionScreen() {
             {/* Live RES */}
             {hasGrades && (
               <View style={[styles.resCard, { backgroundColor: getResBg(res), borderColor: getResColor(res) + '40' }]}>
+                <Text style={styles.resEyebrow}>Relative Effort Score</Text>
                 <View style={styles.resTop}>
-                  <View>
-                    <Text style={styles.resCardLabel}>Relative Effort Score</Text>
-                    <Text style={styles.resCardHint}>{getResLabel(res)}</Text>
-                  </View>
-                  <View style={[styles.resCircle, { borderColor: getResColor(res) + '60' }]}>
+                  <Text style={[styles.resVerdict, { color: getResColor(res) }]}>{getResLabel(res)}</Text>
+                  <View style={[styles.resCircle, { borderColor: getResColor(res) + '50' }]}>
                     <Text style={[styles.resScore, { color: getResColor(res) }]}>{res}</Text>
                   </View>
                 </View>
@@ -246,10 +291,9 @@ export default function SessionScreen() {
 
             {/* Hold Types */}
             <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="hand-right-outline" size={16} color="#888" />
-                <Text style={styles.sectionTitle}>Hold Types</Text>
-                <Text style={styles.sectionAffects}>affects RES</Text>
+              <View style={styles.sectionTop}>
+                <Text style={styles.sectionEyebrow}>Hold Types</Text>
+                <Text style={styles.sectionTag}>affects RES</Text>
               </View>
               <View style={styles.tagGrid}>
                 {HOLD_TYPES.map((hold) => {
@@ -270,10 +314,9 @@ export default function SessionScreen() {
 
             {/* Movement Types */}
             <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="body-outline" size={16} color="#888" />
-                <Text style={styles.sectionTitle}>Movement Types</Text>
-                <Text style={styles.sectionAffects}>injury tracking</Text>
+              <View style={styles.sectionTop}>
+                <Text style={styles.sectionEyebrow}>Movement Types</Text>
+                <Text style={styles.sectionTag}>injury tracking</Text>
               </View>
               <View style={styles.tagGrid}>
                 {MOVEMENT_TYPES.map((move) => {
@@ -292,10 +335,31 @@ export default function SessionScreen() {
               </View>
             </View>
 
+            {/* Session Notes */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionTop}>
+                <Text style={styles.sectionEyebrow}>Session Notes</Text>
+                <Text style={styles.sectionTag}>optional</Text>
+              </View>
+              <TextInput
+                style={styles.notesInput}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="How did it go? Any wins or tweaks to note..."
+                placeholderTextColor={C.dust}
+                multiline
+                numberOfLines={3}
+                maxLength={300}
+                textAlignVertical="top"
+              />
+              {notes.length > 0 && (
+                <Text style={styles.notesCount}>{notes.length}/300</Text>
+              )}
+            </View>
+
             {/* Save Button */}
             {hasGrades && (
               <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
                 <Text style={styles.saveText}>Save Session</Text>
               </TouchableOpacity>
             )}
@@ -307,70 +371,85 @@ export default function SessionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0d0d0f' },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: C.bg },
+  scrollContent: { padding: 20, paddingBottom: 48 },
 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 16, marginBottom: 24 },
-  greeting: { fontSize: 13, color: '#555', fontWeight: '500', letterSpacing: 0.3, marginBottom: 4 },
-  title: { fontSize: 30, fontWeight: '800', color: '#ffffff', letterSpacing: -0.5 },
-  savedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#001e2e', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#003d4d' },
-  savedBadgeText: { color: '#00b4d8', fontSize: 12, fontWeight: '700' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 16, marginBottom: 24 },
+  greeting: { fontSize: 12, color: C.dust, fontWeight: '600', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
+  title: { fontSize: 36, fontWeight: '800', color: C.chalk, letterSpacing: -1, lineHeight: 40 },
+  headerRule: { height: 1, backgroundColor: C.border, marginTop: 14 },
+  savedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.terraBg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: C.terra + '40', marginTop: 8 },
+  savedBadgeText: { color: C.terra, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  restBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.greenBg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: C.green + '40', marginTop: 8 },
+  restBadgeText: { color: C.green, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
 
-  savedCard: { backgroundColor: '#141416', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#1e1e22' },
+  restDayBlock: { backgroundColor: C.greenBg, borderRadius: 14, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: C.green + '30', marginBottom: 12, gap: 6 },
+  restDayBlockIcon: { width: 52, height: 52, borderRadius: 14, backgroundColor: C.green + '20', justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+  restDayBlockEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 2, textTransform: 'uppercase' },
+  restDayBlockTitle: { color: C.green, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  restDayBlockText: { color: C.dust, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 4 },
+
+  savedCard: { backgroundColor: C.surface, borderRadius: 14, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: C.border },
+  savedCardEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 },
   savedCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  savedCardLabel: { color: '#ffffff', fontSize: 16, fontWeight: '700', marginBottom: 2 },
-  savedCardSub: { color: '#444', fontSize: 13 },
-  resBadge: { alignItems: 'center', borderRadius: 14, padding: 12, borderWidth: 1, minWidth: 56 },
+  savedCardAttempts: { color: C.sand, fontSize: 14 },
+  resBadge: { alignItems: 'center', borderRadius: 12, padding: 12, borderWidth: 1, minWidth: 56 },
   resBadgeScore: { fontSize: 22, fontWeight: '800' },
-  resBadgeLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  savedGrades: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  savedGradeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1e1e22', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  savedGradeText: { color: '#00b4d8', fontSize: 13, fontWeight: '700' },
-  savedGradeCount: { color: '#444', fontSize: 12 },
-  savedHint: { color: '#333', fontSize: 11, textAlign: 'center' },
+  resBadgeLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
+  savedGrades: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  savedGradeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.surfaceAlt, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: C.border },
+  savedGradeText: { color: C.terra, fontSize: 12, fontWeight: '700' },
+  savedGradeCount: { color: C.dust, fontSize: 11 },
+  savedNotes: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: C.surfaceAlt, borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: C.border },
+  savedNotesText: { color: C.sand, fontSize: 13, flex: 1, lineHeight: 18 },
+  savedHint: { color: C.dust, fontSize: 10, textAlign: 'center', letterSpacing: 0.5 },
 
-  warningBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1e1400', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#3a2800' },
-  warningText: { color: '#7a5a20', fontSize: 13, flex: 1 },
+  warningBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.amberBg, borderRadius: 10, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.amber + '30' },
+  warningText: { color: C.amber + 'cc', fontSize: 13, flex: 1 },
 
-  sectionCard: { backgroundColor: '#141416', borderRadius: 20, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: '#1e1e22' },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  sectionTitle: { color: '#888', fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, flex: 1 },
-  sectionHint: { color: '#444', fontSize: 12, marginBottom: 14 },
-  sectionAffects: { color: '#333', fontSize: 11, fontWeight: '600' },
-  attemptsBadge: { backgroundColor: '#1e1e22', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-  attemptsBadgeText: { color: '#555', fontSize: 11, fontWeight: '600' },
+  sectionCard: { backgroundColor: C.surface, borderRadius: 14, padding: 18, marginBottom: 10, borderWidth: 1, borderColor: C.border },
+  sectionTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  sectionEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 2, textTransform: 'uppercase' },
+  sectionHint: { color: C.dust, fontSize: 12, marginBottom: 14, marginTop: 4 },
+  sectionTag: { fontSize: 9, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', opacity: 0.6 },
+  attemptsLabel: { fontSize: 10, fontWeight: '700', color: C.terra, letterSpacing: 1 },
 
-  gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gradeCard: { width: '22%', backgroundColor: '#1e1e22', borderRadius: 12, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#2a2a2e' },
-  gradeCardActive: { borderColor: '#00b4d8', backgroundColor: '#001a24' },
-  gradeLabel: { color: '#555', fontSize: 14, fontWeight: '700', marginBottom: 6 },
-  gradeLabelActive: { color: '#00b4d8' },
-  counter: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  counterBtn: { width: 22, height: 22, backgroundColor: '#2a2a2e', borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-  counterBtnActive: { backgroundColor: '#003a4d' },
-  counterBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '800', lineHeight: 18 },
-  countText: { color: '#ffffff', fontSize: 13, fontWeight: '700', minWidth: 14, textAlign: 'center' },
+  gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
+  gradeCard: { width: '22%', backgroundColor: C.surfaceAlt, borderRadius: 10, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  gradeCardActive: { borderColor: C.terra + '80', backgroundColor: C.terraBg },
+  gradeLabel: { color: C.dust, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  gradeLabelActive: { color: C.terra },
+  counter: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  counterBtn: { width: 20, height: 20, backgroundColor: C.border, borderRadius: 5, justifyContent: 'center', alignItems: 'center' },
+  counterBtnActive: { backgroundColor: C.terraDark },
+  counterBtnText: { color: C.chalk, fontSize: 13, fontWeight: '800', lineHeight: 17 },
+  countText: { color: C.chalk, fontSize: 12, fontWeight: '700', minWidth: 12, textAlign: 'center' },
 
-  resCard: { borderRadius: 20, padding: 20, marginBottom: 12, borderWidth: 1 },
+  resCard: { borderRadius: 14, padding: 18, marginBottom: 10, borderWidth: 1 },
+  resEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 },
   resTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  resCardLabel: { color: '#666', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  resCardHint: { color: '#888', fontSize: 13, fontWeight: '500' },
-  resCircle: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  resScore: { fontSize: 22, fontWeight: '800' },
-  resBarTrack: { height: 4, backgroundColor: '#ffffff10', borderRadius: 2, overflow: 'hidden' },
-  resBarFill: { height: 4, borderRadius: 2 },
+  resVerdict: { fontSize: 18, fontWeight: '700', flex: 1, lineHeight: 22 },
+  resCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  resScore: { fontSize: 20, fontWeight: '800' },
+  resBarTrack: { height: 2, backgroundColor: C.border, borderRadius: 1, overflow: 'hidden' },
+  resBarFill: { height: 2, borderRadius: 1 },
 
-  tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tagCard: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#1e1e22', borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2e' },
-  tagCardSelected: { backgroundColor: '#001a24', borderColor: '#00b4d8' },
-  tagCardMovement: { backgroundColor: '#1a1000', borderColor: '#f4a261' },
-  tagLabel: { color: '#666', fontSize: 14, fontWeight: '600' },
-  tagLabelSelected: { color: '#00b4d8' },
-  tagLabelMovement: { color: '#f4a261' },
-  tagRisk: { color: '#333', fontSize: 11, marginTop: 2 },
-  tagRiskSelected: { color: '#004d66' },
-  tagRiskMovement: { color: '#6a4000' },
+  tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
+  tagCard: { paddingHorizontal: 14, paddingVertical: 9, backgroundColor: C.surfaceAlt, borderRadius: 8, borderWidth: 1, borderColor: C.border },
+  tagCardSelected: { backgroundColor: C.terraBg, borderColor: C.terra + '60' },
+  tagCardMovement: { backgroundColor: C.amberBg, borderColor: C.amber + '50' },
+  tagLabel: { color: C.dust, fontSize: 13, fontWeight: '600' },
+  tagLabelSelected: { color: C.terra },
+  tagLabelMovement: { color: C.amber },
+  tagRisk: { color: C.dust, fontSize: 10, marginTop: 2, opacity: 0.6 },
+  tagRiskSelected: { color: C.terraDark, opacity: 1 },
+  tagRiskMovement: { color: C.amber, opacity: 0.6 },
 
-  saveButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#00b4d8', padding: 18, borderRadius: 16, marginTop: 8 },
-  saveText: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
+  notesInput: { backgroundColor: C.surfaceAlt, borderRadius: 10, padding: 14, color: C.chalk, fontSize: 14, lineHeight: 20, minHeight: 80, borderWidth: 1, borderColor: C.border, marginTop: 10 },
+  notesCount: { color: C.dust, fontSize: 10, textAlign: 'right', marginTop: 6 },
+
+  saveButton: { backgroundColor: C.terra, padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  saveText: { color: C.chalk, fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
 });
+
+const C_terraDark = '#8a4a2a';
