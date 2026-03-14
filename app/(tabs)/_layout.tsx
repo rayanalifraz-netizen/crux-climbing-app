@@ -10,10 +10,10 @@ export default function TabLayout() {
           backgroundColor: '#f5f0e8',
           borderTopColor: '#e0d8c8',
           borderTopWidth: 1,
-  },
-  tabBarActiveTintColor: '#c4734a',
-  tabBarInactiveTintColor: '#a89880',
-}}
+        },
+        tabBarActiveTintColor: '#c4734a',
+        tabBarInactiveTintColor: '#a89880',
+      }}
     >
       <Tabs.Screen
         name="index"
@@ -48,6 +48,15 @@ export default function TabLayout() {
           title: 'Calendar',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="heatmap"
+        options={{
+          title: 'Body',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="fitness-outline" size={size} color={color} />
           ),
         }}
       />
