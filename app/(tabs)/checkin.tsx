@@ -71,6 +71,9 @@ const FINGER_ZONES = [
   { id: 'thumb', label: 'Thumb' },
 ];
 
+const SIDES = ['L', 'R'] as const;
+type Side = typeof SIDES[number];
+
 const PAIN_AREAS = [
   { id: 'shoulder', label: 'Shoulder' },
   { id: 'elbow', label: 'Elbow' },
@@ -301,21 +304,27 @@ export default function CheckInScreen() {
             <WindowBox label="Finger Condition">
               <View style={styles.sectionInner}>
                 <Text style={styles.sectionHint}>Tap any fingers that feel sore or tweaked</Text>
-                <View style={styles.chipRow}>
-                  {FINGER_ZONES.map((finger) => {
-                    const selected = affectedFingers.includes(finger.id);
-                    return (
-                      <TouchableOpacity
-                        key={finger.id}
-                        style={[styles.chip, selected && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
-                        onPress={() => toggleFinger(finger.id)}
-                      >
-                        <Text style={[styles.chipText, selected && { color: C.red }]}>
-                          {finger.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <View style={styles.fingerTable}>
+                  {FINGER_ZONES.map((finger) => (
+                    <View key={finger.id} style={styles.fingerRow}>
+                      <Text style={styles.fingerLabel}>{finger.label}</Text>
+                      <View style={styles.fingerSides}>
+                        {SIDES.map((side) => {
+                          const id = `${side}_${finger.id}`;
+                          const selected = affectedFingers.includes(id);
+                          return (
+                            <TouchableOpacity
+                              key={side}
+                              style={[styles.sideChip, selected && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
+                              onPress={() => toggleFinger(id)}
+                            >
+                              <Text style={[styles.sideChipText, selected && { color: C.red }]}>{side}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
                 </View>
               </View>
             </WindowBox>
@@ -445,6 +454,13 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 4, borderWidth: 1, borderColor: C.borderLight },
   chipText: { color: C.sand, fontSize: 12, fontWeight: '700' },
+
+  fingerTable: { gap: 8 },
+  fingerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  fingerLabel: { color: C.inkLight, fontSize: 13, fontWeight: '700', width: 60 },
+  fingerSides: { flexDirection: 'row', gap: 8, flex: 1 },
+  sideChip: { flex: 1, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 4, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center' },
+  sideChipText: { color: C.sand, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
 
   drsInner: { padding: 18, paddingTop: 22 },
   drsTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
