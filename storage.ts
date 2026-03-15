@@ -21,6 +21,7 @@ export type UserProfile = {
   maxGrade: string;
   projectGrade: string;
   name?: string;
+  sendsToUnlock?: number;
 };
 
 export type BodyPartCounts = Record<string, number>;

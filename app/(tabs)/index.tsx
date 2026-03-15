@@ -156,11 +156,45 @@ function GradeModal({ visible, onClose, onSave }) {
   );
 }
 
+const SENDS_OPTIONS = [3, 5, 8, 10, 12, 15, 20, 25, 30];
+
+function SendsModal({ visible, current, onClose, onSave }) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.container}>
+          <View style={modalStyles.titleBar}>
+            <Text style={modalStyles.titleBarText}>Sends to Unlock</Text>
+            <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
+              <Text style={modalStyles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={modalStyles.body}>
+            <Text style={modalStyles.subtitle}>How many sends of your project grade unlock the next level?</Text>
+            <View style={modalStyles.gradeGrid}>
+              {SENDS_OPTIONS.map((n) => (
+                <TouchableOpacity
+                  key={n}
+                  style={[modalStyles.gradeButton, current === n && modalStyles.selectedButton]}
+                  onPress={() => onSave(n)}
+                >
+                  <Text style={[modalStyles.gradeText, current === n && modalStyles.selectedText]}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [totalSessions, setTotalSessions] = useState(0);
   const [progressCount, setProgressCount] = useState(0);
-  const [progressMax] = useState(10);
+  const [progressMax, setProgressMax] = useState(10);
+  const [showSendsModal, setShowSendsModal] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
   const [highIntensityDays, setHighIntensityDays] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
@@ -175,6 +209,7 @@ export default function ProfileScreen() {
     ]);
     if (!prof) { setProfile(null); return; }
     setProfile(prof);
+    setProgressMax(prof.sendsToUnlock ?? 10);
     setTotalSessions(Object.keys(sessions).length);
     setHighIntensityDays(getConsecutiveHighIntensityDays(sessions));
     setWeeklySummary(getWeeklySummary(sessions, checkIns));
@@ -188,7 +223,8 @@ export default function ProfileScreen() {
       });
     }
     setProgressCount(count);
-    const goalReached = count >= progressMax;
+    const target = prof.sendsToUnlock ?? 10;
+    const goalReached = count >= target;
     setShowCongrats(goalReached);
 
     if (goalReached && prof.projectGrade && prof.maxGrade) {
@@ -211,6 +247,12 @@ export default function ProfileScreen() {
     await loadData();
   };
 
+  const handleSendsChange = async (n) => {
+    await saveProfile({ ...profile, sendsToUnlock: n });
+    setShowSendsModal(false);
+    await loadData();
+  };
+
   const getAvgResColor = (res) => {
     if (!res) return C.sand;
     if (res <= 40) return C.terra;
@@ -227,6 +269,7 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         <GradeModal visible={modalVisible} onClose={() => setModalVisible(false)} onSave={handleGradeSave} />
+        <SendsModal visible={showSendsModal} current={progressMax} onClose={() => setShowSendsModal(false)} onSave={handleSendsChange} />
 
         {/* Header */}
         <View style={styles.header}>
@@ -322,6 +365,9 @@ export default function ProfileScreen() {
                   {showCongrats ? 'Grade updated — new goal set' : `${progressMax - progressCount} more to unlock ${profile.projectGrade}`}
                 </Text>
               </View>
+              <TouchableOpacity style={styles.sendsTargetBtn} onPress={() => setShowSendsModal(true)}>
+                <Text style={styles.sendsTargetText}>Target: {progressMax} sends · change →</Text>
+              </TouchableOpacity>
             </WindowBox>
 
             {/* Weekly */}
@@ -405,6 +451,8 @@ const styles = StyleSheet.create({
   progressTrack: { height: 3, backgroundColor: C.borderLight, borderRadius: 2, marginBottom: 10, overflow: 'hidden' },
   progressFill: { height: 3, backgroundColor: C.terra, borderRadius: 2 },
   progressHint: { color: C.sand, fontSize: 11 },
+  sendsTargetBtn: { borderTopWidth: 1, borderTopColor: C.terraBorder + '40', paddingHorizontal: 18, paddingVertical: 10 },
+  sendsTargetText: { color: C.terraDark || C.terra, fontSize: 11, fontWeight: '600' },
 
   weeklyInner: { flexDirection: 'row', padding: 16 },
   weeklyCellWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
