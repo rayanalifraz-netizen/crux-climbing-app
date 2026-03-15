@@ -198,10 +198,23 @@ const ID_TO_PART: Record<string, { id: string; name: string }> = {
   mantles:     { id: 'wrist',    name: 'Wrist' },
 };
 
+const PART_NAMES: Record<string, string> = {
+  finger:   'Fingers / A2 Pulley',
+  thumb:    'Thumb',
+  shoulder: 'Shoulder',
+  elbow:    'Elbow',
+  wrist:    'Wrist',
+  knee:     'Knee',
+  hip:      'Hip',
+  ankle:    'Ankle',
+  low:      'Low risk / General',
+};
+
 const DEFAULT_THRESHOLDS: Record<string, number> = {
   finger:   6,
   shoulder: 8,
   thumb:    6,
+  elbow:    4,
   knee:     8,
   ankle:    8,
   hip:      8,
@@ -209,18 +222,29 @@ const DEFAULT_THRESHOLDS: Record<string, number> = {
   low:      12,
 };
 
+const PAIN_AREA_TO_PART: Record<string, string> = {
+  shoulder: 'shoulder',
+  elbow:    'elbow',
+  wrist:    'wrist',
+  knee:     'knee',
+  hip:      'hip',
+};
+
 export const computeBodyLoads = (
   sessions: Record<string, Session>,
-  windowDays = 14
+  windowDays = 14,
+  checkIns: Record<string, CheckIn> = {}
 ): BodyPartCounts => {
   const counts: BodyPartCounts = {};
   const today = new Date();
 
-  Object.entries(sessions).forEach(([dateStr, sess]) => {
-    const d = new Date(dateStr);
-    const diffDays = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0 || diffDays >= windowDays) return;
+  const inWindow = (dateStr: string) => {
+    const diff = Math.floor((today.getTime() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+    return diff >= 0 && diff < windowDays;
+  };
 
+  Object.entries(sessions).forEach(([dateStr, sess]) => {
+    if (!inWindow(dateStr)) return;
     sess.holdTypes?.forEach((hid) => {
       const key = ID_TO_PART[hid]?.id ?? 'low';
       counts[key] = (counts[key] || 0) + 1;
@@ -231,19 +255,30 @@ export const computeBodyLoads = (
     });
   });
 
+  Object.entries(checkIns).forEach(([dateStr, ci]) => {
+    if (!inWindow(dateStr)) return;
+    ci.painAreas?.forEach((area) => {
+      const key = PAIN_AREA_TO_PART[area];
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    });
+    ci.affectedFingers?.forEach(() => {
+      counts['finger'] = (counts['finger'] || 0) + 1;
+    });
+  });
+
   return counts;
 };
 
 export const getInjuryAlerts = async (windowDays = 14): Promise<BodyAlert[]> => {
   try {
-    const sessions = await getSessions();
-    const counts = computeBodyLoads(sessions, windowDays);
+    const [sessions, checkIns] = await Promise.all([getSessions(), getCheckIns()]);
+    const counts = computeBodyLoads(sessions, windowDays, checkIns);
     const alerts: BodyAlert[] = [];
 
     Object.entries(counts).forEach(([partId, count]) => {
       const threshold = DEFAULT_THRESHOLDS[partId] ?? 10;
       if (count >= threshold) {
-        const partName = Object.values(ID_TO_PART).find(p => p.id === partId)?.name || partId;
+        const partName = PART_NAMES[partId] || partId;
         alerts.push({
           partId,
           partName,
