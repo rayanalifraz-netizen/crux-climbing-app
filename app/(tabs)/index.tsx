@@ -40,18 +40,6 @@ function WindowBox({ label, labelColor, borderColor, bgColor, children, style })
   );
 }
 
-function getConsecutiveHighIntensityDays(sessions) {
-  let count = 0;
-  const today = new Date();
-  for (let i = 1; i <= 7; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-    if (sessions[dateStr] && sessions[dateStr].res >= 70) count++;
-    else break;
-  }
-  return count;
-}
 
 function getWeeklySummary(sessions, checkIns) {
   const today = new Date();
@@ -177,7 +165,6 @@ export default function ProfileScreen() {
   const [progressMax, setProgressMax] = useState(10);
   const [showSendsModal, setShowSendsModal] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
-  const [highIntensityDays, setHighIntensityDays] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [weeklySummary, setWeeklySummary] = useState(null);
   const [injuryAlerts, setInjuryAlerts] = useState([]);
@@ -192,7 +179,6 @@ export default function ProfileScreen() {
     setProfile(prof);
     setProgressMax(prof.sendsToUnlock ?? 10);
     setTotalSessions(Object.keys(sessions).length);
-    setHighIntensityDays(getConsecutiveHighIntensityDays(sessions));
     setWeeklySummary(getWeeklySummary(sessions, checkIns));
     setInjuryAlerts(alerts);
 
@@ -379,13 +365,6 @@ export default function ProfileScreen() {
                 <View style={styles.statCell}>
                   <Text style={styles.statEyebrow}>Sessions</Text>
                   <Text style={styles.statBig}>{totalSessions}</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statCell}>
-                  <Text style={styles.statEyebrow}>Hard Streak</Text>
-                  <Text style={[styles.statBig, highIntensityDays >= 3 && { color: C.amber }]}>
-                    {highIntensityDays}
-                  </Text>
                 </View>
               </View>
             </WindowBox>
