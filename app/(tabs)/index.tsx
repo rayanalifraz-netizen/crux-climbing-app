@@ -1,39 +1,14 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getCheckIns, getInjuryAlerts, getProfile, getSessions, saveProfile } from '../../storage';
+import { useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 
-const C = {
-  bg:         '#e8e0d0',
-  surface:    '#f5f0e8',
-  surfaceAlt: '#ede8dc',
-  border:     '#8a7a6a',
-  borderLight:'#c8bfaa',
-  ink:        '#2a2018',
-  inkLight:   '#4a3e32',
-  sand:       '#7a6e60',
-  dust:       '#a89880',
-  terra:      '#c4734a',
-  terraBg:    '#faf0e8',
-  terraBorder:'#c4734a',
-  amber:      '#c4843a',
-  amberBg:    '#fef8ee',
-  amberBorder:'#c4843a',
-  red:        '#c44a3a',
-  redBg:      '#fef5f4',
-  redBorder:  '#c44a3a',
-  green:      '#5a8a4a',
-  greenBg:    '#f4faf0',
-  greenBorder:'#5a8a4a',
-  blue:       '#4a6a9a',
-  blueBg:     '#f0f4fa',
-  blueBorder: '#4a6a9a',
-};
-
 // Retro window box component
 function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+  const { C } = useTheme();
   return (
     <View style={[{
       borderWidth: 1.5,
@@ -106,6 +81,8 @@ function GradeModal({ visible, onClose, onSave }) {
   const handleSave = () => { onSave(maxGrade, projectGrade); reset(); };
   const maxIndex = maxGrade ? V_GRADES.indexOf(maxGrade) : 0;
   const availableProjectGrades = V_GRADES.slice(maxIndex);
+  const { C } = useTheme();
+  const modalStyles = useMemo(() => makeModalStyles(C), [C]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -159,6 +136,8 @@ function GradeModal({ visible, onClose, onSave }) {
 const SENDS_OPTIONS = [3, 5, 8, 10, 12, 15, 20, 25, 30];
 
 function SendsModal({ visible, current, onClose, onSave }) {
+  const { C } = useTheme();
+  const modalStyles = useMemo(() => makeModalStyles(C), [C]);
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={modalStyles.overlay}>
@@ -190,6 +169,8 @@ function SendsModal({ visible, current, onClose, onSave }) {
 }
 
 export default function ProfileScreen() {
+  const { C } = useTheme();
+  const styles = useMemo(() => makeStyles(C), [C]);
   const [profile, setProfile] = useState(null);
   const [totalSessions, setTotalSessions] = useState(0);
   const [progressCount, setProgressCount] = useState(0);
@@ -417,71 +398,75 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  scrollContent: { paddingBottom: 48 },
+function makeStyles(C) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    scrollContent: { paddingBottom: 48 },
 
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-  greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-  title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
 
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: C.ink },
-  emptyText: { color: C.sand, fontSize: 13, textAlign: 'center' },
-  setupButton: { backgroundColor: C.terra, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 4, marginTop: 4 },
-  setupButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    emptyTitle: { fontSize: 18, fontWeight: '800', color: C.ink },
+    emptyText: { color: C.sand, fontSize: 13, textAlign: 'center' },
+    setupButton: { backgroundColor: C.terra, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 4, marginTop: 4 },
+    setupButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
-  alertInner: { padding: 14 },
-  alertText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
+    alertInner: { padding: 14 },
+    alertText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
 
-  gradeHeroInner: { flexDirection: 'row', padding: 20, paddingBottom: 8 },
-  gradeHeroCol: { flex: 1 },
-  gradeHeroDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 12 },
-  gradeEyebrow: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-  gradeBig: { fontSize: 64, fontWeight: '800', color: C.ink, letterSpacing: -2, lineHeight: 68 },
-  editGradesBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, padding: 12, alignItems: 'center' },
-  editGradesBtnText: { color: C.sand, fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
+    gradeHeroInner: { flexDirection: 'row', padding: 20, paddingBottom: 8 },
+    gradeHeroCol: { flex: 1 },
+    gradeHeroDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 12 },
+    gradeEyebrow: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+    gradeBig: { fontSize: 64, fontWeight: '800', color: C.ink, letterSpacing: -2, lineHeight: 68 },
+    editGradesBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, padding: 12, alignItems: 'center' },
+    editGradesBtnText: { color: C.sand, fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
 
-  progressInner: { padding: 18 },
-  progressTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
-  progressEyebrow: { fontSize: 9, fontWeight: '800', color: C.terraDark || C.sand, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
-  progressNumRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  progressBigNum: { fontSize: 48, fontWeight: '800', color: C.terra, letterSpacing: -2, lineHeight: 52 },
-  progressDenom: { fontSize: 18, fontWeight: '600', color: C.sand },
-  progressPct: { fontSize: 13, fontWeight: '700', color: C.sand },
-  progressTrack: { height: 3, backgroundColor: C.borderLight, borderRadius: 2, marginBottom: 10, overflow: 'hidden' },
-  progressFill: { height: 3, backgroundColor: C.terra, borderRadius: 2 },
-  progressHint: { color: C.sand, fontSize: 11 },
-  sendsTargetBtn: { borderTopWidth: 1, borderTopColor: C.terraBorder + '40', paddingHorizontal: 18, paddingVertical: 10 },
-  sendsTargetText: { color: C.terraDark || C.terra, fontSize: 11, fontWeight: '600' },
+    progressInner: { padding: 18 },
+    progressTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
+    progressEyebrow: { fontSize: 9, fontWeight: '800', color: C.terraDark || C.sand, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+    progressNumRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+    progressBigNum: { fontSize: 48, fontWeight: '800', color: C.terra, letterSpacing: -2, lineHeight: 52 },
+    progressDenom: { fontSize: 18, fontWeight: '600', color: C.sand },
+    progressPct: { fontSize: 13, fontWeight: '700', color: C.sand },
+    progressTrack: { height: 3, backgroundColor: C.borderLight, borderRadius: 2, marginBottom: 10, overflow: 'hidden' },
+    progressFill: { height: 3, backgroundColor: C.terra, borderRadius: 2 },
+    progressHint: { color: C.sand, fontSize: 11 },
+    sendsTargetBtn: { borderTopWidth: 1, borderTopColor: C.terraBorder + '40', paddingHorizontal: 18, paddingVertical: 10 },
+    sendsTargetText: { color: C.terraDark || C.terra, fontSize: 11, fontWeight: '600' },
 
-  weeklyInner: { flexDirection: 'row', padding: 16 },
-  weeklyCellWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  weeklyCell: { flex: 1, alignItems: 'center' },
-  weeklyBig: { fontSize: 26, fontWeight: '800', color: C.ink, letterSpacing: -1, marginBottom: 2 },
-  weeklySmall: { fontSize: 8, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
-  weeklyDivider: { width: 1, height: 30, backgroundColor: C.borderLight },
+    weeklyInner: { flexDirection: 'row', padding: 16 },
+    weeklyCellWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    weeklyCell: { flex: 1, alignItems: 'center' },
+    weeklyBig: { fontSize: 26, fontWeight: '800', color: C.ink, letterSpacing: -1, marginBottom: 2 },
+    weeklySmall: { fontSize: 8, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
+    weeklyDivider: { width: 1, height: 30, backgroundColor: C.borderLight },
 
-  statsInner: { flexDirection: 'row', padding: 18 },
-  statCell: { flex: 1 },
-  statEyebrow: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
-  statBig: { fontSize: 44, fontWeight: '800', color: C.ink, letterSpacing: -2, lineHeight: 48 },
-  statDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 16 },
-});
+    statsInner: { flexDirection: 'row', padding: 18 },
+    statCell: { flex: 1 },
+    statEyebrow: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
+    statBig: { fontSize: 44, fontWeight: '800', color: C.ink, letterSpacing: -2, lineHeight: 48 },
+    statDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 16 },
+  });
+}
 
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
-  container: { backgroundColor: C.surface, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderWidth: 1.5, borderColor: C.border, marginHorizontal: 0 },
-  titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
-  titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
-  closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
-  closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
-  body: { padding: 24, paddingBottom: 48 },
-  subtitle: { fontSize: 13, color: C.sand, marginBottom: 20 },
-  gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
-  selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
-  gradeText: { color: C.sand, fontSize: 14, fontWeight: '700' },
-  selectedText: { color: '#fff' },
-  continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 4, alignItems: 'center', marginTop: 24 },
-  continueText: { color: C.surface, fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
-});
+function makeModalStyles(C) {
+  return StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
+    container: { backgroundColor: C.surface, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderWidth: 1.5, borderColor: C.border, marginHorizontal: 0 },
+    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
+    titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
+    closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
+    closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
+    body: { padding: 24, paddingBottom: 48 },
+    subtitle: { fontSize: 13, color: C.sand, marginBottom: 20 },
+    gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
+    selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
+    gradeText: { color: C.sand, fontSize: 14, fontWeight: '700' },
+    selectedText: { color: '#fff' },
+    continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 4, alignItems: 'center', marginTop: 24 },
+    continueText: { color: C.surface, fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
+  });
+}

@@ -1,36 +1,14 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { getCheckIns, getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
+import { useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 const today = getTodayDate();
 
-const C = {
-  bg:         '#e8e0d0',
-  surface:    '#f5f0e8',
-  surfaceAlt: '#ede8dc',
-  border:     '#8a7a6a',
-  borderLight:'#c8bfaa',
-  ink:        '#2a2018',
-  sand:       '#7a6e60',
-  dust:       '#a89880',
-  terra:      '#c4734a',
-  terraBg:    '#faf0e8',
-  terraBorder:'#c4734a',
-  terraDark:  '#9a5535',
-  amber:      '#c4843a',
-  amberBg:    '#fef8ee',
-  amberBorder:'#c4843a',
-  red:        '#c44a3a',
-  redBg:      '#fef5f4',
-  redBorder:  '#c44a3a',
-  green:      '#5a8a4a',
-  greenBg:    '#f4faf0',
-  greenBorder:'#5a8a4a',
-};
-
 function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+  const { C } = useTheme();
   return (
     <View style={[{
       borderWidth: 1.5,
@@ -106,6 +84,8 @@ function calculateRES(gradeCounts, maxGrade, selectedHolds) {
 }
 
 export default function SessionScreen() {
+  const { C } = useTheme();
+  const styles = useMemo(() => makeStyles(C), [C]);
   const [gradeCounts, setGradeCounts] = useState({});
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
@@ -381,65 +361,67 @@ export default function SessionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  scrollContent: { paddingBottom: 48 },
+function makeStyles(C) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    scrollContent: { paddingBottom: 48 },
 
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-  greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
-  statusBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
-  statusBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    statusBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
+    statusBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 
-  restDayInner: { padding: 24, alignItems: 'center', gap: 8 },
-  restDayTitle: { fontSize: 28, fontWeight: '800', color: C.green, letterSpacing: -1 },
-  restDayText: { color: C.sand, fontSize: 12, textAlign: 'center', lineHeight: 18 },
+    restDayInner: { padding: 24, alignItems: 'center', gap: 8 },
+    restDayTitle: { fontSize: 28, fontWeight: '800', color: C.green, letterSpacing: -1 },
+    restDayText: { color: C.sand, fontSize: 12, textAlign: 'center', lineHeight: 18 },
 
-  savedInner: { padding: 18, paddingTop: 22 },
-  savedTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  savedAttempts: { color: C.sand, fontSize: 13 },
-  resBox: { alignItems: 'center', borderWidth: 1.5, borderRadius: 4, padding: 10, minWidth: 52 },
-  resBoxNum: { fontSize: 20, fontWeight: '800' },
-  resBoxLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
-  savedGrades: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  savedGradeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: C.surface, borderRadius: 4, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: C.borderLight },
-  savedGradeText: { color: C.terra, fontSize: 12, fontWeight: '800' },
-  savedGradeCount: { color: C.dust, fontSize: 11 },
-  savedNotesBox: { backgroundColor: C.surface, borderRadius: 4, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: C.borderLight },
-  savedNotesText: { color: C.sand, fontSize: 12, lineHeight: 18 },
-  savedHint: { color: C.dust, fontSize: 10, textAlign: 'center' },
+    savedInner: { padding: 18, paddingTop: 22 },
+    savedTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+    savedAttempts: { color: C.sand, fontSize: 13 },
+    resBox: { alignItems: 'center', borderWidth: 1.5, borderRadius: 4, padding: 10, minWidth: 52 },
+    resBoxNum: { fontSize: 20, fontWeight: '800' },
+    resBoxLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
+    savedGrades: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+    savedGradeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: C.surface, borderRadius: 4, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: C.borderLight },
+    savedGradeText: { color: C.terra, fontSize: 12, fontWeight: '800' },
+    savedGradeCount: { color: C.dust, fontSize: 11 },
+    savedNotesBox: { backgroundColor: C.surface, borderRadius: 4, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: C.borderLight },
+    savedNotesText: { color: C.sand, fontSize: 12, lineHeight: 18 },
+    savedHint: { color: C.dust, fontSize: 10, textAlign: 'center' },
 
-  noticeInner: { padding: 14 },
-  noticeText: { color: C.amber, fontSize: 12, fontWeight: '600' },
+    noticeInner: { padding: 14 },
+    noticeText: { color: C.amber, fontSize: 12, fontWeight: '600' },
 
-  sectionInner: { padding: 16, paddingTop: 20 },
-  sectionHint: { color: C.dust, fontSize: 11, marginBottom: 12 },
+    sectionInner: { padding: 16, paddingTop: 20 },
+    sectionHint: { color: C.dust, fontSize: 11, marginBottom: 12 },
 
-  gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  gradeCell: { width: '22%', backgroundColor: C.surfaceAlt, borderRadius: 4, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
-  gradeLabel: { color: C.sand, fontSize: 13, fontWeight: '800', marginBottom: 6 },
-  counter: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  counterBtn: { width: 20, height: 20, backgroundColor: C.borderLight, borderRadius: 3, justifyContent: 'center', alignItems: 'center' },
-  counterBtnText: { color: C.sand, fontSize: 13, fontWeight: '800', lineHeight: 17 },
-  countText: { color: C.ink, fontSize: 12, fontWeight: '800', minWidth: 12, textAlign: 'center' },
+    gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    gradeCell: { width: '22%', backgroundColor: C.surfaceAlt, borderRadius: 4, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
+    gradeLabel: { color: C.sand, fontSize: 13, fontWeight: '800', marginBottom: 6 },
+    counter: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    counterBtn: { width: 20, height: 20, backgroundColor: C.borderLight, borderRadius: 3, justifyContent: 'center', alignItems: 'center' },
+    counterBtnText: { color: C.sand, fontSize: 13, fontWeight: '800', lineHeight: 17 },
+    countText: { color: C.ink, fontSize: 12, fontWeight: '800', minWidth: 12, textAlign: 'center' },
 
-  resInner: { padding: 18, paddingTop: 22 },
-  resTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  resVerdict: { fontSize: 16, fontWeight: '700', flex: 1, lineHeight: 20 },
-  resScoreBox: { width: 52, height: 52, borderWidth: 1.5, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
-  resScoreNum: { fontSize: 20, fontWeight: '800' },
-  resTrack: { height: 3, backgroundColor: C.borderLight, borderRadius: 1, overflow: 'hidden' },
-  resFill: { height: 3, borderRadius: 1 },
+    resInner: { padding: 18, paddingTop: 22 },
+    resTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+    resVerdict: { fontSize: 16, fontWeight: '700', flex: 1, lineHeight: 20 },
+    resScoreBox: { width: 52, height: 52, borderWidth: 1.5, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+    resScoreNum: { fontSize: 20, fontWeight: '800' },
+    resTrack: { height: 3, backgroundColor: C.borderLight, borderRadius: 1, overflow: 'hidden' },
+    resFill: { height: 3, borderRadius: 1 },
 
-  tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  tagChip: { paddingHorizontal: 13, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 4, borderWidth: 1, borderColor: C.borderLight },
-  tagLabel: { color: C.sand, fontSize: 13, fontWeight: '700' },
-  tagRisk: { color: C.dust, fontSize: 9, marginTop: 2, letterSpacing: 0.3 },
+    tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    tagChip: { paddingHorizontal: 13, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 4, borderWidth: 1, borderColor: C.borderLight },
+    tagLabel: { color: C.sand, fontSize: 13, fontWeight: '700' },
+    tagRisk: { color: C.dust, fontSize: 9, marginTop: 2, letterSpacing: 0.3 },
 
-  notesInput: { backgroundColor: C.surfaceAlt, borderRadius: 4, padding: 12, color: C.ink, fontSize: 13, lineHeight: 19, minHeight: 72, borderWidth: 1, borderColor: C.borderLight },
-  notesCount: { color: C.dust, fontSize: 10, textAlign: 'right', marginTop: 6 },
+    notesInput: { backgroundColor: C.surfaceAlt, borderRadius: 4, padding: 12, color: C.ink, fontSize: 13, lineHeight: 19, minHeight: 72, borderWidth: 1, borderColor: C.borderLight },
+    notesCount: { color: C.dust, fontSize: 10, textAlign: 'right', marginTop: 6 },
 
-  saveBtn: { marginHorizontal: 16, backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center', marginTop: 4 },
-  saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
-});
+    saveBtn: { marginHorizontal: 16, backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center', marginTop: 4 },
+    saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+  });
+}

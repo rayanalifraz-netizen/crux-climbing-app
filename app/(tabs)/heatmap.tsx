@@ -1,35 +1,13 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { getCheckIns, getSessions } from '../../storage';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DIAGRAM_WIDTH = SCREEN_WIDTH - 32;
 const DIAGRAM_HEIGHT = DIAGRAM_WIDTH * 1.6;
-
-const C = {
-  bg:         '#e8e0d0',
-  surface:    '#f5f0e8',
-  surfaceAlt: '#ede8dc',
-  border:     '#8a7a6a',
-  borderLight:'#c8bfaa',
-  ink:        '#2a2018',
-  sand:       '#7a6e60',
-  dust:       '#a89880',
-  terra:      '#c4734a',
-  terraBg:    '#faf0e8',
-  terraBorder:'#c4734a',
-  amber:      '#c4843a',
-  amberBg:    '#fef8ee',
-  amberBorder:'#c4843a',
-  red:        '#c44a3a',
-  redBg:      '#fef5f4',
-  redBorder:  '#c44a3a',
-  green:      '#5a8a4a',
-  greenBg:    '#f4faf0',
-  greenBorder:'#5a8a4a',
-};
 
 // Body part definitions with positions as % of diagram dimensions
 const BODY_PARTS = [
@@ -55,21 +33,21 @@ const THRESHOLDS = {
   ankle:    [3, 6],
 };
 
-function getColor(load, thresholds) {
+function getColor(C, load, thresholds) {
   if (load === 0) return C.green;
   if (load < thresholds[0]) return C.green;
   if (load < thresholds[1]) return C.amber;
   return C.red;
 }
 
-function getBgColor(load, thresholds) {
+function getBgColor(C, load, thresholds) {
   if (load === 0) return C.greenBg;
   if (load < thresholds[0]) return C.greenBg;
   if (load < thresholds[1]) return C.amberBg;
   return C.redBg;
 }
 
-function getBorderColor(load, thresholds) {
+function getBorderColor(C, load, thresholds) {
   if (load === 0) return C.greenBorder;
   if (load < thresholds[0]) return C.greenBorder;
   if (load < thresholds[1]) return C.amberBorder;
@@ -84,6 +62,7 @@ function getLabel(load, thresholds) {
 }
 
 function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+  const { C } = useTheme();
   return (
     <View style={[{
       borderWidth: 1.5,
@@ -115,6 +94,7 @@ function WindowBox({ label, labelColor, borderColor, bgColor, children, style })
 }
 
 function BodyDiagram({ loads }) {
+  const { C } = useTheme();
   const W = DIAGRAM_WIDTH;
   const H = DIAGRAM_HEIGHT;
   const cx = W / 2;
@@ -205,7 +185,7 @@ function BodyDiagram({ loads }) {
       {BODY_PARTS.map((part) => {
         const load = loads[part.id] || 0;
         const thresholds = THRESHOLDS[part.id];
-        const color = getColor(load, thresholds);
+        const color = getColor(C, load, thresholds);
         const px = part.x * W;
         const py = part.y * H;
         const r = part.radius * W;
@@ -227,7 +207,7 @@ function BodyDiagram({ loads }) {
       {BODY_PARTS.map((part) => {
         const load = loads[part.id] || 0;
         const thresholds = THRESHOLDS[part.id];
-        const color = getColor(load, thresholds);
+        const color = getColor(C, load, thresholds);
         const px = part.x * W;
         const py = part.y * H;
 
@@ -245,6 +225,8 @@ function BodyDiagram({ loads }) {
 }
 
 export default function HeatmapScreen() {
+  const { C } = useTheme();
+  const styles = useMemo(() => makeStyles(C), [C]);
   const [loads, setLoads] = useState({});
   const [window, setWindow] = useState(14);
   const [lastUpdated, setLastUpdated] = useState('');
@@ -381,9 +363,9 @@ export default function HeatmapScreen() {
             {BODY_PARTS.map((part, i) => {
               const load = loads[part.id] || 0;
               const thresholds = THRESHOLDS[part.id];
-              const color = getColor(load, thresholds);
-              const bgColor = getBgColor(load, thresholds);
-              const borderColor = getBorderColor(load, thresholds);
+              const color = getColor(C, load, thresholds);
+              const bgColor = getBgColor(C, load, thresholds);
+              const borderColor = getBorderColor(C, load, thresholds);
               const pct = Math.min(load / thresholds[1], 1);
 
               return (
@@ -440,48 +422,50 @@ export default function HeatmapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  scrollContent: { paddingBottom: 48 },
+function makeStyles(C) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    scrollContent: { paddingBottom: 48 },
 
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
-  greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-  title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
 
-  windowRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
-  windowLabel: { fontSize: 10, fontWeight: '800', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
-  windowBtns: { flexDirection: 'row', gap: 6 },
-  windowBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.surface },
-  windowBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
-  windowBtnText: { fontSize: 11, fontWeight: '800', color: C.dust },
-  windowBtnTextActive: { color: C.terra },
-  updatedText: { fontSize: 9, color: C.dust, marginLeft: 'auto' },
+    windowRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
+    windowLabel: { fontSize: 10, fontWeight: '800', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
+    windowBtns: { flexDirection: 'row', gap: 6 },
+    windowBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.surface },
+    windowBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
+    windowBtnText: { fontSize: 11, fontWeight: '800', color: C.dust },
+    windowBtnTextActive: { color: C.terra },
+    updatedText: { fontSize: 9, color: C.dust, marginLeft: 'auto' },
 
-  alertInner: { padding: 14 },
-  alertText: { color: C.red, fontSize: 12, fontWeight: '600', lineHeight: 17 },
+    alertInner: { padding: 14 },
+    alertText: { color: C.red, fontSize: 12, fontWeight: '600', lineHeight: 17 },
 
-  diagramInner: { padding: 16, paddingTop: 20, alignItems: 'center' },
+    diagramInner: { padding: 16, paddingTop: 20, alignItems: 'center' },
 
-  legendRow: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 12, paddingHorizontal: 16 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 8, height: 8, borderRadius: 1 },
-  legendText: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 0.5 },
+    legendRow: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 12, paddingHorizontal: 16 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    legendDot: { width: 8, height: 8, borderRadius: 1 },
+    legendText: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 0.5 },
 
-  breakdownInner: { padding: 16, paddingTop: 20 },
-  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  breakdownDivider: { height: 1, backgroundColor: C.borderLight },
-  breakdownDot: { width: 8, height: 8, borderRadius: 1 },
-  breakdownLabel: { width: 64, fontSize: 12, fontWeight: '700', color: C.ink },
-  breakdownBarWrap: { flex: 1 },
-  breakdownTrack: { height: 4, backgroundColor: C.borderLight, borderRadius: 2, overflow: 'hidden' },
-  breakdownFill: { height: 4, borderRadius: 2 },
-  breakdownBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
-  breakdownBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+    breakdownInner: { padding: 16, paddingTop: 20 },
+    breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+    breakdownDivider: { height: 1, backgroundColor: C.borderLight },
+    breakdownDot: { width: 8, height: 8, borderRadius: 1 },
+    breakdownLabel: { width: 64, fontSize: 12, fontWeight: '700', color: C.ink },
+    breakdownBarWrap: { flex: 1 },
+    breakdownTrack: { height: 4, backgroundColor: C.borderLight, borderRadius: 2, overflow: 'hidden' },
+    breakdownFill: { height: 4, borderRadius: 2 },
+    breakdownBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+    breakdownBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
 
-  summaryInner: { flexDirection: 'row', padding: 18 },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryEyebrow: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
-  summaryBig: { fontSize: 32, fontWeight: '800', color: C.ink, letterSpacing: -1, lineHeight: 36 },
-  summarySmall: { fontSize: 9, fontWeight: '600', color: C.dust, marginTop: 2 },
-  summaryDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 8 },
-});
+    summaryInner: { flexDirection: 'row', padding: 18 },
+    summaryItem: { flex: 1, alignItems: 'center' },
+    summaryEyebrow: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+    summaryBig: { fontSize: 32, fontWeight: '800', color: C.ink, letterSpacing: -1, lineHeight: 36 },
+    summarySmall: { fontSize: 9, fontWeight: '600', color: C.dust, marginTop: 2 },
+    summaryDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 8 },
+  });
+}

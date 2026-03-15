@@ -1,35 +1,13 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { clearAllData, deleteCheckInByKey, deleteSessionsByKey, getProfile, getTodayDate, saveProfile } from '../../storage';
+import { useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 
-const C = {
-  bg:         '#e8e0d0',
-  surface:    '#f5f0e8',
-  surfaceAlt: '#ede8dc',
-  border:     '#8a7a6a',
-  borderLight:'#c8bfaa',
-  ink:        '#2a2018',
-  sand:       '#7a6e60',
-  dust:       '#a89880',
-  terra:      '#c4734a',
-  terraBg:    '#faf0e8',
-  terraBorder:'#c4734a',
-  terraDark:  '#9a5535',
-  amber:      '#c4843a',
-  amberBg:    '#fef8ee',
-  amberBorder:'#c4843a',
-  red:        '#c44a3a',
-  redBg:      '#fef5f4',
-  redBorder:  '#c44a3a',
-  green:      '#5a8a4a',
-  greenBg:    '#f4faf0',
-  greenBorder:'#5a8a4a',
-};
-
 function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+  const { C } = useTheme();
   return (
     <View style={[{
       borderWidth: 1.5,
@@ -62,6 +40,8 @@ function WindowBox({ label, labelColor, borderColor, bgColor, children, style })
 }
 
 function GradeModal({ visible, onClose, onSave }) {
+  const { C } = useTheme();
+  const modalStyles = useMemo(() => makeModalStyles(C), [C]);
   const [step, setStep] = useState(1);
   const [maxGrade, setMaxGrade] = useState(null);
   const [projectGrade, setProjectGrade] = useState(null);
@@ -122,6 +102,8 @@ function GradeModal({ visible, onClose, onSave }) {
 }
 
 function SettingsRow({ label, sublabel, onPress, destructive = false, rightText }) {
+  const { C } = useTheme();
+  const styles = useMemo(() => makeStyles(C), [C]);
   return (
     <TouchableOpacity style={styles.row} onPress={onPress}>
       <View style={styles.rowContent}>
@@ -136,6 +118,8 @@ function SettingsRow({ label, sublabel, onPress, destructive = false, rightText 
 }
 
 export default function SettingsScreen() {
+  const { C, isDark, toggleDark } = useTheme();
+  const styles = useMemo(() => makeStyles(C), [C]);
   const [profile, setProfile] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -242,6 +226,19 @@ export default function SettingsScreen() {
           </View>
         </WindowBox>
 
+        {/* Appearance */}
+        <WindowBox label="Appearance">
+          <TouchableOpacity style={styles.row} onPress={toggleDark}>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Dark Mode</Text>
+              <Text style={styles.rowSublabel}>{isDark ? 'On — tap to switch to light' : 'Off — tap to switch to dark'}</Text>
+            </View>
+            <View style={[styles.toggleTrack, isDark && { backgroundColor: C.terra, borderColor: C.terraBorder }]}>
+              <View style={[styles.toggleThumb, isDark && { transform: [{ translateX: 18 }] }]} />
+            </View>
+          </TouchableOpacity>
+        </WindowBox>
+
         {/* Grades */}
         <WindowBox label="Grades" borderColor={C.terraBorder} bgColor={C.terraBg} labelColor={C.terra}>
           <View style={styles.gradeDisplay}>
@@ -302,58 +299,65 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  scrollContent: { paddingBottom: 48 },
+function makeStyles(C) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    scrollContent: { paddingBottom: 48 },
 
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-  greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-  title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
 
-  profileInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 20, gap: 14 },
-  profileAvatar: { width: 44, height: 44, borderRadius: 4, borderWidth: 1.5, borderColor: C.terraBorder, backgroundColor: C.terraBg, justifyContent: 'center', alignItems: 'center' },
-  profileAvatarText: { fontSize: 20, fontWeight: '800', color: C.terra },
-  profileInfo: { flex: 1 },
-  profileName: { color: C.ink, fontSize: 15, fontWeight: '800', marginBottom: 2 },
-  profileGrades: { color: C.dust, fontSize: 11 },
-  profileBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6 },
-  profileBtnText: { color: C.sand, fontSize: 11, fontWeight: '800' },
-  nameInput: { color: C.ink, fontSize: 15, fontWeight: '700', borderBottomWidth: 1.5, borderBottomColor: C.terraBorder, paddingBottom: 2, minWidth: 120 },
+    profileInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 20, gap: 14 },
+    profileAvatar: { width: 44, height: 44, borderRadius: 4, borderWidth: 1.5, borderColor: C.terraBorder, backgroundColor: C.terraBg, justifyContent: 'center', alignItems: 'center' },
+    profileAvatarText: { fontSize: 20, fontWeight: '800', color: C.terra },
+    profileInfo: { flex: 1 },
+    profileName: { color: C.ink, fontSize: 15, fontWeight: '800', marginBottom: 2 },
+    profileGrades: { color: C.dust, fontSize: 11 },
+    profileBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6 },
+    profileBtnText: { color: C.sand, fontSize: 11, fontWeight: '800' },
+    nameInput: { color: C.ink, fontSize: 15, fontWeight: '700', borderBottomWidth: 1.5, borderBottomColor: C.terraBorder, paddingBottom: 2, minWidth: 120 },
 
-  gradeDisplay: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 20 },
-  gradeItem: { flex: 1, alignItems: 'center' },
-  gradeEyebrow: { fontSize: 9, fontWeight: '800', color: C.terraDark, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
-  gradeBig: { fontSize: 40, fontWeight: '800', color: C.ink, letterSpacing: -1 },
-  gradeDivider: { width: 1, backgroundColor: C.terraBorder + '40', marginHorizontal: 8 },
-  rowDivider: { height: 1, marginHorizontal: 16 },
+    gradeDisplay: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 20 },
+    gradeItem: { flex: 1, alignItems: 'center' },
+    gradeEyebrow: { fontSize: 9, fontWeight: '800', color: C.terraDark, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+    gradeBig: { fontSize: 40, fontWeight: '800', color: C.ink, letterSpacing: -1 },
+    gradeDivider: { width: 1, backgroundColor: C.terraBorder + '40', marginHorizontal: 8 },
+    rowDivider: { height: 1, marginHorizontal: 16 },
 
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  rowContent: { flex: 1 },
-  rowLabel: { color: C.ink, fontSize: 13, fontWeight: '700' },
-  rowSublabel: { color: C.dust, fontSize: 11, marginTop: 2 },
-  rowArrow: { color: C.sand, fontSize: 14, fontWeight: '700' },
+    row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
+    rowContent: { flex: 1 },
+    rowLabel: { color: C.ink, fontSize: 13, fontWeight: '700' },
+    rowSublabel: { color: C.dust, fontSize: 11, marginTop: 2 },
+    rowArrow: { color: C.sand, fontSize: 14, fontWeight: '700' },
 
-  appInfo: { alignItems: 'center', gap: 4, paddingTop: 24, paddingBottom: 8 },
-  appInfoBox: { borderWidth: 1.5, borderColor: C.border, borderRadius: 4, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 8 },
-  appInfoName: { color: C.sand, fontSize: 14, fontWeight: '800', letterSpacing: 4 },
-  appInfoTagline: { color: C.dust, fontSize: 11 },
-  appInfoVersion: { color: C.dust, fontSize: 10, opacity: 0.6 },
-});
+    toggleTrack: { width: 40, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.borderLight, backgroundColor: C.surfaceAlt, justifyContent: 'center', paddingHorizontal: 2 },
+    toggleThumb: { width: 14, height: 14, borderRadius: 7, backgroundColor: C.sand },
 
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
-  container: { backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border },
-  titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
-  titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
-  closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
-  closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
-  body: { padding: 24, paddingBottom: 48 },
-  subtitle: { fontSize: 12, color: C.dust, marginBottom: 20 },
-  gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: C.borderLight },
-  selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
-  gradeText: { color: C.sand, fontSize: 14, fontWeight: '800' },
-  selectedText: { color: '#fff' },
-  continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 4, alignItems: 'center', marginTop: 24 },
-  continueText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
-});
+    appInfo: { alignItems: 'center', gap: 4, paddingTop: 24, paddingBottom: 8 },
+    appInfoBox: { borderWidth: 1.5, borderColor: C.border, borderRadius: 4, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 8 },
+    appInfoName: { color: C.sand, fontSize: 14, fontWeight: '800', letterSpacing: 4 },
+    appInfoTagline: { color: C.dust, fontSize: 11 },
+    appInfoVersion: { color: C.dust, fontSize: 10, opacity: 0.6 },
+  });
+}
+
+function makeModalStyles(C) {
+  return StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
+    container: { backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border },
+    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
+    titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
+    closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
+    closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
+    body: { padding: 24, paddingBottom: 48 },
+    subtitle: { fontSize: 12, color: C.dust, marginBottom: 20 },
+    gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: C.borderLight },
+    selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
+    gradeText: { color: C.sand, fontSize: 14, fontWeight: '800' },
+    selectedText: { color: '#fff' },
+    continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 4, alignItems: 'center', marginTop: 24 },
+    continueText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+  });
+}

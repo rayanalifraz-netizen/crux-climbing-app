@@ -1,40 +1,15 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { deleteGoalDate, getCheckIns, getGoalDate, getSessions, saveGoalDate } from '../../storage';
+import { useTheme } from '../../context/ThemeContext';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-const C = {
-  bg:         '#e8e0d0',
-  surface:    '#f5f0e8',
-  surfaceAlt: '#ede8dc',
-  border:     '#8a7a6a',
-  borderLight:'#c8bfaa',
-  ink:        '#2a2018',
-  sand:       '#7a6e60',
-  dust:       '#a89880',
-  terra:      '#c4734a',
-  terraBg:    '#faf0e8',
-  terraBorder:'#c4734a',
-  terraDark:  '#9a5535',
-  amber:      '#c4843a',
-  amberBg:    '#fef8ee',
-  amberBorder:'#c4843a',
-  red:        '#c44a3a',
-  redBg:      '#fef5f4',
-  redBorder:  '#c44a3a',
-  green:      '#5a8a4a',
-  greenBg:    '#f4faf0',
-  greenBorder:'#5a8a4a',
-  goal:       '#7a5aaa',
-  goalBg:     '#f8f4ff',
-  goalBorder: '#7a5aaa',
-};
-
 function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+  const { C } = useTheme();
   return (
     <View style={[{
       borderWidth: 1.5,
@@ -66,21 +41,21 @@ function WindowBox({ label, labelColor, borderColor, bgColor, children, style })
   );
 }
 
-function getResColor(res) {
+function getResColor(C, res) {
   if (!res && res !== 0) return null;
   if (res <= 40) return C.terra;
   if (res <= 70) return C.amber;
   return C.red;
 }
 
-function getResBorder(res) {
+function getResBorder(C, res) {
   if (!res && res !== 0) return C.border;
   if (res <= 40) return C.terraBorder;
   if (res <= 70) return C.amberBorder;
   return C.redBorder;
 }
 
-function getResBg(res) {
+function getResBg(C, res) {
   if (!res && res !== 0) return C.surface;
   if (res <= 40) return C.terraBg;
   if (res <= 70) return C.amberBg;
@@ -111,6 +86,9 @@ function formatGoalDate(dateStr) {
 }
 
 export default function CalendarScreen() {
+  const { C } = useTheme();
+  const styles = useMemo(() => makeStyles(C), [C]);
+  const modalStyles = useMemo(() => makeModalStyles(C), [C]);
   const [sessions, setSessions] = useState({});
   const [checkIns, setCheckIns] = useState({});
   const [selectedDate, setSelectedDate] = useState(null);
@@ -305,7 +283,7 @@ export default function CalendarScreen() {
                 const isSelected = selectedDate === dateStr;
                 const isToday = dateStr === todayStr;
                 const isGoalDay = dateStr === goalDate;
-                const dotColor = restDay ? C.green : session ? getResColor(session.res) : null;
+                const dotColor = restDay ? C.green : session ? getResColor(C, session.res) : null;
                 const hasActivity = restDay || !!session;
 
                 return (
@@ -366,9 +344,9 @@ export default function CalendarScreen() {
         {selectedDate && (isRestDay || selectedSession) && (
           <WindowBox
             label={new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            borderColor={selectedSession ? getResBorder(selectedSession.res) : C.greenBorder}
-            bgColor={selectedSession ? getResBg(selectedSession.res) : C.greenBg}
-            labelColor={selectedSession ? getResColor(selectedSession.res) : C.green}
+            borderColor={selectedSession ? getResBorder(C, selectedSession.res) : C.greenBorder}
+            bgColor={selectedSession ? getResBg(C, selectedSession.res) : C.greenBg}
+            labelColor={selectedSession ? getResColor(C, selectedSession.res) : C.green}
             style={{ marginTop: 4 }}
           >
             <View style={styles.detailInner}>
@@ -384,19 +362,19 @@ export default function CalendarScreen() {
                   {/* RES + intensity row */}
                   <View style={styles.detailTopRow}>
                     <View style={[styles.intensityTag, {
-                      borderColor: getResBorder(selectedSession.res),
-                      backgroundColor: getResBg(selectedSession.res),
+                      borderColor: getResBorder(C, selectedSession.res),
+                      backgroundColor: getResBg(C, selectedSession.res),
                     }]}>
-                      <Text style={[styles.intensityTagText, { color: getResColor(selectedSession.res) }]}>
+                      <Text style={[styles.intensityTagText, { color: getResColor(C, selectedSession.res) }]}>
                         {getResLabel(selectedSession.res)} Session
                       </Text>
                     </View>
                     <View style={styles.detailRight}>
-                      <View style={[styles.resScoreBox, { borderColor: getResBorder(selectedSession.res) }]}>
-                        <Text style={[styles.resScoreNum, { color: getResColor(selectedSession.res) }]}>
+                      <View style={[styles.resScoreBox, { borderColor: getResBorder(C, selectedSession.res) }]}>
+                        <Text style={[styles.resScoreNum, { color: getResColor(C, selectedSession.res) }]}>
                           {selectedSession.res}
                         </Text>
-                        <Text style={[styles.resScoreLabel, { color: getResColor(selectedSession.res) }]}>RES</Text>
+                        <Text style={[styles.resScoreLabel, { color: getResColor(C, selectedSession.res) }]}>RES</Text>
                       </View>
                       <Text style={styles.detailAttempts}>
                         {Object.values(selectedSession.gradeCounts || {}).reduce((a, b) => a + b, 0)} attempts
@@ -473,96 +451,100 @@ export default function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  scrollContent: { paddingBottom: 48 },
+function makeStyles(C) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.bg },
+    scrollContent: { paddingBottom: 48 },
 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
-  greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-  title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
-  statsBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: C.border, borderRadius: 4, padding: 12, gap: 12, backgroundColor: C.surface, marginTop: 6 },
-  statItem: { alignItems: 'center' },
-  statNum: { color: C.ink, fontSize: 18, fontWeight: '800' },
-  statLabel: { color: C.dust, fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
-  statDivider: { width: 1, height: 24, backgroundColor: C.borderLight },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    statsBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: C.border, borderRadius: 4, padding: 12, gap: 12, backgroundColor: C.surface, marginTop: 6 },
+    statItem: { alignItems: 'center' },
+    statNum: { color: C.ink, fontSize: 18, fontWeight: '800' },
+    statLabel: { color: C.dust, fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
+    statDivider: { width: 1, height: 24, backgroundColor: C.borderLight },
 
-  goalInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 20, gap: 12 },
-  goalDate: { color: C.ink, fontSize: 14, fontWeight: '800', marginBottom: 3 },
-  goalCountdown: { color: C.goal, fontSize: 11, fontWeight: '600' },
-  goalActions: { gap: 6 },
-  goalBtn: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 5 },
-  goalBtnText: { fontSize: 11, fontWeight: '800' },
+    goalInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 20, gap: 12 },
+    goalDate: { color: C.ink, fontSize: 14, fontWeight: '800', marginBottom: 3 },
+    goalCountdown: { color: C.goal, fontSize: 11, fontWeight: '600' },
+    goalActions: { gap: 6 },
+    goalBtn: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 5 },
+    goalBtnText: { fontSize: 11, fontWeight: '800' },
 
-  setGoalBtn: { marginHorizontal: 16, marginBottom: 12, borderWidth: 1.5, borderColor: C.goalBorder, borderRadius: 4, padding: 12, alignItems: 'center', backgroundColor: C.goalBg },
-  setGoalBtnText: { color: C.goal, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+    setGoalBtn: { marginHorizontal: 16, marginBottom: 12, borderWidth: 1.5, borderColor: C.goalBorder, borderRadius: 4, padding: 12, alignItems: 'center', backgroundColor: C.goalBg },
+    setGoalBtnText: { color: C.goal, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
 
-  calendarInner: { padding: 16, paddingTop: 20 },
-  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  navBtn: { width: 30, height: 30, borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceAlt },
-  navBtnText: { color: C.ink, fontSize: 18, fontWeight: '800', lineHeight: 22 },
-  monthTitle: { color: C.ink, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
-  dayHeaders: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  dayHeader: { color: C.dust, fontSize: 9, fontWeight: '800', width: '14.28%', textAlign: 'center', letterSpacing: 0.5, textTransform: 'uppercase' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  emptyCell: { width: '14.28%', aspectRatio: 1 },
-  cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 3, borderWidth: 1, borderColor: 'transparent', marginBottom: 2 },
-  cellText: { color: C.dust, fontSize: 12, fontWeight: '600' },
-  dot: { width: 3, height: 3, borderRadius: 1.5, marginTop: 1 },
-  legend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.borderLight },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 5, height: 5, borderRadius: 1 },
-  legendText: { color: C.dust, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+    calendarInner: { padding: 16, paddingTop: 20 },
+    monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+    navBtn: { width: 30, height: 30, borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceAlt },
+    navBtnText: { color: C.ink, fontSize: 18, fontWeight: '800', lineHeight: 22 },
+    monthTitle: { color: C.ink, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+    dayHeaders: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+    dayHeader: { color: C.dust, fontSize: 9, fontWeight: '800', width: '14.28%', textAlign: 'center', letterSpacing: 0.5, textTransform: 'uppercase' },
+    grid: { flexDirection: 'row', flexWrap: 'wrap' },
+    emptyCell: { width: '14.28%', aspectRatio: 1 },
+    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 3, borderWidth: 1, borderColor: 'transparent', marginBottom: 2 },
+    cellText: { color: C.dust, fontSize: 12, fontWeight: '600' },
+    dot: { width: 3, height: 3, borderRadius: 1.5, marginTop: 1 },
+    legend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.borderLight },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    legendDot: { width: 5, height: 5, borderRadius: 1 },
+    legendText: { color: C.dust, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
 
-  emptyState: { marginHorizontal: 16, padding: 32, alignItems: 'center', gap: 6 },
-  emptyTitle: { color: C.sand, fontSize: 14, fontWeight: '800' },
-  emptyText: { color: C.dust, fontSize: 12, textAlign: 'center', lineHeight: 18 },
-  hintText: { color: C.dust, textAlign: 'center', fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8 },
+    emptyState: { marginHorizontal: 16, padding: 32, alignItems: 'center', gap: 6 },
+    emptyTitle: { color: C.sand, fontSize: 14, fontWeight: '800' },
+    emptyText: { color: C.dust, fontSize: 12, textAlign: 'center', lineHeight: 18 },
+    hintText: { color: C.dust, textAlign: 'center', fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8 },
 
-  detailInner: { padding: 18, paddingTop: 22 },
-  detailTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-  intensityTag: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 5 },
-  intensityTagText: { fontSize: 11, fontWeight: '800' },
-  detailRight: { alignItems: 'flex-end', gap: 4 },
-  resScoreBox: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
-  resScoreNum: { fontSize: 18, fontWeight: '800', lineHeight: 20 },
-  resScoreLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
-  detailAttempts: { color: C.dust, fontSize: 11 },
-  detailRule: { height: 1, backgroundColor: C.borderLight, marginBottom: 12 },
-  detailSectionLabel: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 12 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
-  chipGrade: { fontSize: 12, fontWeight: '800' },
-  chipCount: { fontSize: 11 },
-  notesText: { color: C.sand, fontSize: 12, lineHeight: 18, marginBottom: 8 },
-  restBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
-  restBadgeText: { color: C.green, fontSize: 11, fontWeight: '800' },
-  restMsg: { color: C.sand, fontSize: 12 },
+    detailInner: { padding: 18, paddingTop: 22 },
+    detailTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+    intensityTag: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 5 },
+    intensityTagText: { fontSize: 11, fontWeight: '800' },
+    detailRight: { alignItems: 'flex-end', gap: 4 },
+    resScoreBox: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
+    resScoreNum: { fontSize: 18, fontWeight: '800', lineHeight: 20 },
+    resScoreLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
+    detailAttempts: { color: C.dust, fontSize: 11 },
+    detailRule: { height: 1, backgroundColor: C.borderLight, marginBottom: 12 },
+    detailSectionLabel: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 12 },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
+    chipGrade: { fontSize: 12, fontWeight: '800' },
+    chipCount: { fontSize: 11 },
+    notesText: { color: C.sand, fontSize: 12, lineHeight: 18, marginBottom: 8 },
+    restBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
+    restBadgeText: { color: C.green, fontSize: 11, fontWeight: '800' },
+    restMsg: { color: C.sand, fontSize: 12 },
 
-  emptyDayInner: { padding: 20, alignItems: 'center' },
-  emptyDayText: { color: C.dust, fontSize: 12, fontWeight: '600' },
-});
+    emptyDayInner: { padding: 20, alignItems: 'center' },
+    emptyDayText: { color: C.dust, fontSize: 12, fontWeight: '600' },
+  });
+}
 
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
-  container: { backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border },
-  titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
-  titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
-  closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
-  closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
-  body: { padding: 20, paddingBottom: 48 },
-  subtitle: { fontSize: 12, color: C.dust, marginBottom: 20 },
-  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  navBtn: { width: 30, height: 30, borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
-  navBtnText: { color: C.ink, fontSize: 18, fontWeight: '800', lineHeight: 22 },
-  monthTitle: { color: C.ink, fontSize: 14, fontWeight: '800' },
-  dayHeaders: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  dayHeader: { color: C.dust, fontSize: 9, fontWeight: '700', width: '14.28%', textAlign: 'center', textTransform: 'uppercase' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  emptyCell: { width: '14.28%', aspectRatio: 1 },
-  cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 3, borderWidth: 1.5, borderColor: C.borderLight, marginBottom: 4 },
-  cellPast: { opacity: 0.25 },
-  cellGoal: { backgroundColor: C.goalBg, borderColor: C.goalBorder },
-  cellText: { color: C.ink, fontSize: 13, fontWeight: '600' },
-  cellTextPast: { color: C.dust },
-  cellTextGoal: { color: C.goal, fontWeight: '800' },
-});
+function makeModalStyles(C) {
+  return StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
+    container: { backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border },
+    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
+    titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
+    closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
+    closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
+    body: { padding: 20, paddingBottom: 48 },
+    subtitle: { fontSize: 12, color: C.dust, marginBottom: 20 },
+    monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+    navBtn: { width: 30, height: 30, borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+    navBtnText: { color: C.ink, fontSize: 18, fontWeight: '800', lineHeight: 22 },
+    monthTitle: { color: C.ink, fontSize: 14, fontWeight: '800' },
+    dayHeaders: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    dayHeader: { color: C.dust, fontSize: 9, fontWeight: '700', width: '14.28%', textAlign: 'center', textTransform: 'uppercase' },
+    grid: { flexDirection: 'row', flexWrap: 'wrap' },
+    emptyCell: { width: '14.28%', aspectRatio: 1 },
+    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 3, borderWidth: 1.5, borderColor: C.borderLight, marginBottom: 4 },
+    cellPast: { opacity: 0.25 },
+    cellGoal: { backgroundColor: C.goalBg, borderColor: C.goalBorder },
+    cellText: { color: C.ink, fontSize: 13, fontWeight: '600' },
+    cellTextPast: { color: C.dust },
+    cellTextGoal: { color: C.goal, fontWeight: '800' },
+  });
+}

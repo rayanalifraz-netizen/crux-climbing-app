@@ -165,10 +165,20 @@ export const deleteGoalDate = async (): Promise<void> => {
 
 // ─── Clear all ────────────────────────────────────────────────────────────────
 
+export const getDarkMode = async (): Promise<boolean> => {
+  const val = await secureGet('darkMode');
+  return val === 'true';
+};
+
+export const saveDarkMode = async (val: boolean): Promise<void> => {
+  await secureSet('darkMode', val ? 'true' : 'false');
+};
+
 export const clearAllData = async (): Promise<void> => {
   await Promise.all([
     secureDelete('profile'),
     secureDelete('goalDate'),
+    secureDelete('darkMode'),
     secureDeleteLarge('sessions'),
     secureDeleteLarge('checkins'),
   ]);
