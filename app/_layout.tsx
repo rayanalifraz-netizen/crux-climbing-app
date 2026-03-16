@@ -42,22 +42,28 @@ function CustomSplash({ onDone }: { onDone: () => void }) {
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
   const [appReady, setAppReady] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
     async function init() {
       const [done, prof] = await Promise.all([getOnboardingComplete(), getProfile()]);
       if (!done && !prof) {
-        // Brand new user — show onboarding
-        router.replace('/onboarding');
+        setNeedsOnboarding(true);
       } else if (!done && prof) {
-        // Existing user before onboarding was added — backfill flag
         await markOnboardingComplete();
       }
       setAppReady(true);
     }
     init();
   }, []);
+
+  // Fire redirect only after Stack is mounted
+  useEffect(() => {
+    if (appReady && needsOnboarding) {
+      router.replace('/onboarding');
+    }
+  }, [appReady, needsOnboarding]);
 
   if (!appReady) return null;
 
