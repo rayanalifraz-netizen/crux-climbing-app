@@ -1,14 +1,56 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 import 'react-native-reanimated';
 import { ThemeProvider as AppThemeProvider } from '../context/ThemeContext';
+
+SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+function CustomSplash({ onDone }: { onDone: () => void }) {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }).start(() => onDone());
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <Animated.View style={[styles.splash, { opacity }]}>
+      <Image
+        source={require('../assets/images/splash-icon.png')}
+        style={styles.splashImage}
+        resizeMode="contain"
+      />
+      <Text style={styles.splashTitle}>CRUX</Text>
+      <Text style={styles.splashSubtitle}>The Climbing Recovery App</Text>
+    </Animated.View>
+  );
+}
+
 export default function RootLayout() {
+  const [splashDone, setSplashDone] = useState(false);
+  const [appReady, setAppReady] = useState(false);
+
+  useEffect(() => {
+    SplashScreen.hideAsync();
+    setAppReady(true);
+  }, []);
+
+  if (!appReady) return null;
+
   return (
     <AppThemeProvider>
       <ThemeProvider value={DefaultTheme}>
@@ -18,6 +60,35 @@ export default function RootLayout() {
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
+      {!splashDone && <CustomSplash onDone={() => setSplashDone(true)} />}
     </AppThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  splash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#e8e0d0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  splashImage: {
+    width: 280,
+    height: 280,
+  },
+  splashTitle: {
+    marginTop: 24,
+    fontSize: 42,
+    fontWeight: '900',
+    letterSpacing: 6,
+    color: '#c8622a',
+  },
+  splashSubtitle: {
+    marginTop: 6,
+    fontSize: 15,
+    fontWeight: '500',
+    letterSpacing: 1.5,
+    color: '#c8622a',
+  },
+});
