@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { clearAllData, deleteCheckInByKey, deleteSessionsByKey, getProfile, getTodayDate, saveProfile } from '../../storage';
+import { AlertSettings, clearAllData, deleteCheckInByKey, deleteSessionsByKey, getAlertSettings, getProfile, getTodayDate, saveAlertSettings, saveProfile } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
@@ -124,13 +124,21 @@ export default function SettingsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [alertSettings, setAlertSettings] = useState<AlertSettings>({ weeklyLoad: true, injuryOverload: true, bodyHighLoad: true });
 
-  useFocusEffect(useCallback(() => { loadProfile(); }, []));
+  useFocusEffect(useCallback(() => { loadData(); }, []));
 
-  const loadProfile = async () => {
-    const prof = await getProfile();
+  const loadData = async () => {
+    const [prof, alerts] = await Promise.all([getProfile(), getAlertSettings()]);
     setProfile(prof);
     if (prof?.name) setNameInput(prof.name);
+    setAlertSettings(alerts);
+  };
+
+  const toggleAlert = async (key: keyof AlertSettings) => {
+    const updated = { ...alertSettings, [key]: !alertSettings[key] };
+    setAlertSettings(updated);
+    await saveAlertSettings(updated);
   };
 
   const saveName = async () => {
@@ -144,7 +152,7 @@ export default function SettingsScreen() {
     const updated = { ...profile, maxGrade, projectGrade };
     await saveProfile(updated);
     setModalVisible(false);
-    await loadProfile();
+    await loadData();
   };
 
   const clearTodaySession = () => {
@@ -237,6 +245,40 @@ export default function SettingsScreen() {
               <View style={[styles.toggleThumb, isDark && { transform: [{ translateX: 18 }] }]} />
             </View>
           </TouchableOpacity>
+        </WindowBox>
+
+        {/* Alerts */}
+        <WindowBox label="Alerts">
+          {[
+            {
+              key: 'weeklyLoad' as keyof AlertSettings,
+              label: 'Weekly Load Warning',
+              sublabel: 'Warns when your total weekly effort is very high',
+            },
+            {
+              key: 'injuryOverload' as keyof AlertSettings,
+              label: 'Injury Overload',
+              sublabel: 'Flags body parts with too many strain signals in 14 days',
+            },
+            {
+              key: 'bodyHighLoad' as keyof AlertSettings,
+              label: 'High Body Load',
+              sublabel: 'Banner on the Body tab when a part reaches its limit',
+            },
+          ].map((item, i, arr) => (
+            <View key={item.key}>
+              <TouchableOpacity style={styles.row} onPress={() => toggleAlert(item.key)}>
+                <View style={styles.rowContent}>
+                  <Text style={styles.rowLabel}>{item.label}</Text>
+                  <Text style={styles.rowSublabel}>{item.sublabel}</Text>
+                </View>
+                <View style={[styles.toggleTrack, alertSettings[item.key] && { backgroundColor: C.terra, borderColor: C.terraBorder }]}>
+                  <View style={[styles.toggleThumb, alertSettings[item.key] && { transform: [{ translateX: 18 }] }]} />
+                </View>
+              </TouchableOpacity>
+              {i < arr.length - 1 && <View style={styles.rowDivider} />}
+            </View>
+          ))}
         </WindowBox>
 
         {/* Grades */}

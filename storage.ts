@@ -26,6 +26,27 @@ export type UserProfile = {
 
 export type BodyPartCounts = Record<string, number>;
 
+export type AlertSettings = {
+  weeklyLoad: boolean;
+  injuryOverload: boolean;
+  bodyHighLoad: boolean;
+};
+
+const DEFAULT_ALERT_SETTINGS: AlertSettings = {
+  weeklyLoad: true,
+  injuryOverload: true,
+  bodyHighLoad: true,
+};
+
+export const getAlertSettings = async (): Promise<AlertSettings> => {
+  const data = await secureGet('alertSettings');
+  return data ? { ...DEFAULT_ALERT_SETTINGS, ...JSON.parse(data) } : DEFAULT_ALERT_SETTINGS;
+};
+
+export const saveAlertSettings = async (settings: AlertSettings): Promise<void> => {
+  await secureSet('alertSettings', JSON.stringify(settings));
+};
+
 export type BodyAlert = {
   partId: string;
   partName: string;
@@ -179,6 +200,7 @@ export const clearAllData = async (): Promise<void> => {
     secureDelete('profile'),
     secureDelete('goalDate'),
     secureDelete('darkMode'),
+    secureDelete('alertSettings'),
     secureDeleteLarge('sessions'),
     secureDeleteLarge('checkins'),
   ]);

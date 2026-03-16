@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
-import { getCheckIns, getSessions } from '../../storage';
+import { getAlertSettings, getCheckIns, getSessions } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -230,11 +230,13 @@ export default function HeatmapScreen() {
   const [loads, setLoads] = useState({});
   const [window, setWindow] = useState(14);
   const [lastUpdated, setLastUpdated] = useState('');
+  const [alertSettings, setAlertSettings] = useState({ bodyHighLoad: true });
 
   useFocusEffect(useCallback(() => { computeLoads(); }, [window]));
 
   const computeLoads = async () => {
-    const [sessions, checkIns] = await Promise.all([getSessions(), getCheckIns()]);
+    const [sessions, checkIns, alertPrefs] = await Promise.all([getSessions(), getCheckIns(), getAlertSettings()]);
+    setAlertSettings(alertPrefs);
     const today = new Date();
     const counts = {};
 
@@ -317,7 +319,7 @@ export default function HeatmapScreen() {
         </View>
 
         {/* Alert if high load parts */}
-        {highParts.length > 0 && (
+        {alertSettings.bodyHighLoad && highParts.length > 0 && (
           <WindowBox
             label="⚠ High Load Detected"
             borderColor={C.redBorder}

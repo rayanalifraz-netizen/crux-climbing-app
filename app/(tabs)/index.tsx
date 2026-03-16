@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getCheckIns, getInjuryAlerts, getProfile, getSessions, saveProfile } from '../../storage';
+import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveProfile } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
@@ -168,12 +168,13 @@ export default function ProfileScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [weeklySummary, setWeeklySummary] = useState(null);
   const [injuryAlerts, setInjuryAlerts] = useState([]);
+  const [alertSettings, setAlertSettings] = useState({ weeklyLoad: true, injuryOverload: true, bodyHighLoad: true });
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
-    const [prof, sessions, checkIns, alerts] = await Promise.all([
-      getProfile(), getSessions(), getCheckIns(), getInjuryAlerts(),
+    const [prof, sessions, checkIns, alerts, alertPrefs] = await Promise.all([
+      getProfile(), getSessions(), getCheckIns(), getInjuryAlerts(), getAlertSettings(),
     ]);
     if (!prof) { setProfile(null); return; }
     setProfile(prof);
@@ -181,6 +182,7 @@ export default function ProfileScreen() {
     setTotalSessions(Object.keys(sessions).length);
     setWeeklySummary(getWeeklySummary(sessions, checkIns));
     setInjuryAlerts(alerts);
+    setAlertSettings(alertPrefs);
 
     let count = 0;
     if (prof.projectGrade) {
@@ -257,7 +259,7 @@ export default function ProfileScreen() {
         ) : (
           <>
             {/* Alerts */}
-            {weeklySummary?.totalRes >= 280 && (
+            {alertSettings.weeklyLoad && weeklySummary?.totalRes >= 280 && (
               <WindowBox
                 label="⚠ Notice"
                 borderColor={C.amberBorder}
@@ -273,7 +275,7 @@ export default function ProfileScreen() {
               </WindowBox>
             )}
 
-            {injuryAlerts.length > 0 && (
+            {alertSettings.injuryOverload && injuryAlerts.length > 0 && (
               <WindowBox
                 label="⚠ Overload"
                 borderColor={C.redBorder}

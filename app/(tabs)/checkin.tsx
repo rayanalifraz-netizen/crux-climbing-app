@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
+import { getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
 const today = getTodayDate();
@@ -116,16 +116,18 @@ export default function CheckInScreen() {
   const [drs, setDrs] = useState(null);
   const [recentSessions, setRecentSessions] = useState([]);
   const [injuryAlerts, setInjuryAlerts] = useState([]);
+  const [alertSettings, setAlertSettings] = useState({ injuryOverload: true });
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
-    const [checkIns, sessions, alerts] = await Promise.all([
-      getCheckIns(), getSessions(), getInjuryAlerts(),
+    const [checkIns, sessions, alerts, alertPrefs] = await Promise.all([
+      getCheckIns(), getSessions(), getInjuryAlerts(), getAlertSettings(),
     ]);
     const last7 = getLast7Days().map(date => sessions[date] || null);
     setRecentSessions(last7);
     setInjuryAlerts(alerts);
+    setAlertSettings(alertPrefs);
 
     if (checkIns[today]) {
       setAlreadyCheckedIn(true);
@@ -197,7 +199,7 @@ export default function CheckInScreen() {
         </View>
 
         {/* Injury Alert */}
-        {injuryAlerts.length > 0 && (
+        {alertSettings.injuryOverload && injuryAlerts.length > 0 && (
           <WindowBox
             label="⚠ Overload Warning"
             borderColor={C.redBorder}
