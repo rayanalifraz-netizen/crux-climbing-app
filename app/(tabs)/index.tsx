@@ -257,6 +257,30 @@ function computeRecovery(sessions, checkIns) {
   return { days, earliestDate, isReady, factors, res: lastSession.res };
 }
 
+function computeCheckInStreak(checkIns: Record<string, any>): { current: number; last7: boolean[] } {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  // If no check-in today yet, start counting from yesterday so streak stays alive
+  const startOffset = checkIns[todayStr] ? 0 : 1;
+
+  let current = 0;
+  for (let i = startOffset; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    if (checkIns[ds]) current++;
+    else break;
+  }
+
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (6 - i));
+    return !!checkIns[d.toISOString().split('T')[0]];
+  });
+
+  return { current, last7 };
+}
+
 function getWeeklySummary(sessions, checkIns) {
   const today = new Date();
   let sessionCount = 0, totalRes = 0, restDays = 0, hardSessions = 0;
@@ -387,6 +411,7 @@ export default function ProfileScreen() {
   const [alertSettings, setAlertSettings] = useState({ weeklyLoad: true, injuryOverload: true, bodyHighLoad: true });
   const [recovery, setRecovery] = useState(null);
   const [chiData, setChiData] = useState(null);
+  const [streak, setStreak] = useState<{ current: number; last7: boolean[] } | null>(null);
 
   useFocusEffect(useCallback(() => {
     loadData();
@@ -405,6 +430,7 @@ export default function ProfileScreen() {
     setAlertSettings(alertPrefs);
     setRecovery(computeRecovery(sessions, checkIns));
     setChiData(computeCHI(sessions, checkIns, alerts));
+    setStreak(computeCheckInStreak(checkIns));
 
     let count = 0;
     if (prof.projectGrade) {
@@ -554,6 +580,40 @@ export default function ProfileScreen() {
 
             {/* CHI */}
             {totalSessions > 0 && chiData && <CHICard data={chiData} />}
+
+            {/* Streak */}
+            {streak !== null && (
+              <Card label="Check-in Streak" style={{ marginTop: 8 }}>
+                <View style={styles.streakInner}>
+                  <View style={styles.streakLeft}>
+                    <View style={styles.streakNumRow}>
+                      <Text style={styles.streakNum}>{streak.current}</Text>
+                      <Text style={styles.streakUnit}>day{streak.current !== 1 ? 's' : ''}</Text>
+                    </View>
+                    <Text style={styles.streakMsg}>
+                      {streak.current === 0
+                        ? 'Check in today to start your streak'
+                        : streak.current < 3
+                        ? 'Great start — keep it going!'
+                        : streak.current < 7
+                        ? 'Building momentum!'
+                        : streak.current < 14
+                        ? 'One week strong 🔥'
+                        : 'Incredible consistency!'}
+                    </Text>
+                  </View>
+                  <View style={styles.streakDots}>
+                    {streak.last7.map((done, i) => (
+                      <View
+                        key={i}
+                        style={[styles.streakDot, done ? styles.streakDotDone : styles.streakDotMiss]}
+                      />
+                    ))}
+                    <Text style={styles.streakDotLabel}>last 7 days</Text>
+                  </View>
+                </View>
+              </Card>
+            )}
 
             {/* Grade Hero */}
             <Card label="Current Status" style={{ marginTop: 8 }}>
@@ -749,6 +809,18 @@ function makeStyles(C) {
     weeklyBig: { fontSize: 26, fontWeight: '800', color: C.ink, letterSpacing: -1, marginBottom: 2 },
     weeklySmall: { fontSize: 8, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
     weeklyDivider: { width: 1, height: 30, backgroundColor: C.borderLight },
+
+    streakInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
+    streakLeft: { flex: 1 },
+    streakNumRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
+    streakNum: { fontSize: 52, fontWeight: '900', color: C.terra, letterSpacing: -2, lineHeight: 56 },
+    streakUnit: { fontSize: 16, fontWeight: '700', color: C.sand },
+    streakMsg: { fontSize: 12, color: C.sand, lineHeight: 17 },
+    streakDots: { alignItems: 'center', gap: 5 },
+    streakDot: { width: 10, height: 10, borderRadius: 5 },
+    streakDotDone: { backgroundColor: C.terra },
+    streakDotMiss: { backgroundColor: C.borderLight },
+    streakDotLabel: { fontSize: 9, fontWeight: '600', color: C.dust, letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 4 },
 
     startStep: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12 },
     startStepNum: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
