@@ -260,10 +260,10 @@ export default function SessionScreen() {
                         <View style={styles.counter}>
                           {isActive && (
                             <TouchableOpacity onPress={() => decrementGrade(grade)} style={styles.counterBtn}>
-                              <Text style={styles.counterBtnText}>−</Text>
+                              <Text style={[styles.counterBtnText, { color: gradeColor(grade) }]}>−</Text>
                             </TouchableOpacity>
                           )}
-                          {isActive && <Text style={styles.countText}>{count}</Text>}
+                          {isActive && <Text style={[styles.countText, { color: gradeColor(grade) }]}>{count}</Text>}
                           <TouchableOpacity
                             onPress={() => incrementGrade(grade)}
                             style={[styles.counterBtn, isActive && { backgroundColor: gradeColor(grade) }]}
