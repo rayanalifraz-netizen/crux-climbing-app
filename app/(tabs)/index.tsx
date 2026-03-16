@@ -96,8 +96,20 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
   }
   load = Math.max(0, Math.min(100, load));
 
-  // 3. Injury Status (30%) — injury alert count
-  const injury = Math.max(0, 100 - injuryAlerts.length * 25);
+  // 3. Injury Status (30%) — injury alerts + recent check-in pain
+  let injury = 100 - injuryAlerts.length * 25;
+  for (let i = 0; i <= 2; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ci = checkIns[d.toISOString().split('T')[0]];
+    if (!ci || ci.isRestDay) continue;
+    const p = ci.painAreas?.length || 0;
+    const f = ci.affectedFingers?.length || 0;
+    if (p >= 3) injury -= 30; else if (p >= 2) injury -= 18; else if (p >= 1) injury -= 8;
+    if (f >= 3) injury -= 20; else if (f >= 1) injury -= 10;
+    break;
+  }
+  injury = Math.max(0, injury);
 
   const chi = Math.round(readiness * 0.35 + load * 0.35 + injury * 0.30);
   return { chi, readiness: Math.round(readiness), load: Math.round(load), injury: Math.round(injury) };
