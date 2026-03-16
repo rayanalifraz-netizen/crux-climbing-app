@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -481,7 +481,46 @@ export default function ProfileScreen() {
         ) : (
           <>
             {/* Alerts */}
-            {alertSettings.weeklyLoad && weeklySummary?.totalRes >= 280 && (
+            {/* ── Getting started (no sessions yet) ── */}
+            {totalSessions === 0 && (
+              <Card label="Getting Started" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra} style={{ marginTop: 8 }}>
+                <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 13, color: C.sand, lineHeight: 19, marginBottom: 16 }}>
+                    Your recovery scores, CHI, and progress appear here once you start logging. Do these two things first:
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.startStep}
+                    onPress={() => router.navigate('/(tabs)/session')}
+                  >
+                    <View style={[styles.startStepNum, { backgroundColor: C.terra }]}>
+                      <Text style={styles.startStepNumText}>1</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.startStepTitle, { color: C.ink }]}>Log a session</Text>
+                      <Text style={styles.startStepSub}>Track grades and hold types from today's climb</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={C.dust} />
+                  </TouchableOpacity>
+                  <View style={styles.startDivider} />
+                  <TouchableOpacity
+                    style={styles.startStep}
+                    onPress={() => router.navigate('/(tabs)/checkin')}
+                  >
+                    <View style={[styles.startStepNum, { backgroundColor: '#52B788' }]}>
+                      <Text style={styles.startStepNumText}>2</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.startStepTitle, { color: C.ink }]}>Morning check-in</Text>
+                      <Text style={styles.startStepSub}>Log soreness and pain to track recovery</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={C.dust} />
+                  </TouchableOpacity>
+                  <View style={{ height: 16 }} />
+                </View>
+              </Card>
+            )}
+
+            {totalSessions > 0 && alertSettings.weeklyLoad && weeklySummary?.totalRes >= 280 && (
               <Card
                 label="⚠ Notice"
                 accentColor={C.amber}
@@ -497,7 +536,7 @@ export default function ProfileScreen() {
               </Card>
             )}
 
-            {alertSettings.injuryOverload && injuryAlerts.length > 0 && (
+            {totalSessions > 0 && alertSettings.injuryOverload && injuryAlerts.length > 0 && (
               <Card
                 label="⚠ Overload"
                 accentColor={C.red}
@@ -514,7 +553,7 @@ export default function ProfileScreen() {
             )}
 
             {/* CHI */}
-            {chiData && <CHICard data={chiData} />}
+            {totalSessions > 0 && chiData && <CHICard data={chiData} />}
 
             {/* Grade Hero */}
             <Card label="Current Status" style={{ marginTop: 8 }}>
@@ -565,7 +604,7 @@ export default function ProfileScreen() {
             </Card>
 
             {/* Recovery */}
-            {recovery && (() => {
+            {totalSessions > 0 && recovery && (() => {
               const rc = recovery.isReady
                 ? { color: C.green, bg: C.greenBg, border: C.greenBorder }
                 : recovery.days >= 3
@@ -615,7 +654,7 @@ export default function ProfileScreen() {
             })()}
 
             {/* Weekly */}
-            {weeklySummary && (
+            {totalSessions > 0 && weeklySummary && (
               <Card label="This Week">
                 <View style={styles.weeklyInner}>
                   {[
@@ -710,6 +749,13 @@ function makeStyles(C) {
     weeklyBig: { fontSize: 26, fontWeight: '800', color: C.ink, letterSpacing: -1, marginBottom: 2 },
     weeklySmall: { fontSize: 8, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
     weeklyDivider: { width: 1, height: 30, backgroundColor: C.borderLight },
+
+    startStep: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12 },
+    startStepNum: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    startStepNumText: { fontSize: 13, fontWeight: '800', color: '#fff' },
+    startStepTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+    startStepSub: { fontSize: 12, color: C.sand, lineHeight: 16 },
+    startDivider: { height: 1, backgroundColor: C.borderLight, marginLeft: 42 },
 
     statsInner: { flexDirection: 'row', padding: 18 },
     statCell: { flex: 1 },
