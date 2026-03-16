@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { getAlertSettings, getCheckIns, getInjuryAlerts, getOnboardingComplete, getProfile, getSessions, markOnboardingComplete, saveProfile } from '../../storage';
+import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveProfile } from '../../storage';
 import { gradeColor, useTheme } from '../../context/ThemeContext';
 
 const GAUGE_R = 85;
@@ -389,17 +389,7 @@ export default function ProfileScreen() {
   const [chiData, setChiData] = useState(null);
 
   useFocusEffect(useCallback(() => {
-    async function check() {
-      const [done, prof] = await Promise.all([getOnboardingComplete(), getProfile()]);
-      if (done || prof) {
-        // Existing user without the flag — backfill it so they never hit onboarding again
-        if (!done) await markOnboardingComplete();
-        loadData();
-      } else {
-        router.replace('/onboarding');
-      }
-    }
-    check();
+    loadData();
   }, []));
 
   const loadData = async () => {

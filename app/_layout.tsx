@@ -1,11 +1,12 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet, Text } from 'react-native';
 import 'react-native-reanimated';
 import { ThemeProvider as AppThemeProvider } from '../context/ThemeContext';
+import { getOnboardingComplete, getProfile, markOnboardingComplete } from '../storage';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -44,7 +45,18 @@ export default function RootLayout() {
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
-    setAppReady(true);
+    async function init() {
+      const [done, prof] = await Promise.all([getOnboardingComplete(), getProfile()]);
+      if (!done && !prof) {
+        // Brand new user — show onboarding
+        router.replace('/onboarding');
+      } else if (!done && prof) {
+        // Existing user before onboarding was added — backfill flag
+        await markOnboardingComplete();
+      }
+      setAppReady(true);
+    }
+    init();
   }, []);
 
   if (!appReady) return null;
