@@ -52,7 +52,7 @@ export default function OnboardingScreen() {
   const projectGrades = maxGrade ? V_GRADES.slice(maxIndex) : [];
 
   const isSetupSlide = slide === TOTAL_SLIDES - 1;
-  const canFinish = isSetupSlide && name.trim().length > 0 && maxGrade && projectGrade;
+  const canFinish = isSetupSlide && !!maxGrade && !!projectGrade;
 
   const goNext = () => {
     const next = slide + 1;
@@ -63,7 +63,7 @@ export default function OnboardingScreen() {
   const handleFinish = async () => {
     if (!canFinish || saving) return;
     setSaving(true);
-    await saveProfile({ name: name.trim(), maxGrade: maxGrade!, projectGrade: projectGrade! });
+    await saveProfile({ name: name.trim() || 'Climber', maxGrade: maxGrade!, projectGrade: projectGrade! });
     await markOnboardingComplete();
     router.replace('/(tabs)');
   };
@@ -129,12 +129,13 @@ export default function OnboardingScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={s.setupScroll}
               keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
             >
               <Text style={s.setupTitle}>Set Up Your Profile</Text>
               <Text style={s.setupSubtitle}>This helps Crux personalise your scores and track your progress.</Text>
 
               {/* Name */}
-              <Text style={s.fieldLabel}>Your name</Text>
+              <Text style={s.fieldLabel}>Your name <Text style={s.optional}>(optional)</Text></Text>
               <TextInput
                 style={s.nameInput}
                 value={name}
@@ -148,7 +149,7 @@ export default function OnboardingScreen() {
 
               {/* Max grade */}
               <Text style={s.fieldLabel}>Hardest grade you've sent</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.gradeScroll} contentContainerStyle={s.gradeRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.gradeScroll} contentContainerStyle={s.gradeRow} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                 {V_GRADES.map(g => {
                   const sel = maxGrade === g;
                   return (
@@ -168,7 +169,7 @@ export default function OnboardingScreen() {
               {!maxGrade ? (
                 <Text style={s.gradeHint}>Select your level first</Text>
               ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.gradeScroll} contentContainerStyle={s.gradeRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.gradeScroll} contentContainerStyle={s.gradeRow} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                   {projectGrades.map(g => {
                     const sel = projectGrade === g;
                     return (
@@ -260,6 +261,7 @@ const s = StyleSheet.create({
   gradeChipSelected: { backgroundColor: '#C8622A', borderColor: '#C8622A' },
   gradeChipText: { fontSize: 14, fontWeight: '700', color: '#8A837A' },
   gradeChipTextSelected: { color: '#FFFFFF' },
+  optional: { fontSize: 10, fontWeight: '400', color: '#B8B0A8', textTransform: 'none', letterSpacing: 0 },
 
   // Bottom bar
   bottomBar: { paddingHorizontal: 28, paddingBottom: 24, paddingTop: 12, backgroundColor: '#F2F0ED' },
