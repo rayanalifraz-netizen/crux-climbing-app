@@ -1,8 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveProfile } from '../../storage';
 import { gradeColor, useTheme } from '../../context/ThemeContext';
+
+const GAUGE_R = 85;
+const GAUGE_SW = 16;
+const GAUGE_SIZE = (GAUGE_R + GAUGE_SW + 6) * 2;
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 
@@ -44,6 +50,144 @@ function Card({ label, labelColor, accentColor, bgColor, children, style }: {
   );
 }
 
+
+function computeCHI(sessions, checkIns, injuryAlerts) {
+  const today = new Date();
+
+  // 1. Body Readiness (35%) — from latest check-in (today or yesterday)
+  let readiness = 65;
+  for (let i = 0; i <= 2; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ci = checkIns[d.toISOString().split('T')[0]];
+    if (!ci) continue;
+    if (ci.isRestDay) { readiness = 100; break; }
+    let score = 100;
+    const s = parseInt(ci.soreness || '0');
+    if (s >= 8) score -= 40; else if (s >= 6) score -= 25; else if (s >= 4) score -= 10;
+    const p = ci.painAreas?.length || 0;
+    if (p >= 3) score -= 30; else if (p >= 2) score -= 20; else if (p >= 1) score -= 10;
+    const f = ci.affectedFingers?.length || 0;
+    if (f >= 3) score -= 20; else if (f >= 1) score -= 10;
+    readiness = Math.max(0, Math.min(100, score));
+    break;
+  }
+
+  // 2. Load Balance (35%) — last 7 days
+  let load = 100;
+  let sessionCount = 0, totalRES = 0, restCount = 0, consec = 0, maxConsec = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    if (sessions[ds]) {
+      sessionCount++; totalRES += sessions[ds].res;
+      if (sessions[ds].res > 70) { consec++; maxConsec = Math.max(maxConsec, consec); } else consec = 0;
+    } else consec = 0;
+    if (checkIns[ds]?.isRestDay) restCount++;
+  }
+  if (sessionCount === 0) {
+    load = 65;
+  } else {
+    if (totalRES >= 300) load -= 30; else if (totalRES >= 240) load -= 15;
+    if (maxConsec >= 3) load -= 25; else if (maxConsec >= 2) load -= 10;
+    if (restCount === 0 && sessionCount >= 4) load -= 15;
+    else if (restCount >= 1) load += 5;
+  }
+  load = Math.max(0, Math.min(100, load));
+
+  // 3. Injury Status (30%) — injury alert count
+  const injury = Math.max(0, 100 - injuryAlerts.length * 25);
+
+  const chi = Math.round(readiness * 0.35 + load * 0.35 + injury * 0.30);
+  return { chi, readiness: Math.round(readiness), load: Math.round(load), injury: Math.round(injury) };
+}
+
+function CHICard({ data }) {
+  const { C } = useTheme();
+  const { chi, readiness, load, injury } = data;
+
+  const chiColor = chi >= 80 ? C.green : chi >= 65 ? C.terra : chi >= 45 ? C.amber : C.red;
+  const chiLabel = chi >= 80 ? 'Peak' : chi >= 65 ? 'Good' : chi >= 45 ? 'Stressed' : 'Recovery Mode';
+  const chiDesc = chi >= 80
+    ? 'Your body is in peak condition for performance.'
+    : chi >= 65
+    ? 'Good shape — a few things to keep an eye on.'
+    : chi >= 45
+    ? 'Your body is under stress. Consider active recovery.'
+    : 'High recovery need. Prioritize rest over training.';
+
+  const circumference = 2 * Math.PI * GAUGE_R;
+  const arcLength = circumference * 0.75;
+  const filled = (chi / 100) * arcLength;
+  const cx = GAUGE_SIZE / 2;
+  const cy = GAUGE_SIZE / 2;
+
+  return (
+    <View style={{
+      backgroundColor: C.surface, borderRadius: 20, marginHorizontal: 16, marginBottom: 14,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12,
+      elevation: 3, padding: 20,
+    }}>
+      {/* Title row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: C.ink, letterSpacing: 0.2 }}>Climber Health Index</Text>
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.terra, justifyContent: 'center', alignItems: 'center' }}>
+          <Ionicons name="fitness" size={18} color="#fff" />
+        </View>
+      </View>
+
+      {/* Gauge */}
+      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <Svg width={GAUGE_SIZE} height={GAUGE_SIZE}>
+          <Circle cx={cx} cy={cy} r={GAUGE_R} fill="none"
+            stroke={C.borderLight} strokeWidth={GAUGE_SW}
+            strokeDasharray={`${arcLength} ${circumference - arcLength}`}
+            strokeLinecap="round"
+            transform={`rotate(135 ${cx} ${cy})`}
+          />
+          <Circle cx={cx} cy={cy} r={GAUGE_R} fill="none"
+            stroke={chiColor} strokeWidth={GAUGE_SW}
+            strokeDasharray={`${filled} ${circumference - filled}`}
+            strokeLinecap="round"
+            transform={`rotate(135 ${cx} ${cy})`}
+          />
+        </Svg>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 58, fontWeight: '900', color: C.ink, letterSpacing: -2, lineHeight: 62 }}>{chi}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: chiColor, marginTop: 2 }}>{chiLabel}</Text>
+        </View>
+      </View>
+
+      {/* Description */}
+      <Text style={{ textAlign: 'center', color: C.sand, fontSize: 13, lineHeight: 18, marginTop: -12, marginBottom: 20 }}>
+        {chiDesc}
+      </Text>
+
+      {/* Sub-component bars */}
+      <View style={{ gap: 10 }}>
+        {[
+          { label: 'Readiness', value: readiness },
+          { label: 'Load Balance', value: load },
+          { label: 'Injury Status', value: injury },
+        ].map(item => {
+          const barColor = item.value >= 80 ? C.green : item.value >= 55 ? C.amber : C.red;
+          return (
+            <View key={item.label}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>{item.label}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: barColor }}>{item.value}</Text>
+              </View>
+              <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                <View style={{ height: 5, width: `${item.value}%`, backgroundColor: barColor, borderRadius: 3 }} />
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 function computeRecovery(sessions, checkIns) {
   const sortedDates = Object.keys(sessions).sort().reverse();
@@ -230,6 +374,7 @@ export default function ProfileScreen() {
   const [injuryAlerts, setInjuryAlerts] = useState([]);
   const [alertSettings, setAlertSettings] = useState({ weeklyLoad: true, injuryOverload: true, bodyHighLoad: true });
   const [recovery, setRecovery] = useState(null);
+  const [chiData, setChiData] = useState(null);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
@@ -245,6 +390,7 @@ export default function ProfileScreen() {
     setInjuryAlerts(alerts);
     setAlertSettings(alertPrefs);
     setRecovery(computeRecovery(sessions, checkIns));
+    setChiData(computeCHI(sessions, checkIns, alerts));
 
     let count = 0;
     if (prof.projectGrade) {
@@ -352,6 +498,9 @@ export default function ProfileScreen() {
                 </View>
               </Card>
             )}
+
+            {/* CHI */}
+            {chiData && <CHICard data={chiData} />}
 
             {/* Grade Hero */}
             <Card label="Current Status" style={{ marginTop: 8 }}>
