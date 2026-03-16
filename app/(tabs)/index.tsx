@@ -54,7 +54,8 @@ function computeRecovery(sessions, checkIns) {
   const daysSince = Math.round((today.getTime() - lastD.getTime()) / (1000 * 60 * 60 * 24));
   if (daysSince > 7) return null;
 
-  let days = lastSession.res <= 40 ? 1 : lastSession.res <= 70 ? 2 : 3;
+  // Base: light = 0, moderate/hard = 1. Adjustments only for genuine warning signs.
+  let days = lastSession.res <= 40 ? 0 : 1;
   const factors: string[] = [];
 
   const nextDayD = new Date(lastD);
@@ -62,12 +63,19 @@ function computeRecovery(sessions, checkIns) {
   const nextDayStr = nextDayD.toISOString().split('T')[0];
   const checkIn = checkIns[nextDayStr] || checkIns[lastDate];
 
-  if (checkIn && parseInt(checkIn.soreness) >= 7) {
-    days += 1; factors.push('High soreness');
+  const soreness = parseInt(checkIn?.soreness || '0');
+  const fingerIntensive = lastSession.holdTypes?.some(h => ['crimps', 'pockets'].includes(h));
+  const fingersSore = (checkIn?.affectedFingers?.length || 0) > 0;
+
+  // Only add a day for high soreness (8+), not moderate
+  if (soreness >= 8) {
+    days += 1; factors.push('Very high soreness');
   }
-  if (lastSession.holdTypes?.some(h => ['crimps', 'pockets'].includes(h))) {
-    days += 1; factors.push('Finger-intensive holds');
+  // Finger-intensive holds AND fingers reported sore — both signals needed
+  if (fingerIntensive && fingersSore) {
+    days += 1; factors.push('Finger load + soreness');
   }
+  // 3+ consecutive hard sessions, not 2
   let consecutive = 0;
   for (let i = 0; i < 5; i++) {
     const d = new Date(lastD);
@@ -76,14 +84,11 @@ function computeRecovery(sessions, checkIns) {
     if (sessions[dStr]?.res >= 70) consecutive++;
     else break;
   }
-  if (consecutive >= 2) {
-    days += 1; factors.push('Consecutive hard days');
-  }
-  if (checkIn?.affectedFingers?.length > 0) {
-    days += 1; factors.push('Finger soreness reported');
+  if (consecutive >= 3) {
+    days += 1; factors.push('3+ hard sessions in a row');
   }
 
-  days = Math.min(days, 5);
+  days = Math.min(days, 3);
 
   const earliestDate = new Date(lastD);
   earliestDate.setDate(earliestDate.getDate() + days);
