@@ -413,11 +413,7 @@ export default function ProfileScreen() {
   const [chiData, setChiData] = useState(null);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] } | null>(null);
 
-  useFocusEffect(useCallback(() => {
-    loadData();
-  }, []));
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const [prof, sessions, checkIns, alerts, alertPrefs] = await Promise.all([
       getProfile(), getSessions(), getCheckIns(), getInjuryAlerts(), getAlertSettings(),
     ]);
@@ -439,9 +435,9 @@ export default function ProfileScreen() {
           count += sess.gradeCounts[prof.projectGrade];
       });
     }
-    setProgressCount(count);
     const target = prof.sendsToUnlock ?? 10;
     const goalReached = count >= target;
+    setProgressCount(count);
     setShowCongrats(goalReached);
 
     if (goalReached && prof.projectGrade && prof.maxGrade) {
@@ -451,23 +447,27 @@ export default function ProfileScreen() {
         const newProjectIndex = Math.min(projectIndex + 1, V_GRADES.length - 1);
         await saveProfile({ ...prof, maxGrade: prof.projectGrade, projectGrade: V_GRADES[newProjectIndex] });
         const updatedProf = await getProfile();
-        setProfile(updatedProf);
+        if (updatedProf) setProfile(updatedProf);
         setProgressCount(0);
         setShowCongrats(false);
       }
     }
-  };
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    loadData();
+  }, [loadData]));
 
   const handleGradeSave = async (maxGrade, projectGrade) => {
     await saveProfile({ ...profile, maxGrade, projectGrade });
     setModalVisible(false);
-    await loadData();
+    loadData();
   };
 
   const handleSendsChange = async (n) => {
     await saveProfile({ ...profile, sendsToUnlock: n });
     setShowSendsModal(false);
-    await loadData();
+    loadData();
   };
 
   const getAvgResColor = (res) => {
