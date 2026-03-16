@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveProfile } from '../../storage';
+import { getAlertSettings, getCheckIns, getInjuryAlerts, getOnboardingComplete, getProfile, getSessions, saveProfile } from '../../storage';
 import { gradeColor, useTheme } from '../../context/ThemeContext';
 
 const GAUGE_R = 85;
@@ -388,7 +388,12 @@ export default function ProfileScreen() {
   const [recovery, setRecovery] = useState(null);
   const [chiData, setChiData] = useState(null);
 
-  useFocusEffect(useCallback(() => { loadData(); }, []));
+  useFocusEffect(useCallback(() => {
+    getOnboardingComplete().then(done => {
+      if (!done) router.replace('/onboarding');
+      else loadData();
+    });
+  }, []));
 
   const loadData = async () => {
     const [prof, sessions, checkIns, alerts, alertPrefs] = await Promise.all([

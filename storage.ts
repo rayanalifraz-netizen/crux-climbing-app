@@ -201,9 +201,19 @@ export const clearAllData = async (): Promise<void> => {
     secureDelete('goalDate'),
     secureDelete('darkMode'),
     secureDelete('alertSettings'),
+    secureDelete('onboardingComplete'),
     secureDeleteLarge('sessions'),
     secureDeleteLarge('checkins'),
   ]);
+};
+
+export const getOnboardingComplete = async (): Promise<boolean> => {
+  try { return (await SecureStore.getItemAsync('onboardingComplete')) === 'true'; }
+  catch { return false; }
+};
+
+export const markOnboardingComplete = async (): Promise<void> => {
+  await SecureStore.setItemAsync('onboardingComplete', 'true');
 };
 
 // ─── Date helper ──────────────────────────────────────────────────────────────
