@@ -41,6 +41,57 @@ function WindowBox({ label, labelColor, borderColor, bgColor, children, style })
 }
 
 
+function computeRecovery(sessions, checkIns) {
+  const sortedDates = Object.keys(sessions).sort().reverse();
+  if (sortedDates.length === 0) return null;
+
+  const lastDate = sortedDates[0];
+  const lastSession = sessions[lastDate];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const lastD = new Date(lastDate + 'T00:00:00');
+  const daysSince = Math.round((today.getTime() - lastD.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysSince > 7) return null;
+
+  let days = lastSession.res <= 40 ? 1 : lastSession.res <= 70 ? 2 : 3;
+  const factors: string[] = [];
+
+  const nextDayD = new Date(lastD);
+  nextDayD.setDate(nextDayD.getDate() + 1);
+  const nextDayStr = nextDayD.toISOString().split('T')[0];
+  const checkIn = checkIns[nextDayStr] || checkIns[lastDate];
+
+  if (checkIn && parseInt(checkIn.soreness) >= 7) {
+    days += 1; factors.push('High soreness');
+  }
+  if (lastSession.holdTypes?.some(h => ['crimps', 'pockets'].includes(h))) {
+    days += 1; factors.push('Finger-intensive holds');
+  }
+  let consecutive = 0;
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(lastD);
+    d.setDate(d.getDate() - i);
+    const dStr = d.toISOString().split('T')[0];
+    if (sessions[dStr]?.res >= 70) consecutive++;
+    else break;
+  }
+  if (consecutive >= 2) {
+    days += 1; factors.push('Consecutive hard days');
+  }
+  if (checkIn?.affectedFingers?.length > 0) {
+    days += 1; factors.push('Finger soreness reported');
+  }
+
+  days = Math.min(days, 5);
+
+  const earliestDate = new Date(lastD);
+  earliestDate.setDate(earliestDate.getDate() + days);
+  const isReady = today >= earliestDate;
+
+  return { days, earliestDate, isReady, factors, res: lastSession.res };
+}
+
 function getWeeklySummary(sessions, checkIns) {
   const today = new Date();
   let sessionCount = 0, totalRes = 0, restDays = 0, hardSessions = 0;
@@ -169,6 +220,7 @@ export default function ProfileScreen() {
   const [weeklySummary, setWeeklySummary] = useState(null);
   const [injuryAlerts, setInjuryAlerts] = useState([]);
   const [alertSettings, setAlertSettings] = useState({ weeklyLoad: true, injuryOverload: true, bodyHighLoad: true });
+  const [recovery, setRecovery] = useState(null);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
@@ -183,6 +235,7 @@ export default function ProfileScreen() {
     setWeeklySummary(getWeeklySummary(sessions, checkIns));
     setInjuryAlerts(alerts);
     setAlertSettings(alertPrefs);
+    setRecovery(computeRecovery(sessions, checkIns));
 
     let count = 0;
     if (prof.projectGrade) {
@@ -339,6 +392,53 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </WindowBox>
 
+            {/* Recovery */}
+            {recovery && (() => {
+              const rc = recovery.isReady
+                ? { color: C.green, bg: C.greenBg, border: C.greenBorder }
+                : recovery.days >= 3
+                  ? { color: C.red, bg: C.redBg, border: C.redBorder }
+                  : { color: C.amber, bg: C.amberBg, border: C.amberBorder };
+              return (
+                <WindowBox label="Recovery" borderColor={rc.border} bgColor={rc.bg} labelColor={rc.color}>
+                  <View style={styles.recoveryInner}>
+                    <View style={styles.recoveryTopRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.recoveryStatus, { color: rc.color }]}>
+                          {recovery.isReady ? 'Ready to climb' : `Earliest: ${recovery.earliestDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`}
+                        </Text>
+                        {!recovery.isReady && (
+                          <Text style={[styles.recoverySub, { color: rc.color + 'aa' }]}>
+                            {recovery.days} day{recovery.days !== 1 ? 's' : ''} recommended rest · Last session RES {recovery.res}
+                          </Text>
+                        )}
+                        {recovery.isReady && (
+                          <Text style={[styles.recoverySub, { color: rc.color + 'aa' }]}>
+                            Last session RES {recovery.res} — body should be ready
+                          </Text>
+                        )}
+                      </View>
+                      <View style={[styles.recoveryDaysBox, { borderColor: rc.border }]}>
+                        <Text style={[styles.recoveryDaysNum, { color: rc.color }]}>
+                          {recovery.isReady ? '✓' : recovery.days}
+                        </Text>
+                        {!recovery.isReady && <Text style={[styles.recoveryDaysLabel, { color: rc.color }]}>days</Text>}
+                      </View>
+                    </View>
+                    {!recovery.isReady && recovery.factors.length > 0 && (
+                      <View style={styles.recoveryFactors}>
+                        {recovery.factors.map(f => (
+                          <View key={f} style={[styles.recoveryFactor, { borderColor: rc.border + '60' }]}>
+                            <Text style={[styles.recoveryFactorText, { color: rc.color }]}>{f}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </WindowBox>
+              );
+            })()}
+
             {/* Weekly */}
             {weeklySummary && (
               <WindowBox label="This Week">
@@ -416,6 +516,17 @@ function makeStyles(C) {
     progressHint: { color: C.sand, fontSize: 11 },
     sendsTargetBtn: { borderTopWidth: 1, borderTopColor: C.terraBorder + '40', paddingHorizontal: 18, paddingVertical: 10 },
     sendsTargetText: { color: C.terraDark || C.terra, fontSize: 11, fontWeight: '600' },
+
+    recoveryInner: { padding: 18, paddingTop: 22 },
+    recoveryTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    recoveryStatus: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5, marginBottom: 4 },
+    recoverySub: { fontSize: 11, fontWeight: '600', lineHeight: 16 },
+    recoveryDaysBox: { width: 52, height: 52, borderWidth: 1.5, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+    recoveryDaysNum: { fontSize: 20, fontWeight: '800', lineHeight: 24 },
+    recoveryDaysLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+    recoveryFactors: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+    recoveryFactor: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+    recoveryFactorText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
 
     weeklyInner: { flexDirection: 'row', padding: 16 },
     weeklyCellWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
