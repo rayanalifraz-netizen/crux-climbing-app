@@ -439,6 +439,9 @@ export default function ProfileScreen() {
                         ))}
                       </View>
                     )}
+                    <Text style={styles.recoveryDisclaimer}>
+                      Guide only — always trust how your body feels over any estimate.
+                    </Text>
                   </View>
                 </WindowBox>
               );
@@ -532,6 +535,7 @@ function makeStyles(C) {
     recoveryFactors: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
     recoveryFactor: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
     recoveryFactorText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
+    recoveryDisclaimer: { fontSize: 10, color: C.dust, marginTop: 10, fontStyle: 'italic' },
 
     weeklyInner: { flexDirection: 'row', padding: 16 },
     weeklyCellWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
