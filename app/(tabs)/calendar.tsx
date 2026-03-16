@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { deleteGoalDate, getCheckIns, getGoalDate, getSessions, saveGoalDate } from '../../storage';
 import { gradeColor, gradeColorBg, useTheme } from '../../context/ThemeContext';
 
@@ -101,6 +101,9 @@ export default function CalendarScreen() {
   const [goalDate, setGoalDate] = useState(null);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalPickerMonth, setGoalPickerMonth] = useState(new Date());
+  const [viewerUris, setViewerUris] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [showViewer, setShowViewer] = useState(false);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
@@ -432,6 +435,24 @@ export default function CalendarScreen() {
                       <Text style={styles.notesText}>{selectedSession.notes}</Text>
                     </>
                   ) : null}
+
+                  {selectedSession.mediaUris?.length > 0 && (
+                    <>
+                      <Text style={styles.detailSectionLabel}>Media</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+                          {selectedSession.mediaUris.map((uri, idx) => (
+                            <TouchableOpacity
+                              key={uri}
+                              onPress={() => { setViewerUris(selectedSession.mediaUris); setViewerIndex(idx); setShowViewer(true); }}
+                            >
+                              <Image source={{ uri }} style={styles.mediaThumbnail} />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    </>
+                  )}
                 </>
               )}
 
@@ -452,6 +473,41 @@ export default function CalendarScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      {/* Full-screen media viewer */}
+      <Modal visible={showViewer} transparent animationType="fade" onRequestClose={() => setShowViewer(false)}>
+        <View style={styles.viewerOverlay}>
+          <TouchableOpacity style={styles.viewerClose} onPress={() => setShowViewer(false)}>
+            <Text style={styles.viewerCloseText}>✕</Text>
+          </TouchableOpacity>
+          {viewerUris.length > 0 && (
+            <Image
+              source={{ uri: viewerUris[viewerIndex] }}
+              style={styles.viewerImage}
+              resizeMode="contain"
+            />
+          )}
+          {viewerUris.length > 1 && (
+            <View style={styles.viewerNav}>
+              <TouchableOpacity
+                style={[styles.viewerNavBtn, viewerIndex === 0 && { opacity: 0.3 }]}
+                onPress={() => setViewerIndex(i => Math.max(0, i - 1))}
+                disabled={viewerIndex === 0}
+              >
+                <Text style={styles.viewerNavText}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.viewerCounter}>{viewerIndex + 1} / {viewerUris.length}</Text>
+              <TouchableOpacity
+                style={[styles.viewerNavBtn, viewerIndex === viewerUris.length - 1 && { opacity: 0.3 }]}
+                onPress={() => setViewerIndex(i => Math.min(viewerUris.length - 1, i + 1))}
+                disabled={viewerIndex === viewerUris.length - 1}
+              >
+                <Text style={styles.viewerNavText}>›</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -529,6 +585,17 @@ function makeStyles(C) {
 
     emptyDayInner: { padding: 20, alignItems: 'center' },
     emptyDayText: { color: C.dust, fontSize: 12, fontWeight: '600' },
+
+    mediaThumbnail: { width: 88, height: 88, borderRadius: 10, backgroundColor: C.borderLight },
+
+    viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
+    viewerClose: { position: 'absolute', top: 52, right: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+    viewerCloseText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+    viewerImage: { width: '100%', height: '75%' },
+    viewerNav: { flexDirection: 'row', alignItems: 'center', gap: 24, marginTop: 20 },
+    viewerNavBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+    viewerNavText: { color: '#fff', fontSize: 32, fontWeight: '300' },
+    viewerCounter: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600' },
   });
 }
 

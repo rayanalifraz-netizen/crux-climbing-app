@@ -1,8 +1,9 @@
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { getCheckIns, getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
+import { Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
 import { gradeColor, gradeColorBg, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
@@ -96,6 +97,7 @@ export default function SessionScreen() {
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
   const [notes, setNotes] = useState('');
+  const [pendingMedia, setPendingMedia] = useState<string[]>([]);
   const [maxGrade, setMaxGrade] = useState('');
   const [alreadySaved, setAlreadySaved] = useState(false);
   const [savedSession, setSavedSession] = useState(null);
@@ -142,15 +144,36 @@ export default function SessionScreen() {
     setMovementTypes(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
   };
 
+  const pickMedia = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'],
+      allowsMultipleSelection: true,
+      quality: 0.8,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+    });
+    if (!result.canceled) {
+      setPendingMedia(prev => [...prev, ...result.assets.map(a => a.uri)]);
+    }
+  };
+
+  const removeMedia = (uri: string) => {
+    setPendingMedia(prev => prev.filter(u => u !== uri));
+  };
+
   const handleSave = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await saveSession({ date: today, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim() });
+    // Copy temp picker URIs to persistent storage
+    const persistedUris = await Promise.all(pendingMedia.map(uri => copyMediaToStorage(uri)));
+    await saveSession({ date: today, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: persistedUris });
     setAlreadySaved(true);
-    setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim() });
+    setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: persistedUris });
     setGradeCounts({});
     setHoldTypes([]);
     setMovementTypes([]);
     setNotes('');
+    setPendingMedia([]);
   };
 
   const hasGrades = Object.keys(gradeCounts).length > 0;
@@ -362,6 +385,29 @@ export default function SessionScreen() {
               </View>
             </Card>
 
+            {/* Media */}
+            <Card label="Photos & Videos · optional">
+              <View style={styles.sectionInner}>
+                {pendingMedia.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {pendingMedia.map(uri => (
+                        <View key={uri} style={styles.mediaThumbnailWrap}>
+                          <Image source={{ uri }} style={styles.mediaThumbnail} />
+                          <TouchableOpacity style={styles.mediaRemoveBtn} onPress={() => removeMedia(uri)}>
+                            <Text style={styles.mediaRemoveText}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+                <TouchableOpacity style={styles.mediaAddBtn} onPress={pickMedia}>
+                  <Text style={styles.mediaAddText}>+ Add photos / videos</Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
+
           </>
         )}
 
@@ -409,6 +455,13 @@ function makeStyles(C) {
     savedNotesBox: { backgroundColor: C.surface, borderRadius: 12, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: C.borderLight },
     savedNotesText: { color: C.sand, fontSize: 12, lineHeight: 18 },
     savedHint: { color: C.dust, fontSize: 10, textAlign: 'center' },
+
+    mediaThumbnailWrap: { position: 'relative' },
+    mediaThumbnail: { width: 90, height: 90, borderRadius: 10, backgroundColor: C.borderLight },
+    mediaRemoveBtn: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
+    mediaRemoveText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+    mediaAddBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderStyle: 'dashed', borderRadius: 10, padding: 14, alignItems: 'center' },
+    mediaAddText: { color: C.sand, fontSize: 13, fontWeight: '600' },
 
     noticeInner: { padding: 14, paddingLeft: 24 },
     noticeText: { color: C.amber, fontSize: 12, fontWeight: '600' },

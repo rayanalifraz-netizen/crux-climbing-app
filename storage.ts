@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 
 export type Session = {
@@ -7,6 +8,31 @@ export type Session = {
   movementTypes: string[];
   res: number;
   notes?: string;
+  mediaUris?: string[];
+};
+
+// ─── Media file helpers ───────────────────────────────────────────────────────
+
+const MEDIA_DIR = FileSystem.documentDirectory + 'crux-media/';
+
+const ensureMediaDir = async () => {
+  const info = await FileSystem.getInfoAsync(MEDIA_DIR);
+  if (!info.exists) await FileSystem.makeDirectoryAsync(MEDIA_DIR, { intermediates: true });
+};
+
+export const copyMediaToStorage = async (uri: string): Promise<string> => {
+  await ensureMediaDir();
+  const ext = uri.split('.').pop()?.split('?')[0] || 'jpg';
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const dest = MEDIA_DIR + filename;
+  await FileSystem.copyAsync({ from: uri, to: dest });
+  return dest;
+};
+
+export const deleteMediaFiles = async (uris: string[]): Promise<void> => {
+  await Promise.all(uris.map(uri =>
+    FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {})
+  ));
 };
 
 export type CheckIn = {
@@ -196,6 +222,7 @@ export const saveDarkMode = async (val: boolean): Promise<void> => {
 };
 
 export const clearAllData = async (): Promise<void> => {
+  await FileSystem.deleteAsync(MEDIA_DIR, { idempotent: true }).catch(() => {});
   await Promise.all([
     secureDelete('profile'),
     secureDelete('goalDate'),

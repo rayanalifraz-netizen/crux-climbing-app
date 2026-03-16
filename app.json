@@ -40,7 +40,14 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Crux needs access to your photos so you can attach climbing clips to sessions.",
+          "cameraPermission": "Crux needs camera access to capture climbing clips."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
