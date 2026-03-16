@@ -1,12 +1,11 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet, Text } from 'react-native';
 import 'react-native-reanimated';
 import { ThemeProvider as AppThemeProvider } from '../context/ThemeContext';
-import { getOnboardingComplete, getProfile, markOnboardingComplete } from '../storage';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -41,36 +40,16 @@ function CustomSplash({ onDone }: { onDone: () => void }) {
 
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
-  const [appReady, setAppReady] = useState(false);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
-    async function init() {
-      const [done, prof] = await Promise.all([getOnboardingComplete(), getProfile()]);
-      if (!done && !prof) {
-        setNeedsOnboarding(true);
-      } else if (!done && prof) {
-        await markOnboardingComplete();
-      }
-      setAppReady(true);
-    }
-    init();
   }, []);
-
-  // Fire redirect only after Stack is mounted
-  useEffect(() => {
-    if (appReady && needsOnboarding) {
-      router.replace('/onboarding');
-    }
-  }, [appReady, needsOnboarding]);
-
-  if (!appReady) return null;
 
   return (
     <AppThemeProvider>
       <ThemeProvider value={DefaultTheme}>
         <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
