@@ -3,38 +3,43 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { getCheckIns, getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
-import { useTheme } from '../../context/ThemeContext';
+import { gradeColor, gradeColorBg, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 const today = getTodayDate();
 
-function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+function Card({ label, labelColor, accentColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+}) {
   const { C } = useTheme();
+  const hasAccent = !!accentColor;
   return (
     <View style={[{
-      borderWidth: 1.5,
-      borderColor: borderColor || C.border,
       backgroundColor: bgColor || C.surface,
-      borderRadius: 4,
+      borderRadius: 20,
       marginHorizontal: 16,
-      marginBottom: 12,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.07,
+      shadowRadius: 12,
+      elevation: 3,
+      overflow: 'hidden',
     }, style]}>
+      {hasAccent && (
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
+      )}
       {label && (
-        <View style={{
-          position: 'absolute',
-          top: -10,
-          left: 12,
-          backgroundColor: bgColor || C.surface,
-          paddingHorizontal: 6,
-        }}>
-          <Text style={{
-            fontSize: 9,
-            fontWeight: '800',
-            color: labelColor || C.sand,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-          }}>{label}</Text>
-        </View>
+        <Text style={{
+          fontSize: 10,
+          fontWeight: '700',
+          color: labelColor || C.dust,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingTop: 18,
+          paddingBottom: 2,
+        }}>{label}</Text>
       )}
       {children}
     </View>
@@ -184,19 +189,19 @@ export default function SessionScreen() {
 
         {/* Rest Day Block */}
         {isRestDay && !alreadySaved && (
-          <WindowBox label="Today" borderColor={C.greenBorder} bgColor={C.greenBg} labelColor={C.green}>
+          <Card label="Today" accentColor={C.green} bgColor={C.greenBg} labelColor={C.green}>
             <View style={styles.restDayInner}>
               <Text style={styles.restDayTitle}>Rest Day</Text>
               <Text style={styles.restDayText}>
                 You logged a rest day — no session can be recorded.{'\n'}Clear your check-in from Settings to override.
               </Text>
             </View>
-          </WindowBox>
+          </Card>
         )}
 
         {/* Already Saved */}
         {alreadySaved && savedSession && (
-          <WindowBox label="Today's Session" borderColor={C.terraBorder} bgColor={C.terraBg} labelColor={C.terra}>
+          <Card label="Today's Session" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra}>
             <View style={styles.savedInner}>
               <View style={styles.savedTopRow}>
                 <Text style={styles.savedAttempts}>
@@ -210,8 +215,8 @@ export default function SessionScreen() {
               {savedSession.gradeCounts && Object.keys(savedSession.gradeCounts).length > 0 && (
                 <View style={styles.savedGrades}>
                   {Object.entries(savedSession.gradeCounts).map(([grade, count]) => (
-                    <View key={grade} style={styles.savedGradeChip}>
-                      <Text style={styles.savedGradeText}>{grade}</Text>
+                    <View key={grade} style={[styles.savedGradeChip, { backgroundColor: gradeColorBg(grade), borderColor: gradeColor(grade) + '40' }]}>
+                      <Text style={[styles.savedGradeText, { color: gradeColor(grade) }]}>{grade}</Text>
                       <Text style={styles.savedGradeCount}>×{count}</Text>
                     </View>
                   ))}
@@ -224,22 +229,22 @@ export default function SessionScreen() {
               ) : null}
               <Text style={styles.savedHint}>Clear from Settings to re-log today</Text>
             </View>
-          </WindowBox>
+          </Card>
         )}
 
         {/* Main Form */}
         {!alreadySaved && !isRestDay && (
           <>
             {!maxGrade && (
-              <WindowBox label="Notice" borderColor={C.amberBorder} bgColor={C.amberBg} labelColor={C.amber}>
+              <Card label="Notice" accentColor={C.amber} bgColor={C.amberBg} labelColor={C.amber}>
                 <View style={styles.noticeInner}>
                   <Text style={styles.noticeText}>Set your climbing level in Profile for accurate RES</Text>
                 </View>
-              </WindowBox>
+              </Card>
             )}
 
             {/* Grades */}
-            <WindowBox label={hasGrades ? `Grades Climbed · ${totalAttempts} attempts` : 'Grades Climbed'}>
+            <Card label={hasGrades ? `Grades Climbed · ${totalAttempts} attempts` : 'Grades Climbed'}>
               <View style={styles.sectionInner}>
                 <Text style={styles.sectionHint}>Tap + to log attempts at each grade</Text>
                 <View style={styles.gradeGrid}>
@@ -249,9 +254,9 @@ export default function SessionScreen() {
                     return (
                       <View key={grade} style={[
                         styles.gradeCell,
-                        isActive && { borderColor: C.terraBorder, backgroundColor: C.terraBg }
+                        isActive && { borderColor: gradeColor(grade), backgroundColor: gradeColorBg(grade) }
                       ]}>
-                        <Text style={[styles.gradeLabel, isActive && { color: C.terra }]}>{grade}</Text>
+                        <Text style={[styles.gradeLabel, isActive && { color: gradeColor(grade) }]}>{grade}</Text>
                         <View style={styles.counter}>
                           {isActive && (
                             <TouchableOpacity onPress={() => decrementGrade(grade)} style={styles.counterBtn}>
@@ -261,7 +266,7 @@ export default function SessionScreen() {
                           {isActive && <Text style={styles.countText}>{count}</Text>}
                           <TouchableOpacity
                             onPress={() => incrementGrade(grade)}
-                            style={[styles.counterBtn, isActive && { backgroundColor: C.terraDark }]}
+                            style={[styles.counterBtn, isActive && { backgroundColor: gradeColor(grade) }]}
                           >
                             <Text style={[styles.counterBtnText, { color: isActive ? '#fff' : C.sand }]}>+</Text>
                           </TouchableOpacity>
@@ -271,13 +276,13 @@ export default function SessionScreen() {
                   })}
                 </View>
               </View>
-            </WindowBox>
+            </Card>
 
             {/* Live RES */}
             {hasGrades && (
-              <WindowBox
+              <Card
                 label="Relative Effort Score"
-                borderColor={getResBorder(res)}
+                accentColor={getResColor(res)}
                 bgColor={getResBg(res)}
                 labelColor={getResColor(res)}
               >
@@ -292,11 +297,11 @@ export default function SessionScreen() {
                     <View style={[styles.resFill, { width: `${res}%`, backgroundColor: getResColor(res) }]} />
                   </View>
                 </View>
-              </WindowBox>
+              </Card>
             )}
 
             {/* Hold Types */}
-            <WindowBox label="Hold Types · affects RES">
+            <Card label="Hold Types · affects RES">
               <View style={styles.sectionInner}>
                 <View style={styles.tagGrid}>
                   {HOLD_TYPES.map((hold) => {
@@ -314,10 +319,10 @@ export default function SessionScreen() {
                   })}
                 </View>
               </View>
-            </WindowBox>
+            </Card>
 
             {/* Movement Types */}
-            <WindowBox label="Movement Types · injury tracking">
+            <Card label="Movement Types · injury tracking">
               <View style={styles.sectionInner}>
                 <View style={styles.tagGrid}>
                   {MOVEMENT_TYPES.map((move) => {
@@ -335,10 +340,10 @@ export default function SessionScreen() {
                   })}
                 </View>
               </View>
-            </WindowBox>
+            </Card>
 
             {/* Notes */}
-            <WindowBox label="Session Notes · optional">
+            <Card label="Session Notes · optional">
               <View style={styles.sectionInner}>
                 <TextInput
                   style={styles.notesInput}
@@ -355,7 +360,7 @@ export default function SessionScreen() {
                   <Text style={styles.notesCount}>{notes.length}/300</Text>
                 )}
               </View>
-            </WindowBox>
+            </Card>
 
           </>
         )}
@@ -378,65 +383,65 @@ export default function SessionScreen() {
 function makeStyles(C) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
-    scrollContent: { paddingBottom: 48 },
+    scrollContent: { paddingBottom: 60 },
 
-    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+    header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
     greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
     title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
-    statusBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
+    statusBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
     statusBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 
-    restDayInner: { padding: 24, alignItems: 'center', gap: 8 },
+    restDayInner: { padding: 24, paddingLeft: 24, alignItems: 'center', gap: 8 },
     restDayTitle: { fontSize: 28, fontWeight: '800', color: C.green, letterSpacing: -1 },
     restDayText: { color: C.sand, fontSize: 12, textAlign: 'center', lineHeight: 18 },
 
-    savedInner: { padding: 18, paddingTop: 22 },
+    savedInner: { padding: 18, paddingLeft: 24 },
     savedTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
     savedAttempts: { color: C.sand, fontSize: 13 },
-    resBox: { alignItems: 'center', borderWidth: 1.5, borderRadius: 4, padding: 10, minWidth: 52 },
+    resBox: { alignItems: 'center', borderWidth: 1.5, borderRadius: 12, padding: 10, minWidth: 52 },
     resBoxNum: { fontSize: 20, fontWeight: '800' },
     resBoxLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
     savedGrades: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-    savedGradeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: C.surface, borderRadius: 4, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: C.borderLight },
+    savedGradeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: C.surface, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: C.borderLight },
     savedGradeText: { color: C.terra, fontSize: 12, fontWeight: '800' },
     savedGradeCount: { color: C.dust, fontSize: 11 },
-    savedNotesBox: { backgroundColor: C.surface, borderRadius: 4, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: C.borderLight },
+    savedNotesBox: { backgroundColor: C.surface, borderRadius: 12, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: C.borderLight },
     savedNotesText: { color: C.sand, fontSize: 12, lineHeight: 18 },
     savedHint: { color: C.dust, fontSize: 10, textAlign: 'center' },
 
-    noticeInner: { padding: 14 },
+    noticeInner: { padding: 14, paddingLeft: 24 },
     noticeText: { color: C.amber, fontSize: 12, fontWeight: '600' },
 
-    sectionInner: { padding: 16, paddingTop: 20 },
+    sectionInner: { padding: 16, paddingTop: 14 },
     sectionHint: { color: C.dust, fontSize: 11, marginBottom: 12 },
 
     gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    gradeCell: { width: '22%', backgroundColor: C.surfaceAlt, borderRadius: 4, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
+    gradeCell: { width: '22%', backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
     gradeLabel: { color: C.sand, fontSize: 13, fontWeight: '800', marginBottom: 6 },
     counter: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    counterBtn: { width: 20, height: 20, backgroundColor: C.borderLight, borderRadius: 3, justifyContent: 'center', alignItems: 'center' },
+    counterBtn: { width: 20, height: 20, backgroundColor: C.borderLight, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
     counterBtnText: { color: C.sand, fontSize: 13, fontWeight: '800', lineHeight: 17 },
     countText: { color: C.ink, fontSize: 12, fontWeight: '800', minWidth: 12, textAlign: 'center' },
 
-    resInner: { padding: 18, paddingTop: 22 },
+    resInner: { padding: 18, paddingLeft: 24 },
     resTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
     resVerdict: { fontSize: 16, fontWeight: '700', flex: 1, lineHeight: 20 },
-    resScoreBox: { width: 52, height: 52, borderWidth: 1.5, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+    resScoreBox: { width: 52, height: 52, borderWidth: 1.5, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     resScoreNum: { fontSize: 20, fontWeight: '800' },
-    resTrack: { height: 3, backgroundColor: C.borderLight, borderRadius: 1, overflow: 'hidden' },
-    resFill: { height: 3, borderRadius: 1 },
+    resTrack: { height: 6, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' },
+    resFill: { height: 6, borderRadius: 3 },
 
     tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    tagChip: { paddingHorizontal: 13, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 4, borderWidth: 1, borderColor: C.borderLight },
+    tagChip: { paddingHorizontal: 13, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight },
     tagLabel: { color: C.sand, fontSize: 13, fontWeight: '700' },
     tagRisk: { color: C.dust, fontSize: 9, marginTop: 2, letterSpacing: 0.3 },
 
-    notesInput: { backgroundColor: C.surfaceAlt, borderRadius: 4, padding: 12, color: C.ink, fontSize: 13, lineHeight: 19, minHeight: 72, borderWidth: 1, borderColor: C.borderLight },
+    notesInput: { backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 12, color: C.ink, fontSize: 13, lineHeight: 19, minHeight: 72, borderWidth: 1, borderColor: C.borderLight },
     notesCount: { color: C.dust, fontSize: 10, textAlign: 'right', marginTop: 6 },
 
     stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 16, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
-    saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center' },
+    saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 12, alignItems: 'center' },
     saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   });
 }

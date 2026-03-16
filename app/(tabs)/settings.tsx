@@ -7,33 +7,38 @@ import { useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 
-function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+function Card({ label, labelColor, accentColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+}) {
   const { C } = useTheme();
+  const hasAccent = !!accentColor;
   return (
     <View style={[{
-      borderWidth: 1.5,
-      borderColor: borderColor || C.border,
       backgroundColor: bgColor || C.surface,
-      borderRadius: 4,
+      borderRadius: 20,
       marginHorizontal: 16,
-      marginBottom: 12,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.07,
+      shadowRadius: 12,
+      elevation: 3,
+      overflow: 'hidden',
     }, style]}>
+      {hasAccent && (
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
+      )}
       {label && (
-        <View style={{
-          position: 'absolute',
-          top: -10,
-          left: 12,
-          backgroundColor: bgColor || C.surface,
-          paddingHorizontal: 6,
-        }}>
-          <Text style={{
-            fontSize: 9,
-            fontWeight: '800',
-            color: labelColor || C.sand,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-          }}>{label}</Text>
-        </View>
+        <Text style={{
+          fontSize: 10,
+          fontWeight: '700',
+          color: labelColor || C.dust,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingTop: 18,
+          paddingBottom: 2,
+        }}>{label}</Text>
       )}
       {children}
     </View>
@@ -122,7 +127,7 @@ function AnimatedToggle({ value, onPress }: { value: boolean; onPress: () => voi
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
       <Animated.View style={{
         width: 40, height: 22, borderRadius: 11,
-        borderWidth: 1.5, borderColor: value ? C.terraBorder : C.borderLight,
+        borderWidth: 1, borderColor: value ? C.terraBorder : C.borderLight,
         backgroundColor: trackBg, justifyContent: 'center', paddingHorizontal: 2,
       }}>
         <Animated.View style={{
@@ -228,7 +233,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Profile */}
-        <WindowBox label="Profile">
+        <Card label="Profile">
           <View style={styles.profileInner}>
             <View style={styles.profileAvatar}>
               <Text style={styles.profileAvatarText}>
@@ -267,10 +272,10 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </WindowBox>
+        </Card>
 
         {/* Appearance */}
-        <WindowBox label="Appearance">
+        <Card label="Appearance">
           <TouchableOpacity style={styles.row} onPress={() => { Haptics.selectionAsync(); toggleDark(); }}>
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Dark Mode</Text>
@@ -278,10 +283,10 @@ export default function SettingsScreen() {
             </View>
             <AnimatedToggle value={isDark} onPress={() => { Haptics.selectionAsync(); toggleDark(); }} />
           </TouchableOpacity>
-        </WindowBox>
+        </Card>
 
         {/* Alerts */}
-        <WindowBox label="Alerts">
+        <Card label="Alerts">
           {[
             {
               key: 'weeklyLoad' as keyof AlertSettings,
@@ -310,10 +315,10 @@ export default function SettingsScreen() {
               {i < arr.length - 1 && <View style={styles.rowDivider} />}
             </View>
           ))}
-        </WindowBox>
+        </Card>
 
         {/* Grades */}
-        <WindowBox label="Grades" borderColor={C.terraBorder} bgColor={C.terraBg} labelColor={C.terra}>
+        <Card label="Grades" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra}>
           <View style={styles.gradeDisplay}>
             <View style={styles.gradeItem}>
               <Text style={styles.gradeEyebrow}>Level</Text>
@@ -331,10 +336,10 @@ export default function SettingsScreen() {
             sublabel="Update your climbing level and project"
             onPress={() => setModalVisible(true)}
           />
-        </WindowBox>
+        </Card>
 
         {/* Data */}
-        <WindowBox label="Data" borderColor={C.amberBorder} bgColor={C.amberBg} labelColor={C.amber}>
+        <Card label="Data" accentColor={C.amber} bgColor={C.amberBg} labelColor={C.amber}>
           <SettingsRow
             label="Clear Today's Session"
             sublabel="Re-log today's climbing session"
@@ -346,17 +351,17 @@ export default function SettingsScreen() {
             sublabel="Re-do today's body check-in"
             onPress={clearTodayCheckIn}
           />
-        </WindowBox>
+        </Card>
 
         {/* Danger */}
-        <WindowBox label="Danger Zone" borderColor={C.redBorder} bgColor={C.redBg} labelColor={C.red}>
+        <Card label="Danger Zone" accentColor={C.red} bgColor={C.redBg} labelColor={C.red}>
           <SettingsRow
             label="Clear All Data"
             sublabel="Permanently delete everything"
             onPress={handleClearAllData}
             destructive
           />
-        </WindowBox>
+        </Card>
 
         {/* App Info */}
         <View style={styles.appInfo}>
@@ -375,25 +380,25 @@ export default function SettingsScreen() {
 function makeStyles(C) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
-    scrollContent: { paddingBottom: 48 },
+    scrollContent: { paddingBottom: 60 },
 
-    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+    header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
     greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
     title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
 
-    profileInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 20, gap: 14 },
-    profileAvatar: { width: 44, height: 44, borderRadius: 4, borderWidth: 1.5, borderColor: C.terraBorder, backgroundColor: C.terraBg, justifyContent: 'center', alignItems: 'center' },
+    profileInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 14, gap: 14 },
+    profileAvatar: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.terraBorder, backgroundColor: C.terraBg, justifyContent: 'center', alignItems: 'center' },
     profileAvatarText: { fontSize: 20, fontWeight: '800', color: C.terra },
     profileInfo: { flex: 1 },
     profileName: { color: C.ink, fontSize: 15, fontWeight: '800', marginBottom: 2 },
     profileGrades: { color: C.dust, fontSize: 11 },
-    profileBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6 },
+    profileBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
     profileBtnText: { color: C.sand, fontSize: 11, fontWeight: '800' },
-    nameInput: { color: C.ink, fontSize: 15, fontWeight: '700', borderBottomWidth: 1.5, borderBottomColor: C.terraBorder, paddingBottom: 2, minWidth: 120 },
+    nameInput: { color: C.ink, fontSize: 15, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: C.terraBorder, paddingBottom: 2, minWidth: 120 },
 
-    gradeDisplay: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 20 },
+    gradeDisplay: { flexDirection: 'row', paddingHorizontal: 24, paddingVertical: 16 },
     gradeItem: { flex: 1, alignItems: 'center' },
-    gradeEyebrow: { fontSize: 9, fontWeight: '800', color: C.terraDark, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+    gradeEyebrow: { fontSize: 10, fontWeight: '700', color: C.terraDark, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
     gradeBig: { fontSize: 40, fontWeight: '800', color: C.ink, letterSpacing: -1 },
     gradeDivider: { width: 1, backgroundColor: C.terraBorder + '40', marginHorizontal: 8 },
     rowDivider: { height: 1, marginHorizontal: 16 },
@@ -405,7 +410,7 @@ function makeStyles(C) {
     rowArrow: { color: C.sand, fontSize: 14, fontWeight: '700' },
 
     appInfo: { alignItems: 'center', gap: 4, paddingTop: 24, paddingBottom: 8 },
-    appInfoBox: { borderWidth: 1.5, borderColor: C.border, borderRadius: 4, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 8 },
+    appInfoBox: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 8 },
     appInfoName: { color: C.sand, fontSize: 14, fontWeight: '800', letterSpacing: 4 },
     appInfoTagline: { color: C.dust, fontSize: 11 },
     appInfoVersion: { color: C.dust, fontSize: 10, opacity: 0.6 },
@@ -415,19 +420,19 @@ function makeStyles(C) {
 function makeModalStyles(C) {
   return StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
-    container: { backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border },
-    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
+    container: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.ink, paddingHorizontal: 16, paddingVertical: 14 },
     titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
     closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
     closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
     body: { padding: 24, paddingBottom: 48 },
     subtitle: { fontSize: 12, color: C.dust, marginBottom: 20 },
     gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: C.borderLight },
+    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
     selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
     gradeText: { color: C.sand, fontSize: 14, fontWeight: '800' },
     selectedText: { color: '#fff' },
-    continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 4, alignItems: 'center', marginTop: 24 },
+    continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 24 },
     continueText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   });
 }

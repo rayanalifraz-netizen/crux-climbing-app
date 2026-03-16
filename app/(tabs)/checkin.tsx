@@ -7,33 +7,38 @@ import { useTheme } from '../../context/ThemeContext';
 
 const today = getTodayDate();
 
-function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+function Card({ label, labelColor, accentColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+}) {
   const { C } = useTheme();
+  const hasAccent = !!accentColor;
   return (
     <View style={[{
-      borderWidth: 1.5,
-      borderColor: borderColor || C.border,
       backgroundColor: bgColor || C.surface,
-      borderRadius: 4,
+      borderRadius: 20,
       marginHorizontal: 16,
-      marginBottom: 12,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.07,
+      shadowRadius: 12,
+      elevation: 3,
+      overflow: 'hidden',
     }, style]}>
+      {hasAccent && (
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
+      )}
       {label && (
-        <View style={{
-          position: 'absolute',
-          top: -10,
-          left: 12,
-          backgroundColor: bgColor || C.surface,
-          paddingHorizontal: 6,
-        }}>
-          <Text style={{
-            fontSize: 9,
-            fontWeight: '800',
-            color: labelColor || C.sand,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-          }}>{label}</Text>
-        </View>
+        <Text style={{
+          fontSize: 10,
+          fontWeight: '700',
+          color: labelColor || C.dust,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingTop: 18,
+          paddingBottom: 2,
+        }}>{label}</Text>
       )}
       {children}
     </View>
@@ -205,9 +210,9 @@ export default function CheckInScreen() {
 
         {/* Injury Alert */}
         {alertSettings.injuryOverload && injuryAlerts.length > 0 && (
-          <WindowBox
+          <Card
             label="⚠ Overload Warning"
-            borderColor={C.redBorder}
+            accentColor={C.red}
             bgColor={C.redBg}
             labelColor={C.red}
             style={{ marginTop: 0 }}
@@ -219,14 +224,14 @@ export default function CheckInScreen() {
                 </Text>
               ))}
             </View>
-          </WindowBox>
+          </Card>
         )}
 
         {/* Rest Day Button */}
         {!alreadyCheckedIn && (
-          <WindowBox
+          <Card
             label="Rest Day"
-            borderColor={C.greenBorder}
+            accentColor={C.green}
             bgColor={C.greenBg}
             labelColor={C.green}
           >
@@ -237,14 +242,14 @@ export default function CheckInScreen() {
               </View>
               <Text style={[styles.restDayBtnArrow, { color: C.green }]}>→</Text>
             </TouchableOpacity>
-          </WindowBox>
+          </Card>
         )}
 
         {/* Rest Day Confirmed */}
         {isRestDay && alreadyCheckedIn ? (
-          <WindowBox
+          <Card
             label="Today"
-            borderColor={C.greenBorder}
+            accentColor={C.green}
             bgColor={C.greenBg}
             labelColor={C.green}
           >
@@ -256,11 +261,11 @@ export default function CheckInScreen() {
                 <Text style={styles.restDayDRSScore}>100</Text>
               </View>
             </View>
-          </WindowBox>
+          </Card>
         ) : (
           <>
             {/* Soreness */}
-            <WindowBox label="Overall Soreness">
+            <Card label="Overall Soreness">
               <View style={styles.sectionInner}>
                 <View style={styles.sorenessRow}>
                   {SORENESS_LEVELS.map((level) => {
@@ -285,10 +290,10 @@ export default function CheckInScreen() {
                   </Text>
                 )}
               </View>
-            </WindowBox>
+            </Card>
 
             {/* Finger Condition */}
-            <WindowBox label="Finger Condition">
+            <Card label="Finger Condition">
               <View style={styles.sectionInner}>
                 <Text style={styles.sectionHint}>Tap any fingers that feel sore or tweaked</Text>
                 <View style={styles.fingerTable}>
@@ -314,10 +319,10 @@ export default function CheckInScreen() {
                   ))}
                 </View>
               </View>
-            </WindowBox>
+            </Card>
 
             {/* Pain Areas */}
-            <WindowBox label="Pain or Strain">
+            <Card label="Pain or Strain">
               <View style={styles.sectionInner}>
                 <Text style={styles.sectionHint}>Select all areas that feel off today</Text>
                 <View style={styles.chipRow}>
@@ -337,13 +342,13 @@ export default function CheckInScreen() {
                   })}
                 </View>
               </View>
-            </WindowBox>
+            </Card>
 
             {/* DRS */}
             {displayVerdict && displayScore !== null && (
-              <WindowBox
+              <Card
                 label={alreadyCheckedIn ? 'Daily Readiness Score' : 'Readiness Preview'}
-                borderColor={displayVerdict.border}
+                accentColor={displayVerdict.color}
                 bgColor={displayVerdict.bg}
                 labelColor={displayVerdict.color}
               >
@@ -385,7 +390,7 @@ export default function CheckInScreen() {
                     </Text>
                   )}
                 </View>
-              </WindowBox>
+              </Card>
             )}
 
           </>
@@ -408,19 +413,19 @@ export default function CheckInScreen() {
 function makeStyles(C) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
-    scrollContent: { paddingBottom: 48 },
+    scrollContent: { paddingBottom: 60 },
 
-    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+    header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
     greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
-    doneBadge: { backgroundColor: C.greenBg, borderWidth: 1.5, borderColor: C.greenBorder, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
+    doneBadge: { backgroundColor: C.greenBg, borderWidth: 1, borderColor: C.greenBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
     doneBadgeText: { color: C.green, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 
-    alertInner: { padding: 14, gap: 4 },
+    alertInner: { padding: 14, paddingLeft: 24, gap: 4 },
     alertText: { color: C.red, fontSize: 12, lineHeight: 18 },
 
-    restDayBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+    restDayBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingLeft: 24, gap: 12 },
     restDayBtnLeft: { flex: 1 },
     restDayBtnTitle: { color: C.green, fontSize: 14, fontWeight: '800' },
     restDayBtnSub: { color: C.sand, fontSize: 12, marginTop: 2 },
@@ -433,29 +438,29 @@ function makeStyles(C) {
     restDayDRSLabel: { fontSize: 10, fontWeight: '800', color: C.green, letterSpacing: 2, textTransform: 'uppercase' },
     restDayDRSScore: { fontSize: 28, fontWeight: '800', color: C.green, letterSpacing: -1 },
 
-    sectionInner: { padding: 16, paddingTop: 20 },
+    sectionInner: { padding: 16, paddingTop: 14 },
     sectionHint: { color: C.dust, fontSize: 12, marginBottom: 12 },
 
     sorenessRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-    sorenessBtn: { width: 40, height: 40, backgroundColor: C.surfaceAlt, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
+    sorenessBtn: { width: 44, height: 44, backgroundColor: C.surfaceAlt, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
     sorenessBtnText: { color: C.sand, fontSize: 13, fontWeight: '800' },
     sorenessHint: { color: C.sand, fontSize: 11, marginTop: 12, fontWeight: '600' },
 
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 4, borderWidth: 1, borderColor: C.borderLight },
+    chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight },
     chipText: { color: C.sand, fontSize: 12, fontWeight: '700' },
 
     fingerTable: { gap: 8 },
     fingerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     fingerLabel: { color: C.inkLight, fontSize: 13, fontWeight: '700', width: 60 },
     fingerSides: { flexDirection: 'row', gap: 8, flex: 1 },
-    sideChip: { flex: 1, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 4, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center' },
+    sideChip: { flex: 1, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center' },
     sideChipText: { color: C.sand, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
 
-    drsInner: { padding: 18, paddingTop: 22 },
+    drsInner: { padding: 18, paddingTop: 14, paddingLeft: 24 },
     drsTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
     drsVerdict: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-    drsScoreBox: { width: 56, height: 56, borderWidth: 1.5, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+    drsScoreBox: { width: 56, height: 56, borderWidth: 1.5, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     drsScoreNum: { fontSize: 22, fontWeight: '800' },
     drsBreakdown: { flexDirection: 'row', paddingTop: 14, borderTopWidth: 1 },
     drsBreakdownGroup: { flex: 1, alignItems: 'center', position: 'relative' },
@@ -465,7 +470,7 @@ function makeStyles(C) {
     drsHint: { fontSize: 11, fontWeight: '600' },
 
     stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 16, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
-    saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center' },
+    saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 12, alignItems: 'center' },
     saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   });
 }

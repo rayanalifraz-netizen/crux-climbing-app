@@ -61,32 +61,37 @@ function getLabel(load, thresholds) {
   return 'High load';
 }
 
-function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+function Card({ label, labelColor, accentColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+}) {
   const { C } = useTheme();
+  const hasAccent = !!accentColor;
   return (
     <View style={[{
-      borderWidth: 1.5,
-      borderColor: borderColor || C.border,
       backgroundColor: bgColor || C.surface,
-      borderRadius: 4,
-      marginBottom: 12,
+      borderRadius: 20,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.07,
+      shadowRadius: 12,
+      elevation: 3,
+      overflow: 'hidden',
     }, style]}>
+      {hasAccent && (
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
+      )}
       {label && (
-        <View style={{
-          position: 'absolute',
-          top: -10,
-          left: 12,
-          backgroundColor: bgColor || C.surface,
-          paddingHorizontal: 6,
-        }}>
-          <Text style={{
-            fontSize: 9,
-            fontWeight: '800',
-            color: labelColor || C.sand,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-          }}>{label}</Text>
-        </View>
+        <Text style={{
+          fontSize: 10,
+          fontWeight: '700',
+          color: labelColor || C.dust,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingTop: 18,
+          paddingBottom: 2,
+        }}>{label}</Text>
       )}
       {children}
     </View>
@@ -320,9 +325,9 @@ export default function HeatmapScreen() {
 
         {/* Alert if high load parts */}
         {alertSettings.bodyHighLoad && highParts.length > 0 && (
-          <WindowBox
+          <Card
             label="⚠ High Load Detected"
-            borderColor={C.redBorder}
+            accentColor={C.red}
             bgColor={C.redBg}
             labelColor={C.red}
             style={{ marginHorizontal: 16 }}
@@ -332,18 +337,18 @@ export default function HeatmapScreen() {
                 {highParts.map(p => p.label).join(', ')} — consider reducing load and prioritizing recovery
               </Text>
             </View>
-          </WindowBox>
+          </Card>
         )}
 
         {/* Body Diagram */}
-        <WindowBox
+        <Card
           label="Front View"
           style={{ marginHorizontal: 16 }}
         >
           <View style={styles.diagramInner}>
             <BodyDiagram loads={loads} />
           </View>
-        </WindowBox>
+        </Card>
 
         {/* Legend */}
         <View style={styles.legendRow}>
@@ -360,7 +365,7 @@ export default function HeatmapScreen() {
         </View>
 
         {/* Body Part Breakdown */}
-        <WindowBox label="Load Breakdown" style={{ marginHorizontal: 16 }}>
+        <Card label="Load Breakdown" style={{ marginHorizontal: 16 }}>
           <View style={styles.breakdownInner}>
             {BODY_PARTS.map((part, i) => {
               const load = loads[part.id] || 0;
@@ -391,10 +396,10 @@ export default function HeatmapScreen() {
               );
             })}
           </View>
-        </WindowBox>
+        </Card>
 
         {/* Summary */}
-        <WindowBox label="Summary" style={{ marginHorizontal: 16 }}>
+        <Card label="Summary" style={{ marginHorizontal: 16 }}>
           <View style={styles.summaryInner}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryEyebrow}>Total Load</Text>
@@ -416,7 +421,7 @@ export default function HeatmapScreen() {
               <Text style={styles.summarySmall}>of data</Text>
             </View>
           </View>
-        </WindowBox>
+        </Card>
 
         <View style={{ height: 20 }} />
       </ScrollView>
@@ -427,40 +432,40 @@ export default function HeatmapScreen() {
 function makeStyles(C) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
-    scrollContent: { paddingBottom: 48 },
+    scrollContent: { paddingBottom: 60 },
 
-    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+    header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 16 },
     greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
     title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
 
     windowRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
     windowLabel: { fontSize: 10, fontWeight: '800', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
     windowBtns: { flexDirection: 'row', gap: 6 },
-    windowBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.surface },
+    windowBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.surface },
     windowBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
     windowBtnText: { fontSize: 11, fontWeight: '800', color: C.dust },
     windowBtnTextActive: { color: C.terra },
     updatedText: { fontSize: 9, color: C.dust, marginLeft: 'auto' },
 
-    alertInner: { padding: 14 },
+    alertInner: { padding: 14, paddingLeft: 24 },
     alertText: { color: C.red, fontSize: 12, fontWeight: '600', lineHeight: 17 },
 
-    diagramInner: { padding: 16, paddingTop: 20, alignItems: 'center' },
+    diagramInner: { padding: 16, paddingTop: 14, alignItems: 'center' },
 
     legendRow: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 12, paddingHorizontal: 16 },
     legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    legendDot: { width: 8, height: 8, borderRadius: 1 },
+    legendDot: { width: 8, height: 8, borderRadius: 4 },
     legendText: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 0.5 },
 
-    breakdownInner: { padding: 16, paddingTop: 20 },
+    breakdownInner: { padding: 16, paddingTop: 14 },
     breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
     breakdownDivider: { height: 1, backgroundColor: C.borderLight },
-    breakdownDot: { width: 8, height: 8, borderRadius: 1 },
+    breakdownDot: { width: 8, height: 8, borderRadius: 4 },
     breakdownLabel: { width: 64, fontSize: 12, fontWeight: '700', color: C.ink },
     breakdownBarWrap: { flex: 1 },
-    breakdownTrack: { height: 4, backgroundColor: C.borderLight, borderRadius: 2, overflow: 'hidden' },
-    breakdownFill: { height: 4, borderRadius: 2 },
-    breakdownBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+    breakdownTrack: { height: 6, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' },
+    breakdownFill: { height: 6, borderRadius: 3 },
+    breakdownBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
     breakdownBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
 
     summaryInner: { flexDirection: 'row', padding: 18 },

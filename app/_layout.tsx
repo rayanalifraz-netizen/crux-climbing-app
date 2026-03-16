@@ -66,7 +66,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   splash: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#e8e0d0',
+    backgroundColor: '#F2F0ED',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,

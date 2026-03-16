@@ -2,38 +2,42 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveProfile } from '../../storage';
-import { useTheme } from '../../context/ThemeContext';
+import { gradeColor, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 
-// Retro window box component
-function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+function Card({ label, labelColor, accentColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+}) {
   const { C } = useTheme();
+  const hasAccent = !!accentColor;
   return (
     <View style={[{
-      borderWidth: 1.5,
-      borderColor: borderColor || C.border,
       backgroundColor: bgColor || C.surface,
-      borderRadius: 4,
+      borderRadius: 20,
       marginHorizontal: 16,
-      marginBottom: 12,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.07,
+      shadowRadius: 12,
+      elevation: 3,
+      overflow: 'hidden',
     }, style]}>
+      {hasAccent && (
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
+      )}
       {label && (
-        <View style={{
-          position: 'absolute',
-          top: -10,
-          left: 12,
-          backgroundColor: bgColor || C.surface,
-          paddingHorizontal: 6,
-        }}>
-          <Text style={{
-            fontSize: 9,
-            fontWeight: '800',
-            color: labelColor || C.sand,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-          }}>{label}</Text>
-        </View>
+        <Text style={{
+          fontSize: 10,
+          fontWeight: '700',
+          color: labelColor || C.dust,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingTop: 18,
+          paddingBottom: 2,
+        }}>{label}</Text>
       )}
       {children}
     </View>
@@ -305,7 +309,7 @@ export default function ProfileScreen() {
         </View>
 
         {!profile ? (
-          <WindowBox label="Setup" style={{ marginTop: 20 }}>
+          <Card label="Setup" style={{ marginTop: 20 }}>
             <View style={{ padding: 32, alignItems: 'center', gap: 12 }}>
               <Text style={styles.emptyTitle}>No profile yet</Text>
               <Text style={styles.emptyText}>Set up your grades to start tracking.</Text>
@@ -313,14 +317,14 @@ export default function ProfileScreen() {
                 <Text style={styles.setupButtonText}>Get Started →</Text>
               </TouchableOpacity>
             </View>
-          </WindowBox>
+          </Card>
         ) : (
           <>
             {/* Alerts */}
             {alertSettings.weeklyLoad && weeklySummary?.totalRes >= 280 && (
-              <WindowBox
+              <Card
                 label="⚠ Notice"
-                borderColor={C.amberBorder}
+                accentColor={C.amber}
                 bgColor={C.amberBg}
                 labelColor={C.amber}
                 style={{ marginTop: 8 }}
@@ -330,13 +334,13 @@ export default function ProfileScreen() {
                     Weekly load {weeklySummary.totalRes} RES — consider a rest day
                   </Text>
                 </View>
-              </WindowBox>
+              </Card>
             )}
 
             {alertSettings.injuryOverload && injuryAlerts.length > 0 && (
-              <WindowBox
+              <Card
                 label="⚠ Overload"
-                borderColor={C.redBorder}
+                accentColor={C.red}
                 bgColor={C.redBg}
                 labelColor={C.red}
                 style={{ marginTop: weeklySummary?.totalRes >= 280 ? 0 : 8 }}
@@ -346,11 +350,11 @@ export default function ProfileScreen() {
                     {injuryAlerts.map(a => a.partName).join(' · ')}
                   </Text>
                 </View>
-              </WindowBox>
+              </Card>
             )}
 
             {/* Grade Hero */}
-            <WindowBox label="Current Status" style={{ marginTop: 8 }}>
+            <Card label="Current Status" style={{ marginTop: 8 }}>
               <View style={styles.gradeHeroInner}>
                 <View style={styles.gradeHeroCol}>
                   <Text style={styles.gradeEyebrow}>LEVEL</Text>
@@ -359,7 +363,7 @@ export default function ProfileScreen() {
                 <View style={styles.gradeHeroDivider} />
                 <View style={[styles.gradeHeroCol, { alignItems: 'flex-end' }]}>
                   <Text style={styles.gradeEyebrow}>PROJECT</Text>
-                  <Text style={[styles.gradeBig, { color: C.terra }]}>{profile.projectGrade}</Text>
+                  <Text style={[styles.gradeBig, { color: gradeColor(profile.projectGrade) }]}>{profile.projectGrade}</Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -368,10 +372,10 @@ export default function ProfileScreen() {
               >
                 <Text style={styles.editGradesBtnText}>Edit grades →</Text>
               </TouchableOpacity>
-            </WindowBox>
+            </Card>
 
             {/* Progress */}
-            <WindowBox label="Project Progress" borderColor={C.terraBorder} bgColor={C.terraBg} labelColor={C.terra}>
+            <Card label="Project Progress" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra}>
               <View style={styles.progressInner}>
                 <View style={styles.progressTopRow}>
                   <View>
@@ -395,7 +399,7 @@ export default function ProfileScreen() {
               <TouchableOpacity style={styles.sendsTargetBtn} onPress={() => setShowSendsModal(true)}>
                 <Text style={styles.sendsTargetText}>Target: {progressMax} sends · change →</Text>
               </TouchableOpacity>
-            </WindowBox>
+            </Card>
 
             {/* Recovery */}
             {recovery && (() => {
@@ -405,7 +409,7 @@ export default function ProfileScreen() {
                   ? { color: C.red, bg: C.redBg, border: C.redBorder }
                   : { color: C.amber, bg: C.amberBg, border: C.amberBorder };
               return (
-                <WindowBox label="Recovery" borderColor={rc.border} bgColor={rc.bg} labelColor={rc.color}>
+                <Card label="Recovery" accentColor={rc.color} bgColor={rc.bg} labelColor={rc.color}>
                   <View style={styles.recoveryInner}>
                     <View style={styles.recoveryTopRow}>
                       <View style={{ flex: 1 }}>
@@ -443,13 +447,13 @@ export default function ProfileScreen() {
                       Guide only — always trust how your body feels over any estimate.
                     </Text>
                   </View>
-                </WindowBox>
+                </Card>
               );
             })()}
 
             {/* Weekly */}
             {weeklySummary && (
-              <WindowBox label="This Week">
+              <Card label="This Week">
                 <View style={styles.weeklyInner}>
                   {[
                     { val: weeklySummary.sessionCount, label: 'sessions', color: C.ink },
@@ -466,18 +470,18 @@ export default function ProfileScreen() {
                     </View>
                   ))}
                 </View>
-              </WindowBox>
+              </Card>
             )}
 
             {/* Stats */}
-            <WindowBox label="All Time">
+            <Card label="All Time">
               <View style={styles.statsInner}>
                 <View style={styles.statCell}>
                   <Text style={styles.statEyebrow}>Sessions</Text>
                   <Text style={styles.statBig}>{totalSessions}</Text>
                 </View>
               </View>
-            </WindowBox>
+            </Card>
           </>
         )}
 
@@ -490,50 +494,50 @@ export default function ProfileScreen() {
 function makeStyles(C) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
-    scrollContent: { paddingBottom: 48 },
+    scrollContent: { paddingBottom: 60 },
 
-    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+    header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
     greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
     title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
 
     emptyTitle: { fontSize: 18, fontWeight: '800', color: C.ink },
     emptyText: { color: C.sand, fontSize: 13, textAlign: 'center' },
-    setupButton: { backgroundColor: C.terra, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 4, marginTop: 4 },
+    setupButton: { backgroundColor: C.terra, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, marginTop: 4 },
     setupButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
-    alertInner: { padding: 14 },
+    alertInner: { padding: 14, paddingLeft: 24 },
     alertText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
 
     gradeHeroInner: { flexDirection: 'row', padding: 20, paddingBottom: 8 },
     gradeHeroCol: { flex: 1 },
     gradeHeroDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 12 },
-    gradeEyebrow: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+    gradeEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
     gradeBig: { fontSize: 64, fontWeight: '800', color: C.ink, letterSpacing: -2, lineHeight: 68 },
     editGradesBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, padding: 12, alignItems: 'center' },
     editGradesBtnText: { color: C.sand, fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
 
-    progressInner: { padding: 18 },
+    progressInner: { padding: 18, paddingLeft: 24 },
     progressTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
-    progressEyebrow: { fontSize: 9, fontWeight: '800', color: C.terraDark || C.sand, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+    progressEyebrow: { fontSize: 10, fontWeight: '700', color: C.terraDark || C.sand, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
     progressNumRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
     progressBigNum: { fontSize: 48, fontWeight: '800', color: C.terra, letterSpacing: -2, lineHeight: 52 },
     progressDenom: { fontSize: 18, fontWeight: '600', color: C.sand },
     progressPct: { fontSize: 13, fontWeight: '700', color: C.sand },
-    progressTrack: { height: 3, backgroundColor: C.borderLight, borderRadius: 2, marginBottom: 10, overflow: 'hidden' },
-    progressFill: { height: 3, backgroundColor: C.terra, borderRadius: 2 },
+    progressTrack: { height: 6, backgroundColor: C.borderLight, borderRadius: 3, marginBottom: 10, overflow: 'hidden' },
+    progressFill: { height: 6, backgroundColor: C.terra, borderRadius: 3 },
     progressHint: { color: C.sand, fontSize: 11 },
-    sendsTargetBtn: { borderTopWidth: 1, borderTopColor: C.terraBorder + '40', paddingHorizontal: 18, paddingVertical: 10 },
+    sendsTargetBtn: { borderTopWidth: 1, borderTopColor: C.terraBorder + '40', paddingHorizontal: 24, paddingVertical: 10 },
     sendsTargetText: { color: C.terraDark || C.terra, fontSize: 11, fontWeight: '600' },
 
-    recoveryInner: { padding: 18, paddingTop: 22 },
+    recoveryInner: { padding: 18, paddingTop: 14, paddingLeft: 24 },
     recoveryTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     recoveryStatus: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5, marginBottom: 4 },
     recoverySub: { fontSize: 11, fontWeight: '600', lineHeight: 16 },
-    recoveryDaysBox: { width: 52, height: 52, borderWidth: 1.5, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+    recoveryDaysBox: { width: 52, height: 52, borderWidth: 1.5, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     recoveryDaysNum: { fontSize: 20, fontWeight: '800', lineHeight: 24 },
     recoveryDaysLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
     recoveryFactors: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
-    recoveryFactor: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+    recoveryFactor: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
     recoveryFactorText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
     recoveryDisclaimer: { fontSize: 10, color: C.dust, marginTop: 10, fontStyle: 'italic' },
 
@@ -546,7 +550,7 @@ function makeStyles(C) {
 
     statsInner: { flexDirection: 'row', padding: 18 },
     statCell: { flex: 1 },
-    statEyebrow: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
+    statEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
     statBig: { fontSize: 44, fontWeight: '800', color: C.ink, letterSpacing: -2, lineHeight: 48 },
     statDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 16 },
   });
@@ -555,19 +559,19 @@ function makeStyles(C) {
 function makeModalStyles(C) {
   return StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
-    container: { backgroundColor: C.surface, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderWidth: 1.5, borderColor: C.border, marginHorizontal: 0 },
-    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
+    container: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.ink, paddingHorizontal: 16, paddingVertical: 14 },
     titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
     closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
     closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
     body: { padding: 24, paddingBottom: 48 },
     subtitle: { fontSize: 13, color: C.sand, marginBottom: 20 },
     gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
+    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
     selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
     gradeText: { color: C.sand, fontSize: 14, fontWeight: '700' },
     selectedText: { color: '#fff' },
-    continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 4, alignItems: 'center', marginTop: 24 },
+    continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 24 },
     continueText: { color: C.surface, fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
   });
 }

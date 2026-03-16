@@ -2,39 +2,44 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { deleteGoalDate, getCheckIns, getGoalDate, getSessions, saveGoalDate } from '../../storage';
-import { useTheme } from '../../context/ThemeContext';
+import { gradeColor, gradeColorBg, useTheme } from '../../context/ThemeContext';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-function WindowBox({ label, labelColor, borderColor, bgColor, children, style }) {
+function Card({ label, labelColor, accentColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+}) {
   const { C } = useTheme();
+  const hasAccent = !!accentColor;
   return (
     <View style={[{
-      borderWidth: 1.5,
-      borderColor: borderColor || C.border,
       backgroundColor: bgColor || C.surface,
-      borderRadius: 4,
+      borderRadius: 20,
       marginHorizontal: 16,
-      marginBottom: 12,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.07,
+      shadowRadius: 12,
+      elevation: 3,
+      overflow: 'hidden',
     }, style]}>
+      {hasAccent && (
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
+      )}
       {label && (
-        <View style={{
-          position: 'absolute',
-          top: -10,
-          left: 12,
-          backgroundColor: bgColor || C.surface,
-          paddingHorizontal: 6,
-        }}>
-          <Text style={{
-            fontSize: 9,
-            fontWeight: '800',
-            color: labelColor || C.sand,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-          }}>{label}</Text>
-        </View>
+        <Text style={{
+          fontSize: 10,
+          fontWeight: '700',
+          color: labelColor || C.dust,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingTop: 18,
+          paddingBottom: 2,
+        }}>{label}</Text>
       )}
       {children}
     </View>
@@ -164,7 +169,7 @@ export default function CalendarScreen() {
 
         {/* Goal Date */}
         {goalDate ? (
-          <WindowBox label="Project Goal" borderColor={C.goalBorder} bgColor={C.goalBg} labelColor={C.goal}>
+          <Card label="Project Goal" accentColor={C.goal} bgColor={C.goalBg} labelColor={C.goal}>
             <View style={styles.goalInner}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.goalDate}>{formatGoalDate(goalDate)}</Text>
@@ -188,7 +193,7 @@ export default function CalendarScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </WindowBox>
+          </Card>
         ) : (
           <TouchableOpacity
             style={styles.setGoalBtn}
@@ -251,7 +256,7 @@ export default function CalendarScreen() {
         </Modal>
 
         {/* Calendar */}
-        <WindowBox label={`${MONTHS[month]} ${year}`} style={{ marginTop: 4 }}>
+        <Card label={`${MONTHS[month]} ${year}`} style={{ marginTop: 4 }}>
           <View style={styles.calendarInner}>
             {/* Month Nav */}
             <View style={styles.monthNav}>
@@ -327,7 +332,7 @@ export default function CalendarScreen() {
               ))}
             </View>
           </View>
-        </WindowBox>
+        </Card>
 
         {/* Empty / Hint */}
         {!selectedDate && totalSessions === 0 && Object.keys(checkIns).length === 0 && (
@@ -342,9 +347,9 @@ export default function CalendarScreen() {
 
         {/* Detail Window */}
         {selectedDate && (isRestDay || selectedSession) && (
-          <WindowBox
+          <Card
             label={new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            borderColor={selectedSession ? getResBorder(C, selectedSession.res) : C.greenBorder}
+            accentColor={selectedSession ? getResColor(C, selectedSession.res) : C.green}
             bgColor={selectedSession ? getResBg(C, selectedSession.res) : C.greenBg}
             labelColor={selectedSession ? getResColor(C, selectedSession.res) : C.green}
             style={{ marginTop: 4 }}
@@ -388,9 +393,9 @@ export default function CalendarScreen() {
                   <Text style={styles.detailSectionLabel}>Grades</Text>
                   <View style={styles.chipRow}>
                     {Object.entries(selectedSession.gradeCounts || {}).map(([grade, count]) => (
-                      <View key={grade} style={[styles.chip, { borderColor: C.terraBorder, backgroundColor: C.terraBg }]}>
-                        <Text style={[styles.chipGrade, { color: C.terra }]}>{grade}</Text>
-                        <Text style={[styles.chipCount, { color: C.terraDark }]}>×{count}</Text>
+                      <View key={grade} style={[styles.chip, { borderColor: gradeColor(grade) + '40', backgroundColor: gradeColorBg(grade) }]}>
+                        <Text style={[styles.chipGrade, { color: gradeColor(grade) }]}>{grade}</Text>
+                        <Text style={[styles.chipCount, { color: gradeColor(grade) + 'aa' }]}>×{count}</Text>
                       </View>
                     ))}
                   </View>
@@ -434,15 +439,15 @@ export default function CalendarScreen() {
                 <Text style={styles.restMsg}>Recovery logged — no session this day.</Text>
               )}
             </View>
-          </WindowBox>
+          </Card>
         )}
 
         {selectedDate && !isRestDay && !selectedSession && (
-          <WindowBox style={{ marginTop: 4 }}>
+          <Card style={{ marginTop: 4 }}>
             <View style={styles.emptyDayInner}>
               <Text style={styles.emptyDayText}>No activity logged for this day</Text>
             </View>
-          </WindowBox>
+          </Card>
         )}
 
         <View style={{ height: 20 }} />
@@ -454,37 +459,42 @@ export default function CalendarScreen() {
 function makeStyles(C) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
-    scrollContent: { paddingBottom: 48 },
+    scrollContent: { paddingBottom: 60 },
 
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 28, paddingBottom: 16 },
     greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
     title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
-    statsBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: C.border, borderRadius: 4, padding: 12, gap: 12, backgroundColor: C.surface, marginTop: 6 },
+    statsBox: {
+      flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12,
+      backgroundColor: C.surface, marginTop: 6, borderRadius: 16,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    },
     statItem: { alignItems: 'center' },
     statNum: { color: C.ink, fontSize: 18, fontWeight: '800' },
     statLabel: { color: C.dust, fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
     statDivider: { width: 1, height: 24, backgroundColor: C.borderLight },
 
-    goalInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 20, gap: 12 },
+    goalInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingLeft: 24, paddingTop: 14, gap: 12 },
     goalDate: { color: C.ink, fontSize: 14, fontWeight: '800', marginBottom: 3 },
     goalCountdown: { color: C.goal, fontSize: 11, fontWeight: '600' },
     goalActions: { gap: 6 },
-    goalBtn: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 5 },
+    goalBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
     goalBtnText: { fontSize: 11, fontWeight: '800' },
 
-    setGoalBtn: { marginHorizontal: 16, marginBottom: 12, borderWidth: 1.5, borderColor: C.goalBorder, borderRadius: 4, padding: 12, alignItems: 'center', backgroundColor: C.goalBg },
+    setGoalBtn: { marginHorizontal: 16, marginBottom: 14, borderWidth: 1, borderColor: C.goalBorder, borderRadius: 20, padding: 12, alignItems: 'center', backgroundColor: C.goalBg },
     setGoalBtnText: { color: C.goal, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
 
-    calendarInner: { padding: 16, paddingTop: 20 },
+    calendarInner: { padding: 16, paddingTop: 14 },
     monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-    navBtn: { width: 30, height: 30, borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceAlt },
+    navBtn: { width: 30, height: 30, borderWidth: 1, borderColor: C.borderLight, borderRadius: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceAlt },
     navBtnText: { color: C.ink, fontSize: 18, fontWeight: '800', lineHeight: 22 },
     monthTitle: { color: C.ink, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
     dayHeaders: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
     dayHeader: { color: C.dust, fontSize: 9, fontWeight: '800', width: '14.28%', textAlign: 'center', letterSpacing: 0.5, textTransform: 'uppercase' },
     grid: { flexDirection: 'row', flexWrap: 'wrap' },
     emptyCell: { width: '14.28%', aspectRatio: 1 },
-    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 3, borderWidth: 1, borderColor: 'transparent', marginBottom: 2 },
+    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: 'transparent', marginBottom: 2 },
     cellText: { color: C.dust, fontSize: 12, fontWeight: '600' },
     dot: { width: 3, height: 3, borderRadius: 1.5, marginTop: 1 },
     legend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.borderLight },
@@ -497,23 +507,23 @@ function makeStyles(C) {
     emptyText: { color: C.dust, fontSize: 12, textAlign: 'center', lineHeight: 18 },
     hintText: { color: C.dust, textAlign: 'center', fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8 },
 
-    detailInner: { padding: 18, paddingTop: 22 },
+    detailInner: { padding: 18, paddingLeft: 24 },
     detailTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-    intensityTag: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 5 },
+    intensityTag: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
     intensityTagText: { fontSize: 11, fontWeight: '800' },
     detailRight: { alignItems: 'flex-end', gap: 4 },
-    resScoreBox: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
+    resScoreBox: { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
     resScoreNum: { fontSize: 18, fontWeight: '800', lineHeight: 20 },
     resScoreLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
     detailAttempts: { color: C.dust, fontSize: 11 },
     detailRule: { height: 1, backgroundColor: C.borderLight, marginBottom: 12 },
-    detailSectionLabel: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 },
+    detailSectionLabel: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 12 },
-    chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
     chipGrade: { fontSize: 12, fontWeight: '800' },
     chipCount: { fontSize: 11 },
     notesText: { color: C.sand, fontSize: 12, lineHeight: 18, marginBottom: 8 },
-    restBadge: { borderWidth: 1.5, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
+    restBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
     restBadgeText: { color: C.green, fontSize: 11, fontWeight: '800' },
     restMsg: { color: C.sand, fontSize: 12 },
 
@@ -525,22 +535,22 @@ function makeStyles(C) {
 function makeModalStyles(C) {
   return StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' },
-    container: { backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border },
-    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.border, paddingHorizontal: 16, paddingVertical: 10 },
+    container: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+    titleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.ink, paddingHorizontal: 16, paddingVertical: 14 },
     titleBarText: { fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 },
     closeBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' },
     closeBtnText: { fontSize: 12, fontWeight: '800', color: C.ink },
     body: { padding: 20, paddingBottom: 48 },
     subtitle: { fontSize: 12, color: C.dust, marginBottom: 20 },
     monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-    navBtn: { width: 30, height: 30, borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+    navBtn: { width: 30, height: 30, borderWidth: 1, borderColor: C.borderLight, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
     navBtnText: { color: C.ink, fontSize: 18, fontWeight: '800', lineHeight: 22 },
     monthTitle: { color: C.ink, fontSize: 14, fontWeight: '800' },
     dayHeaders: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
     dayHeader: { color: C.dust, fontSize: 9, fontWeight: '700', width: '14.28%', textAlign: 'center', textTransform: 'uppercase' },
     grid: { flexDirection: 'row', flexWrap: 'wrap' },
     emptyCell: { width: '14.28%', aspectRatio: 1 },
-    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 3, borderWidth: 1.5, borderColor: C.borderLight, marginBottom: 4 },
+    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: C.borderLight, marginBottom: 4 },
     cellPast: { opacity: 0.25 },
     cellGoal: { backgroundColor: C.goalBg, borderColor: C.goalBorder },
     cellText: { color: C.ink, fontSize: 13, fontWeight: '600' },

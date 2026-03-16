@@ -10,11 +10,18 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: C.surface,
-          borderTopColor: C.borderLight,
-          borderTopWidth: 1,
+          borderTopWidth: 0,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          elevation: 8,
+          height: 60,
+          paddingBottom: 8,
         },
         tabBarActiveTintColor: C.terra,
         tabBarInactiveTintColor: C.dust,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       }}
     >
       <Tabs.Screen
