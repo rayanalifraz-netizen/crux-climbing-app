@@ -302,7 +302,7 @@ function GradeModal({ visible, onClose, onSave }) {
           </View>
           <View style={modalStyles.body}>
             <Text style={modalStyles.subtitle}>
-              {step === 1 ? 'Select the hardest grade you have sent' : 'What grade are you working toward?'}
+              {step === 1 ? 'Highest grade you climb confidently' : 'What grade are you working toward?'}
             </Text>
             <View style={modalStyles.gradeGrid}>
               {(step === 1 ? V_GRADES : V_GRADES.slice(maxIndex)).map((grade) => {

@@ -148,7 +148,7 @@ export default function OnboardingScreen() {
               />
 
               {/* Max grade */}
-              <Text style={s.fieldLabel}>Hardest grade you've sent</Text>
+              <Text style={s.fieldLabel}>Highest grade you climb confidently</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.gradeScroll} contentContainerStyle={s.gradeRow} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                 {V_GRADES.map(g => {
                   const sel = maxGrade === g;
