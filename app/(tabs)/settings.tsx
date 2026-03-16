@@ -1,6 +1,7 @@
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AlertSettings, clearAllData, deleteCheckInByKey, deleteSessionsByKey, getAlertSettings, getProfile, getTodayDate, saveAlertSettings, saveProfile } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -101,6 +102,38 @@ function GradeModal({ visible, onClose, onSave }) {
   );
 }
 
+function AnimatedToggle({ value, onPress }: { value: boolean; onPress: () => void }) {
+  const { C } = useTheme();
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: value ? 1 : 0,
+      useNativeDriver: true,
+      bounciness: 5,
+      speed: 20,
+    }).start();
+  }, [value]);
+
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 18] });
+  const trackBg = anim.interpolate({ inputRange: [0, 1], outputRange: [C.surfaceAlt, C.terra] });
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+      <Animated.View style={{
+        width: 40, height: 22, borderRadius: 11,
+        borderWidth: 1.5, borderColor: value ? C.terraBorder : C.borderLight,
+        backgroundColor: trackBg, justifyContent: 'center', paddingHorizontal: 2,
+      }}>
+        <Animated.View style={{
+          width: 14, height: 14, borderRadius: 7, backgroundColor: value ? '#fff' : C.sand,
+          transform: [{ translateX }],
+        }} />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 function SettingsRow({ label, sublabel, onPress, destructive = false, rightText }) {
   const { C } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
@@ -156,6 +189,7 @@ export default function SettingsScreen() {
   };
 
   const clearTodaySession = () => {
+    Haptics.selectionAsync();
     Alert.alert("Clear Today's Session", "This will delete today's session so you can re-log it.", [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Clear', style: 'destructive', onPress: async () => { await deleteSessionsByKey(getTodayDate()); } }
@@ -163,6 +197,7 @@ export default function SettingsScreen() {
   };
 
   const clearTodayCheckIn = () => {
+    Haptics.selectionAsync();
     Alert.alert("Clear Today's Check-in", "This will delete today's check-in so you can re-log it.", [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Clear', style: 'destructive', onPress: async () => { await deleteCheckInByKey(getTodayDate()); } }
@@ -236,14 +271,12 @@ export default function SettingsScreen() {
 
         {/* Appearance */}
         <WindowBox label="Appearance">
-          <TouchableOpacity style={styles.row} onPress={toggleDark}>
+          <TouchableOpacity style={styles.row} onPress={() => { Haptics.selectionAsync(); toggleDark(); }}>
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Dark Mode</Text>
               <Text style={styles.rowSublabel}>{isDark ? 'On — tap to switch to light' : 'Off — tap to switch to dark'}</Text>
             </View>
-            <View style={[styles.toggleTrack, isDark && { backgroundColor: C.terra, borderColor: C.terraBorder }]}>
-              <View style={[styles.toggleThumb, isDark && { transform: [{ translateX: 18 }] }]} />
-            </View>
+            <AnimatedToggle value={isDark} onPress={() => { Haptics.selectionAsync(); toggleDark(); }} />
           </TouchableOpacity>
         </WindowBox>
 
@@ -267,14 +300,12 @@ export default function SettingsScreen() {
             },
           ].map((item, i, arr) => (
             <View key={item.key}>
-              <TouchableOpacity style={styles.row} onPress={() => toggleAlert(item.key)}>
+              <TouchableOpacity style={styles.row} onPress={() => { Haptics.selectionAsync(); toggleAlert(item.key); }}>
                 <View style={styles.rowContent}>
                   <Text style={styles.rowLabel}>{item.label}</Text>
                   <Text style={styles.rowSublabel}>{item.sublabel}</Text>
                 </View>
-                <View style={[styles.toggleTrack, alertSettings[item.key] && { backgroundColor: C.terra, borderColor: C.terraBorder }]}>
-                  <View style={[styles.toggleThumb, alertSettings[item.key] && { transform: [{ translateX: 18 }] }]} />
-                </View>
+                <AnimatedToggle value={alertSettings[item.key]} onPress={() => { Haptics.selectionAsync(); toggleAlert(item.key); }} />
               </TouchableOpacity>
               {i < arr.length - 1 && <View style={styles.rowDivider} />}
             </View>
@@ -372,9 +403,6 @@ function makeStyles(C) {
     rowLabel: { color: C.ink, fontSize: 13, fontWeight: '700' },
     rowSublabel: { color: C.dust, fontSize: 11, marginTop: 2 },
     rowArrow: { color: C.sand, fontSize: 14, fontWeight: '700' },
-
-    toggleTrack: { width: 40, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.borderLight, backgroundColor: C.surfaceAlt, justifyContent: 'center', paddingHorizontal: 2 },
-    toggleThumb: { width: 14, height: 14, borderRadius: 7, backgroundColor: C.sand },
 
     appInfo: { alignItems: 'center', gap: 4, paddingTop: 24, paddingBottom: 8 },
     appInfoBox: { borderWidth: 1.5, borderColor: C.border, borderRadius: 4, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 8 },

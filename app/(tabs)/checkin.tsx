@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -149,15 +150,18 @@ export default function CheckInScreen() {
 
   const toggleFinger = (id) => {
     if (alreadyCheckedIn) return;
+    Haptics.selectionAsync();
     setAffectedFingers(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   };
 
   const togglePain = (id) => {
     if (alreadyCheckedIn) return;
+    Haptics.selectionAsync();
     setPainAreas(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
 
   const handleSave = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await saveCheckIn({ date: today, soreness, affectedFingers, painAreas, isRestDay: false });
     const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, false);
     setDrs(score);
@@ -165,6 +169,7 @@ export default function CheckInScreen() {
   };
 
   const handleRestDay = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await saveCheckIn({ date: today, soreness: '0', affectedFingers: [], painAreas: [], isRestDay: true });
     setIsRestDay(true);
     setDrs(100);
@@ -181,7 +186,7 @@ export default function CheckInScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, soreness && !alreadyCheckedIn && { paddingBottom: 88 }]}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -265,7 +270,7 @@ export default function CheckInScreen() {
                       <TouchableOpacity
                         key={level}
                         style={[styles.sorenessBtn, selected && { backgroundColor: color, borderColor: color }]}
-                        onPress={() => !alreadyCheckedIn && setSoreness(level)}
+                        onPress={() => { if (!alreadyCheckedIn) { Haptics.selectionAsync(); setSoreness(level); } }}
                       >
                         <Text style={[styles.sorenessBtnText, selected && { color: '#fff' }]}>{level}</Text>
                       </TouchableOpacity>
@@ -383,17 +388,19 @@ export default function CheckInScreen() {
               </WindowBox>
             )}
 
-            {/* Save Button */}
-            {soreness && !alreadyCheckedIn && (
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>Save Check-in →</Text>
-              </TouchableOpacity>
-            )}
           </>
         )}
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      {soreness && !alreadyCheckedIn && (
+        <View style={styles.stickyFooter}>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+            <Text style={styles.saveBtnText}>Save Check-in →</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -457,7 +464,8 @@ function makeStyles(C) {
     drsBreakdownTick: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 1 },
     drsHint: { fontSize: 11, fontWeight: '600' },
 
-    saveBtn: { marginHorizontal: 16, backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center', marginTop: 4 },
+    stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 16, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
+    saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center' },
     saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   });
 }

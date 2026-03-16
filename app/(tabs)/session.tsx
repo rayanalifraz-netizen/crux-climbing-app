@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -112,23 +113,32 @@ export default function SessionScreen() {
     setIsRestDay(todayCheckIn?.isRestDay || false);
   };
 
-  const incrementGrade = (grade) =>
+  const incrementGrade = (grade) => {
+    Haptics.selectionAsync();
     setGradeCounts(prev => ({ ...prev, [grade]: (prev[grade] || 0) + 1 }));
+  };
 
-  const decrementGrade = (grade) =>
+  const decrementGrade = (grade) => {
+    Haptics.selectionAsync();
     setGradeCounts(prev => {
       const current = prev[grade] || 0;
       if (current <= 1) { const u = { ...prev }; delete u[grade]; return u; }
       return { ...prev, [grade]: current - 1 };
     });
+  };
 
-  const toggleHold = (id) =>
+  const toggleHold = (id) => {
+    Haptics.selectionAsync();
     setHoldTypes(prev => prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]);
+  };
 
-  const toggleMovement = (id) =>
+  const toggleMovement = (id) => {
+    Haptics.selectionAsync();
     setMovementTypes(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
+  };
 
   const handleSave = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await saveSession({ date: today, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim() });
     setAlreadySaved(true);
     setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim() });
@@ -150,7 +160,7 @@ export default function SessionScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, hasGrades && !alreadySaved && !isRestDay && { paddingBottom: 88 }]} keyboardShouldPersistTaps="handled">
 
         {/* Header */}
         <View style={styles.header}>
@@ -347,18 +357,20 @@ export default function SessionScreen() {
               </View>
             </WindowBox>
 
-            {/* Save */}
-            {hasGrades && (
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>Save Session →</Text>
-              </TouchableOpacity>
-            )}
           </>
         )}
 
         <View style={{ height: 20 }} />
       </ScrollView>
       </KeyboardAvoidingView>
+
+      {hasGrades && !alreadySaved && !isRestDay && (
+        <View style={styles.stickyFooter}>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+            <Text style={styles.saveBtnText}>Save Session →</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -423,7 +435,8 @@ function makeStyles(C) {
     notesInput: { backgroundColor: C.surfaceAlt, borderRadius: 4, padding: 12, color: C.ink, fontSize: 13, lineHeight: 19, minHeight: 72, borderWidth: 1, borderColor: C.borderLight },
     notesCount: { color: C.dust, fontSize: 10, textAlign: 'right', marginTop: 6 },
 
-    saveBtn: { marginHorizontal: 16, backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center', marginTop: 4 },
+    stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 16, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
+    saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 4, alignItems: 'center' },
     saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   });
 }
