@@ -422,8 +422,6 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [totalSessions, setTotalSessions] = useState(0);
   const [totalCheckIns, setTotalCheckIns] = useState(0);
-  const [allTimeAttempts, setAllTimeAttempts] = useState(0);
-  const [allTimeHard, setAllTimeHard] = useState(0);
   const [allTimeRestDays, setAllTimeRestDays] = useState(0);
   const [allTimeAvgRES, setAllTimeAvgRES] = useState<number | null>(null);
   const [progressCount, setProgressCount] = useState(0);
@@ -452,8 +450,6 @@ export default function ProfileScreen() {
     const allSess = Object.values(sessions);
     setTotalSessions(allSess.length);
     setTotalCheckIns(Object.keys(checkIns).length);
-    setAllTimeAttempts(allSess.reduce((sum, s) => sum + Object.values(s.gradeCounts || {}).reduce((a: number, b: any) => a + b, 0), 0));
-    setAllTimeHard(allSess.filter(s => s.res > 70).length);
     setAllTimeRestDays(Object.values(checkIns).filter((c: any) => c.isRestDay).length);
     setAllTimeAvgRES(allSess.length > 0 ? Math.round(allSess.reduce((sum, s) => sum + s.res, 0) / allSess.length) : null);
     setWeeklySummary(getWeeklySummary(sessions, checkIns));
@@ -896,12 +892,10 @@ export default function ProfileScreen() {
               <View style={styles.statsInner}>
                 {[
                   { label: 'Sessions', val: totalSessions },
-                  { label: 'Attempts', val: allTimeAttempts },
-                  { label: 'Hard', val: allTimeHard },
                   { label: 'Rest Days', val: allTimeRestDays },
                   { label: 'Avg RES', val: allTimeAvgRES ?? '—' },
                   { label: 'Check-ins', val: totalCheckIns },
-                ].map((stat, i) => (
+                ].map((stat) => (
                   <View key={stat.label} style={styles.statCell}>
                     <Text style={styles.statEyebrow}>{stat.label}</Text>
                     <Text style={styles.statBig}>{stat.val}</Text>
