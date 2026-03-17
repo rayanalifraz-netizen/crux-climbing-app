@@ -139,7 +139,7 @@ function CHICard({ data }) {
   const chiColor = chi >= 80 ? C.green : chi >= 65 ? C.terra : chi >= 45 ? C.amber : C.red;
   const chiLabel = chi >= 80 ? 'Peak' : chi >= 65 ? 'Good' : chi >= 45 ? 'Stressed' : 'Recovery Mode';
   const chiDesc = chi >= 80
-    ? 'Your body is in peak condition for performance.'
+    ? 'Your body is in a good place — keep it that way.'
     : chi >= 65
     ? 'Good shape — a few things to keep an eye on.'
     : chi >= 45
@@ -214,6 +214,9 @@ function CHICard({ data }) {
           );
         })}
       </View>
+      <Text style={{ fontSize: 10, color: C.dust, marginTop: 14, fontStyle: 'italic', textAlign: 'center' }}>
+        Guide only — always trust how your body feels over any estimate.
+      </Text>
     </View>
   );
 }
