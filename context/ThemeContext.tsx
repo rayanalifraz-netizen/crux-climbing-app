@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getDarkMode, saveDarkMode } from '../storage';
+import { getDarkMode, getGradeSystem, saveDarkMode, saveGradeSystem } from '../storage';
+
+export type GradeSystem = 'V' | 'font';
 
 export const LIGHT = {
   bg:          '#F2F0ED',
@@ -88,15 +90,40 @@ export function gradeColorBg(grade: string): string {
   return GRADE_BG_COLORS[grade] || '#F7F6F3';
 }
 
+export const V_TO_FONT: Record<string, string> = {
+  VB: '3',  V0: '4',  V1: '5',  V2: '5+',
+  V3: '6a', V4: '6b', V5: '6c', V6: '7a',
+  V7: '7a+',V8: '7b', V9: '7c', V10: '8a',
+  V11: '8a+',V12: '8b',
+};
+
+export const toDisplayGrade = (vGrade: string, system: GradeSystem): string => {
+  if (system === 'font') return V_TO_FONT[vGrade] ?? vGrade;
+  return vGrade;
+};
+
 type ColorPalette = typeof LIGHT;
-type ThemeContextType = { C: ColorPalette; isDark: boolean; toggleDark: () => void };
-const ThemeContext = createContext<ThemeContextType>({ C: LIGHT, isDark: false, toggleDark: () => {} });
+type ThemeContextType = {
+  C: ColorPalette;
+  isDark: boolean;
+  toggleDark: () => void;
+  gradeSystem: GradeSystem;
+  toggleGradeSystem: () => void;
+};
+const ThemeContext = createContext<ThemeContextType>({
+  C: LIGHT, isDark: false, toggleDark: () => {},
+  gradeSystem: 'V', toggleGradeSystem: () => {},
+});
 
 export function ThemeProvider({ children }) {
   const [isDark, setIsDark] = useState(false);
+  const [gradeSystem, setGradeSystem] = useState<GradeSystem>('V');
+
   useEffect(() => {
     getDarkMode().then(val => setIsDark(val));
+    getGradeSystem().then(val => setGradeSystem(val));
   }, []);
+
   const toggleDark = useCallback(() => {
     setIsDark(prev => {
       const next = !prev;
@@ -104,8 +131,17 @@ export function ThemeProvider({ children }) {
       return next;
     });
   }, []);
+
+  const toggleGradeSystem = useCallback(() => {
+    setGradeSystem(prev => {
+      const next: GradeSystem = prev === 'V' ? 'font' : 'V';
+      saveGradeSystem(next);
+      return next;
+    });
+  }, []);
+
   return (
-    <ThemeContext.Provider value={{ C: isDark ? DARK : LIGHT, isDark, toggleDark }}>
+    <ThemeContext.Provider value={{ C: isDark ? DARK : LIGHT, isDark, toggleDark, gradeSystem, toggleGradeSystem }}>
       {children}
     </ThemeContext.Provider>
   );

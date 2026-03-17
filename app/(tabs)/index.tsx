@@ -6,7 +6,7 @@ import Svg, { Circle } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
 import { applyReminderSettings, getReminderSettings, saveReminderSettings, type ReminderSettings, scheduleStreakProtection } from '../../notifications';
 import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
-import { gradeColor, useTheme } from '../../context/ThemeContext';
+import { gradeColor, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 import { getCurrentUser, signOut } from '../../lib/supabase';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
@@ -326,7 +326,7 @@ function GradeModal({ visible, onClose, onSave }) {
   const handleSave = () => { onSave(maxGrade, projectGrade); reset(); };
   const maxIndex = maxGrade ? V_GRADES.indexOf(maxGrade) : 0;
   const availableProjectGrades = V_GRADES.slice(maxIndex);
-  const { C } = useTheme();
+  const { C, gradeSystem } = useTheme();
   const modalStyles = useMemo(() => makeModalStyles(C), [C]);
 
   return (
@@ -355,7 +355,7 @@ function GradeModal({ visible, onClose, onSave }) {
                     onPress={() => step === 1 ? setMaxGrade(grade) : setProjectGrade(grade)}
                   >
                     <Text style={[modalStyles.gradeText, selected && modalStyles.selectedText]}>
-                      {grade}
+                      {toDisplayGrade(grade, gradeSystem)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -414,7 +414,7 @@ function SendsModal({ visible, current, onClose, onSave }) {
 }
 
 export default function ProfileScreen() {
-  const { C, isDark } = useTheme();
+  const { C, isDark, gradeSystem } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
   const [profile, setProfile] = useState(null);
   const [totalSessions, setTotalSessions] = useState(0);
@@ -762,12 +762,12 @@ export default function ProfileScreen() {
               <View style={styles.gradeHeroInner}>
                 <View style={styles.gradeHeroCol}>
                   <Text style={styles.gradeEyebrow}>LEVEL</Text>
-                  <Text style={styles.gradeBig}>{profile.maxGrade}</Text>
+                  <Text style={styles.gradeBig}>{toDisplayGrade(profile.maxGrade, gradeSystem)}</Text>
                 </View>
                 <View style={styles.gradeHeroDivider} />
                 <View style={[styles.gradeHeroCol, { alignItems: 'flex-end' }]}>
                   <Text style={styles.gradeEyebrow}>PROJECT</Text>
-                  <Text style={[styles.gradeBig, { color: gradeColor(profile.projectGrade) }]}>{profile.projectGrade}</Text>
+                  <Text style={[styles.gradeBig, { color: gradeColor(profile.projectGrade) }]}>{toDisplayGrade(profile.projectGrade, gradeSystem)}</Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -783,7 +783,7 @@ export default function ProfileScreen() {
               <View style={styles.progressInner}>
                 <View style={styles.progressTopRow}>
                   <View>
-                    <Text style={styles.progressEyebrow}>Sends at {profile.projectGrade}</Text>
+                    <Text style={styles.progressEyebrow}>Sends at {toDisplayGrade(profile.projectGrade, gradeSystem)}</Text>
                     <View style={styles.progressNumRow}>
                       <Text style={styles.progressBigNum}>{progressCount}</Text>
                       <Text style={styles.progressDenom}>/ {progressMax}</Text>
@@ -797,7 +797,7 @@ export default function ProfileScreen() {
                   <View style={[styles.progressFill, { width: `${Math.min(progressCount / progressMax, 1) * 100}%` }]} />
                 </View>
                 <Text style={styles.progressHint}>
-                  {showCongrats ? 'Grade updated — new goal set' : `${progressMax - progressCount} more to unlock ${profile.projectGrade}`}
+                  {showCongrats ? 'Grade updated — new goal set' : `${progressMax - progressCount} more to unlock ${toDisplayGrade(profile.projectGrade, gradeSystem)}`}
                 </Text>
               </View>
               <TouchableOpacity style={styles.sendsTargetBtn} onPress={() => setShowSendsModal(true)}>

@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { deleteGoalDate, getCheckIns, getGoalDate, getSessions, saveGoalDate } from '../../storage';
-import { gradeColor, gradeColorBg, useTheme } from '../../context/ThemeContext';
+import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -92,7 +92,7 @@ function formatGoalDate(dateStr) {
 }
 
 export default function CalendarScreen() {
-  const { C } = useTheme();
+  const { C, gradeSystem } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
   const modalStyles = useMemo(() => makeModalStyles(C), [C]);
   const [sessions, setSessions] = useState({});
@@ -409,7 +409,7 @@ export default function CalendarScreen() {
                   <View style={styles.chipRow}>
                     {Object.entries(selectedSession.gradeCounts || {}).map(([grade, count]) => (
                       <View key={grade} style={[styles.chip, { borderColor: gradeColor(grade) + '40', backgroundColor: gradeColorBg(grade) }]}>
-                        <Text style={[styles.chipGrade, { color: gradeColor(grade) }]}>{grade}</Text>
+                        <Text style={[styles.chipGrade, { color: gradeColor(grade) }]}>{toDisplayGrade(grade, gradeSystem)}</Text>
                         <Text style={[styles.chipCount, { color: gradeColor(grade) + 'aa' }]}>×{count}</Text>
                       </View>
                     ))}

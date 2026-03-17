@@ -6,7 +6,7 @@ import { Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleS
 import ShareCardModal from '../../components/ShareCardModal';
 import { scheduleRecoveryReminder } from '../../notifications';
 import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
-import { gradeColor, gradeColorBg, useTheme } from '../../context/ThemeContext';
+import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 const today = getTodayDate();
@@ -93,7 +93,7 @@ function calculateRES(gradeCounts, maxGrade, selectedHolds) {
 }
 
 export default function SessionScreen() {
-  const { C } = useTheme();
+  const { C, gradeSystem } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
   const [gradeCounts, setGradeCounts] = useState({});
   const [holdTypes, setHoldTypes] = useState([]);
@@ -288,7 +288,7 @@ export default function SessionScreen() {
                         styles.gradeCell,
                         isActive && { borderColor: gradeColor(grade), backgroundColor: gradeColorBg(grade) }
                       ]}>
-                        <Text style={[styles.gradeLabel, isActive && { color: gradeColor(grade) }]}>{grade}</Text>
+                        <Text style={[styles.gradeLabel, isActive && { color: gradeColor(grade) }]}>{toDisplayGrade(grade, gradeSystem)}</Text>
                         <View style={styles.counter}>
                           {isActive && (
                             <TouchableOpacity onPress={() => decrementGrade(grade)} style={styles.counterBtn}>

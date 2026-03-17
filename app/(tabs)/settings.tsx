@@ -3,7 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AlertSettings, clearAllData, deleteCheckInByKey, deleteSessionsByKey, getAlertSettings, getProfile, getTodayDate, saveAlertSettings, saveProfile } from '../../storage';
-import { useTheme } from '../../context/ThemeContext';
+import { toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 
@@ -46,7 +46,7 @@ function Card({ label, labelColor, accentColor, bgColor, children, style }: {
 }
 
 function GradeModal({ visible, onClose, onSave }) {
-  const { C } = useTheme();
+  const { C, gradeSystem } = useTheme();
   const modalStyles = useMemo(() => makeModalStyles(C), [C]);
   const [step, setStep] = useState(1);
   const [maxGrade, setMaxGrade] = useState(null);
@@ -84,7 +84,7 @@ function GradeModal({ visible, onClose, onSave }) {
                     onPress={() => step === 1 ? setMaxGrade(grade) : setProjectGrade(grade)}
                   >
                     <Text style={[modalStyles.gradeText, selected && modalStyles.selectedText]}>
-                      {grade}
+                      {toDisplayGrade(grade, gradeSystem)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -156,7 +156,7 @@ function SettingsRow({ label, sublabel, onPress, destructive = false, rightText 
 }
 
 export default function SettingsScreen() {
-  const { C, isDark, toggleDark } = useTheme();
+  const { C, isDark, toggleDark, gradeSystem, toggleGradeSystem } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
   const [profile, setProfile] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -256,7 +256,7 @@ export default function SettingsScreen() {
                 <Text style={styles.profileName}>{profile?.name || 'Climber'}</Text>
               )}
               <Text style={styles.profileGrades}>
-                {profile ? `${profile.maxGrade} · Projecting ${profile.projectGrade}` : 'No grades set'}
+                {profile ? `${toDisplayGrade(profile.maxGrade, gradeSystem)} · Projecting ${toDisplayGrade(profile.projectGrade, gradeSystem)}` : 'No grades set'}
               </Text>
             </View>
             {editingName ? (
@@ -282,6 +282,16 @@ export default function SettingsScreen() {
               <Text style={styles.rowSublabel}>{isDark ? 'On — tap to switch to light' : 'Off — tap to switch to dark'}</Text>
             </View>
             <AnimatedToggle value={isDark} onPress={() => { Haptics.selectionAsync(); toggleDark(); }} />
+          </TouchableOpacity>
+          <View style={styles.rowDivider} />
+          <TouchableOpacity style={styles.row} onPress={() => { Haptics.selectionAsync(); toggleGradeSystem(); }}>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>European Font Scale</Text>
+              <Text style={styles.rowSublabel}>
+                {gradeSystem === 'font' ? 'On — showing Font grades (6a, 7b…)' : 'Off — showing V grades (V3, V8…)'}
+              </Text>
+            </View>
+            <AnimatedToggle value={gradeSystem === 'font'} onPress={() => { Haptics.selectionAsync(); toggleGradeSystem(); }} />
           </TouchableOpacity>
         </Card>
 
@@ -322,12 +332,12 @@ export default function SettingsScreen() {
           <View style={styles.gradeDisplay}>
             <View style={styles.gradeItem}>
               <Text style={styles.gradeEyebrow}>Level</Text>
-              <Text style={styles.gradeBig}>{profile?.maxGrade ?? '—'}</Text>
+              <Text style={styles.gradeBig}>{profile?.maxGrade ? toDisplayGrade(profile.maxGrade, gradeSystem) : '—'}</Text>
             </View>
             <View style={styles.gradeDivider} />
             <View style={styles.gradeItem}>
               <Text style={styles.gradeEyebrow}>Project</Text>
-              <Text style={[styles.gradeBig, { color: C.terra }]}>{profile?.projectGrade ?? '—'}</Text>
+              <Text style={[styles.gradeBig, { color: C.terra }]}>{profile?.projectGrade ? toDisplayGrade(profile.projectGrade, gradeSystem) : '—'}</Text>
             </View>
           </View>
           <View style={[styles.rowDivider, { backgroundColor: C.terraBorder + '40' }]} />

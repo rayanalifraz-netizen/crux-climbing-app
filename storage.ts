@@ -179,6 +179,17 @@ export const saveDarkMode = async (val: boolean): Promise<void> => {
   await set('darkMode', val ? 'true' : 'false');
 };
 
+// ─── Grade System ─────────────────────────────────────────────────────────────
+
+export const getGradeSystem = async (): Promise<'V' | 'font'> => {
+  const val = await get('gradeSystem');
+  return val === 'font' ? 'font' : 'V';
+};
+
+export const saveGradeSystem = async (val: 'V' | 'font'): Promise<void> => {
+  await set('gradeSystem', val);
+};
+
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 
 export const getOnboardingComplete = async (): Promise<boolean> => {
