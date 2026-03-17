@@ -190,9 +190,10 @@ function RecoveryCard({
   streak: { current: number; last7: boolean[] };
   chiData?: CHIData;
 }) {
-  const drs = checkIn.isRestDay ? 100 : computeDRS(checkIn);
-  const color = drsColor(drs);
-  const verdict = drsLabel(drs);
+  const isRest = checkIn.isRestDay;
+  const drs = isRest ? null : computeDRS(checkIn);
+  const color = isRest ? P.green : drsColor(drs!);
+  const verdict = isRest ? 'Rest Day' : drsLabel(drs!);
 
   return (
     <View style={rc.card}>
@@ -207,8 +208,14 @@ function RecoveryCard({
         <View style={[rc.verdictPill, { backgroundColor: color + '18', borderColor: color + '50' }]}>
           <Text style={[rc.verdictText, { color }]}>{verdict}</Text>
         </View>
-        <Text style={[rc.scoreNum, { color }]}>{drs}</Text>
-        <Text style={rc.scoreLabel}>Daily Readiness Score</Text>
+        {isRest ? (
+          <Text style={rc.restMsg}>Recovery mode — no session today</Text>
+        ) : (
+          <>
+            <Text style={[rc.scoreNum, { color }]}>{drs}</Text>
+            <Text style={rc.scoreLabel}>Daily Readiness Score</Text>
+          </>
+        )}
       </View>
 
       <View style={rc.rule} />
@@ -322,6 +329,7 @@ const rc = StyleSheet.create({
   verdictText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
   scoreNum: { fontSize: 76, fontWeight: '900', letterSpacing: -3, lineHeight: 80 },
   scoreLabel: { fontSize: 10, fontWeight: '700', color: P.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 },
+  restMsg: { fontSize: 13, color: P.sand, marginTop: 12, textAlign: 'center' },
 
   rule: { height: 1, backgroundColor: P.border, marginBottom: 16, marginTop: 4 },
 
