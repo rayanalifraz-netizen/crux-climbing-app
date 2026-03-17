@@ -112,7 +112,7 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
   }
   load = Math.max(0, Math.min(100, load));
 
-  // 3. Injury Status (30%) — injury alerts + recent check-in pain + high soreness signal
+  // 3. Injury Status (30%) — injury alerts + recent check-in pain + session load risk
   let injury = 100 - injuryAlerts.length * 25;
   if (recentSoreness >= 8) injury -= 20;
   for (let i = 0; i <= 2; i++) {
@@ -126,6 +126,27 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
     if (f >= 3) injury -= 20; else if (f >= 1) injury -= 10;
     break;
   }
+
+  // Factor in session training load risk (mirrors heatmap logic)
+  let fingerLoad = 0, shoulderLoad = 0, recentHighRES = false;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const sess = sessions[d.toISOString().split('T')[0]];
+    if (!sess) continue;
+    if (i < 3 && sess.res >= 85) recentHighRES = true;
+    sess.holdTypes?.forEach(h => {
+      if (h === 'crimps' || h === 'pockets') fingerLoad++;
+      if (h === 'slopers') shoulderLoad++;
+    });
+    sess.movementTypes?.forEach(m => {
+      if (m === 'dynos') shoulderLoad++;
+    });
+  }
+  if (fingerLoad >= 3) injury -= 18; else if (fingerLoad >= 2) injury -= 10; else if (fingerLoad >= 1) injury -= 5;
+  if (shoulderLoad >= 3) injury -= 12; else if (shoulderLoad >= 2) injury -= 6;
+  if (recentHighRES) injury -= 8;
+
   injury = Math.max(0, injury);
 
   const chi = Math.round(readiness * 0.35 + load * 0.35 + injury * 0.30);
