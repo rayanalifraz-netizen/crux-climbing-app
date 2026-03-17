@@ -733,28 +733,28 @@ export default function ProfileScreen() {
                   </Text>
                   <TouchableOpacity
                     style={styles.startStep}
-                    onPress={() => router.navigate('/(tabs)/session')}
+                    onPress={() => router.navigate('/(tabs)/checkin')}
                   >
-                    <View style={[styles.startStepNum, { backgroundColor: C.terra }]}>
+                    <View style={[styles.startStepNum, { backgroundColor: '#52B788' }]}>
                       <Text style={styles.startStepNumText}>1</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.startStepTitle, { color: C.ink }]}>Log a session</Text>
-                      <Text style={styles.startStepSub}>Track grades and hold types from today's climb</Text>
+                      <Text style={[styles.startStepTitle, { color: C.ink }]}>Morning check-in</Text>
+                      <Text style={styles.startStepSub}>Log soreness and pain to track recovery</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={C.dust} />
                   </TouchableOpacity>
                   <View style={styles.startDivider} />
                   <TouchableOpacity
                     style={styles.startStep}
-                    onPress={() => router.navigate('/(tabs)/checkin')}
+                    onPress={() => router.navigate('/(tabs)/session')}
                   >
-                    <View style={[styles.startStepNum, { backgroundColor: '#52B788' }]}>
+                    <View style={[styles.startStepNum, { backgroundColor: C.terra }]}>
                       <Text style={styles.startStepNumText}>2</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.startStepTitle, { color: C.ink }]}>Morning check-in</Text>
-                      <Text style={styles.startStepSub}>Log soreness and pain to track recovery</Text>
+                      <Text style={[styles.startStepTitle, { color: C.ink }]}>Log a session</Text>
+                      <Text style={styles.startStepSub}>Track grades and hold types from today's climb</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={C.dust} />
                   </TouchableOpacity>
