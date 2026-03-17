@@ -293,8 +293,8 @@ export default function CalendarScreen() {
                 const isSelected = selectedDate === dateStr;
                 const isToday = dateStr === todayStr;
                 const isGoalDay = dateStr === goalDate;
-                const dotColor = restDay ? C.green : session ? getResColor(C, session.res) : null;
-                const hasActivity = restDay || !!session;
+                const dotColor = restDay ? C.green : session ? getResColor(C, session.res) : checkIn ? C.dust : null;
+                const hasActivity = restDay || !!session || !!checkIn;
 
                 return (
                   <TouchableOpacity
@@ -472,16 +472,40 @@ export default function CalendarScreen() {
                 <Text style={styles.restMsg}>Recovery logged — no session this day.</Text>
               )}
             </View>
-            {selectedDate && (
-              <TouchableOpacity
-                style={styles.editBtn}
-                onPress={() => router.navigate({ pathname: '/(tabs)/session', params: { editDate: selectedDate } })}
-              >
-                <Text style={styles.editBtnText}>
-                  {selectedSession ? 'Edit Session →' : '+ Log Session'}
-                </Text>
-              </TouchableOpacity>
-            )}
+          </Card>
+        )}
+
+        {/* Check-in Summary */}
+        {selectedDate && selectedCheckIn && !isRestDay && (
+          <Card label="Check-in" accentColor={C.green} bgColor={C.greenBg} labelColor={C.green} style={{ marginTop: 4 }}>
+            <View style={styles.detailInner}>
+              <Text style={styles.detailSectionLabel}>Soreness</Text>
+              <Text style={{ color: C.green, fontSize: 22, fontWeight: '800', marginBottom: 14 }}>{selectedCheckIn.soreness}/10</Text>
+              {selectedCheckIn.painAreas?.length > 0 && (
+                <>
+                  <Text style={styles.detailSectionLabel}>Pain Areas</Text>
+                  <View style={styles.chipRow}>
+                    {selectedCheckIn.painAreas.map(area => (
+                      <View key={area} style={[styles.chip, { borderColor: C.redBorder, backgroundColor: C.redBg }]}>
+                        <Text style={[styles.chipGrade, { color: C.red }]}>{area}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+              {selectedCheckIn.affectedFingers?.length > 0 && (
+                <>
+                  <Text style={styles.detailSectionLabel}>Affected Fingers</Text>
+                  <View style={styles.chipRow}>
+                    {selectedCheckIn.affectedFingers.map(f => (
+                      <View key={f} style={[styles.chip, { borderColor: C.amberBorder, backgroundColor: C.amberBg }]}>
+                        <Text style={[styles.chipGrade, { color: C.amber }]}>{f}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+            </View>
           </Card>
         )}
 
@@ -506,22 +530,26 @@ export default function CalendarScreen() {
           </Card>
         )}
 
-        {/* Edit check-in button */}
-        {selectedDate && selectedCheckIn && (
-          <TouchableOpacity
-            style={[styles.editBtnStandalone, { borderColor: C.greenBorder, backgroundColor: C.greenBg }]}
-            onPress={() => router.navigate({ pathname: '/(tabs)/checkin', params: { editDate: selectedDate } })}
-          >
-            <Text style={[styles.editBtnText, { color: C.green }]}>Edit Check-in →</Text>
-          </TouchableOpacity>
-        )}
-        {selectedDate && !selectedCheckIn && (
-          <TouchableOpacity
-            style={[styles.editBtnStandalone, { borderColor: C.borderLight }]}
-            onPress={() => router.navigate({ pathname: '/(tabs)/checkin', params: { editDate: selectedDate } })}
-          >
-            <Text style={[styles.editBtnText, { color: C.sand }]}>+ Log Check-in</Text>
-          </TouchableOpacity>
+        {/* Edit buttons row */}
+        {selectedDate && (
+          <View style={styles.editBtnRow}>
+            <TouchableOpacity
+              style={[styles.editBtnStandalone, { borderColor: C.terraBorder, flex: 1 }]}
+              onPress={() => router.navigate({ pathname: '/(tabs)/session', params: { editDate: selectedDate } })}
+            >
+              <Text style={[styles.editBtnText, { color: C.terra }]}>
+                {selectedSession ? 'Edit Session →' : '+ Log Session'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editBtnStandalone, { borderColor: C.greenBorder, flex: 1 }]}
+              onPress={() => router.navigate({ pathname: '/(tabs)/checkin', params: { editDate: selectedDate } })}
+            >
+              <Text style={[styles.editBtnText, { color: C.green }]}>
+                {selectedCheckIn ? 'Edit Check-in →' : '+ Log Check-in'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {selectedDate && !isRestDay && !selectedSession && !(selectedCheckIn?.mediaUris?.length) && (
@@ -654,9 +682,9 @@ function makeStyles(C) {
     restBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
     restBadgeText: { color: C.green, fontSize: 11, fontWeight: '800' },
     restMsg: { color: C.sand, fontSize: 12 },
-    editBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, padding: 14, alignItems: 'center' },
-    editBtnStandalone: { marginHorizontal: 16, marginTop: 0, marginBottom: 10, padding: 14, borderWidth: 1, borderRadius: 16, alignItems: 'center' },
-    editBtnText: { fontSize: 12, fontWeight: '700', color: C.sand, letterSpacing: 0.3 },
+    editBtnRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginBottom: 10 },
+    editBtnStandalone: { marginTop: 0, padding: 14, borderWidth: 1, borderRadius: 16, alignItems: 'center' },
+    editBtnText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
 
     emptyDayInner: { padding: 20, alignItems: 'center' },
     emptyDayText: { color: C.dust, fontSize: 12, fontWeight: '600' },
