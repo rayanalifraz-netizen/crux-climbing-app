@@ -422,6 +422,10 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [totalSessions, setTotalSessions] = useState(0);
   const [totalCheckIns, setTotalCheckIns] = useState(0);
+  const [allTimeAttempts, setAllTimeAttempts] = useState(0);
+  const [allTimeHard, setAllTimeHard] = useState(0);
+  const [allTimeRestDays, setAllTimeRestDays] = useState(0);
+  const [allTimeAvgRES, setAllTimeAvgRES] = useState<number | null>(null);
   const [progressCount, setProgressCount] = useState(0);
   const [progressMax, setProgressMax] = useState(10);
   const [showSendsModal, setShowSendsModal] = useState(false);
@@ -445,8 +449,13 @@ export default function ProfileScreen() {
     if (!prof) { setProfile(null); return; }
     setProfile(prof);
     setProgressMax(prof.sendsToUnlock ?? 10);
-    setTotalSessions(Object.keys(sessions).length);
+    const allSess = Object.values(sessions);
+    setTotalSessions(allSess.length);
     setTotalCheckIns(Object.keys(checkIns).length);
+    setAllTimeAttempts(allSess.reduce((sum, s) => sum + Object.values(s.gradeCounts || {}).reduce((a: number, b: any) => a + b, 0), 0));
+    setAllTimeHard(allSess.filter(s => s.res > 70).length);
+    setAllTimeRestDays(Object.values(checkIns).filter((c: any) => c.isRestDay).length);
+    setAllTimeAvgRES(allSess.length > 0 ? Math.round(allSess.reduce((sum, s) => sum + s.res, 0) / allSess.length) : null);
     setWeeklySummary(getWeeklySummary(sessions, checkIns));
     setInjuryAlerts(alerts);
     setAlertSettings(alertPrefs);
@@ -885,10 +894,19 @@ export default function ProfileScreen() {
             {/* Stats */}
             <Card label="All Time">
               <View style={styles.statsInner}>
-                <View style={styles.statCell}>
-                  <Text style={styles.statEyebrow}>Sessions</Text>
-                  <Text style={styles.statBig}>{totalSessions}</Text>
-                </View>
+                {[
+                  { label: 'Sessions', val: totalSessions },
+                  { label: 'Attempts', val: allTimeAttempts },
+                  { label: 'Hard', val: allTimeHard },
+                  { label: 'Rest Days', val: allTimeRestDays },
+                  { label: 'Avg RES', val: allTimeAvgRES ?? '—' },
+                  { label: 'Check-ins', val: totalCheckIns },
+                ].map((stat, i) => (
+                  <View key={stat.label} style={styles.statCell}>
+                    <Text style={styles.statEyebrow}>{stat.label}</Text>
+                    <Text style={[styles.statBig, i === 2 && allTimeHard >= 3 && { color: C.red }]}>{stat.val}</Text>
+                  </View>
+                ))}
               </View>
             </Card>
           </>
@@ -1107,10 +1125,10 @@ function makeStyles(C) {
     startStepSub: { fontSize: 12, color: C.sand, lineHeight: 16 },
     startDivider: { height: 1, backgroundColor: C.borderLight, marginLeft: 42 },
 
-    statsInner: { flexDirection: 'row', padding: 18 },
-    statCell: { flex: 1 },
+    statsInner: { flexDirection: 'row', flexWrap: 'wrap', padding: 18, gap: 20 },
+    statCell: { width: '28%', flexGrow: 1 },
     statEyebrow: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
-    statBig: { fontSize: 44, fontWeight: '800', color: C.ink, letterSpacing: -2, lineHeight: 48 },
+    statBig: { fontSize: 36, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 40 },
     statDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 16 },
   });
 }
