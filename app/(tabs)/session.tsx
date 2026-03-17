@@ -277,7 +277,7 @@ export default function SessionScreen() {
                   <Text style={styles.savedNotesText}>{savedSession.notes}</Text>
                 </View>
               ) : null}
-              <Text style={styles.savedHint}>Clear from Settings to re-log today</Text>
+              <Text style={styles.savedHint}>Go to Calendar → Edit Session to make changes</Text>
               <TouchableOpacity
                 style={[styles.shareCardBtn, { borderColor: getResBorder(savedSession.res) }]}
                 onPress={() => setShowShareCard(true)}
