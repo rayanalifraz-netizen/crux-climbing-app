@@ -155,7 +155,7 @@ export default function CheckInScreen() {
   useFocusEffect(useCallback(() => {
     const editDate = editStore.checkinDate;
     editStore.checkinDate = null;
-    const date = editDate || today;
+    const date = editDate || getTodayDate();
     const editing = !!editDate;
     setTargetDate(date);
     setIsEditing(editing);
@@ -239,6 +239,7 @@ export default function CheckInScreen() {
     if (!isEditing) cancelStreakProtection().catch(() => {});
     setIsRestDay(true);
     setDrs(100);
+    setMediaUris([]);
     setAlreadyCheckedIn(true);
     if (isEditing) router.navigate('/(tabs)/calendar');
   };
@@ -513,8 +514,8 @@ export default function CheckInScreen() {
           visible={showShareCard}
           onClose={() => setShowShareCard(false)}
           type="recovery"
-          checkIn={{ date: today, soreness, affectedFingers, painAreas, isRestDay: false }}
-          date={today}
+          checkIn={{ date: targetDate, soreness, affectedFingers, painAreas, isRestDay: false }}
+          date={targetDate}
           streak={streak}
         />
       )}

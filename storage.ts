@@ -207,7 +207,7 @@ export const clearAllData = async (): Promise<void> => {
   await FileSystem.deleteAsync(MEDIA_DIR, { idempotent: true }).catch(() => {});
   await AsyncStorage.multiRemove([
     'profile', 'goalDate', 'darkMode', 'alertSettings',
-    'onboardingComplete', 'sessions', 'checkins', 'reminderSettings',
+    'onboardingComplete', 'sessions', 'checkins', 'reminderSettings', 'gradeSystem',
   ]);
   await supabaseSignOut().catch(() => {});
 };

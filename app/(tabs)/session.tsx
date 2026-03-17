@@ -112,7 +112,7 @@ export default function SessionScreen() {
   useFocusEffect(useCallback(() => {
     const editDate = editStore.sessionDate;
     editStore.sessionDate = null;
-    const date = editDate || today;
+    const date = editDate || getTodayDate();
     const editing = !!editDate;
     setTargetDate(date);
     setIsEditing(editing);
