@@ -9,8 +9,6 @@ import { cancelStreakProtection, scheduleStreakProtection } from '../../notifica
 import { copyMediaToStorage, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
-const today = getTodayDate();
-
 function Card({ label, labelColor, accentColor, bgColor, children, style }: {
   label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
 }) {
@@ -135,7 +133,7 @@ function getSorenessColor(C, level) {
 export default function CheckInScreen() {
   const { C } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
-  const [targetDate, setTargetDate] = useState(today);
+  const [targetDate, setTargetDate] = useState(getTodayDate());
   const [isEditing, setIsEditing] = useState(false);
 
   const [soreness, setSoreness] = useState(null);
@@ -149,6 +147,7 @@ export default function CheckInScreen() {
   const [injuryAlerts, setInjuryAlerts] = useState([]);
   const [alertSettings, setAlertSettings] = useState({ injuryOverload: true });
   const [mediaUris, setMediaUris] = useState<string[]>([]);
+  const [pendingMedia, setPendingMedia] = useState<string[]>([]);
   const [showShareCard, setShowShareCard] = useState(false);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] }>({ current: 0, last7: Array(7).fill(false) });
 
@@ -188,6 +187,7 @@ export default function CheckInScreen() {
       setPainAreas([]);
       setIsRestDay(false);
       setMediaUris([]);
+      setPendingMedia([]);
       setDrs(null);
     }
   };
@@ -207,12 +207,13 @@ export default function CheckInScreen() {
       quality: 0.8,
     });
     if (!result.canceled) {
-      setMediaUris(prev => [...prev, ...result.assets.map(a => a.uri)]);
+      setPendingMedia(prev => [...prev, ...result.assets.map(a => a.uri)]);
     }
   };
 
   const removeMedia = (uri: string) => {
     setMediaUris(prev => prev.filter(u => u !== uri));
+    setPendingMedia(prev => prev.filter(u => u !== uri));
   };
 
   const togglePain = (id) => {
@@ -223,11 +224,13 @@ export default function CheckInScreen() {
 
   const handleSave = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const savedUris = await Promise.all(mediaUris.map(copyMediaToStorage));
-    await saveCheckIn({ date: targetDate, soreness, affectedFingers, painAreas, isRestDay: false, mediaUris: savedUris });
+    const persistedUris = await Promise.all(pendingMedia.map(copyMediaToStorage));
+    const mergedUris = [...mediaUris, ...persistedUris];
+    await saveCheckIn({ date: targetDate, soreness, affectedFingers, painAreas, isRestDay, mediaUris: mergedUris });
     if (!isEditing) cancelStreakProtection().catch(() => {});
-    setMediaUris(savedUris);
-    const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, false);
+    setMediaUris(mergedUris);
+    setPendingMedia([]);
+    const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRestDay);
     setDrs(score);
     setAlreadyCheckedIn(true);
     if (isEditing) router.navigate('/(tabs)/calendar');
@@ -240,6 +243,7 @@ export default function CheckInScreen() {
     setIsRestDay(true);
     setDrs(100);
     setMediaUris([]);
+    setPendingMedia([]);
     setAlreadyCheckedIn(true);
     if (isEditing) router.navigate('/(tabs)/calendar');
   };
@@ -415,10 +419,10 @@ export default function CheckInScreen() {
                 {!locked && (
                   <Text style={styles.sectionHint}>Skin condition, tape jobs, or injury photos</Text>
                 )}
-                {mediaUris.length > 0 && (
+                {(mediaUris.length > 0 || pendingMedia.length > 0) && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {mediaUris.map((uri) => (
+                      {[...mediaUris, ...pendingMedia].map((uri) => (
                         <View key={uri} style={styles.mediaThumbnailWrap}>
                           <Image source={{ uri }} style={styles.mediaThumbnail} />
                           {!locked && (
@@ -514,7 +518,7 @@ export default function CheckInScreen() {
           visible={showShareCard}
           onClose={() => setShowShareCard(false)}
           type="recovery"
-          checkIn={{ date: targetDate, soreness, affectedFingers, painAreas, isRestDay: false }}
+          checkIn={{ date: targetDate, soreness, affectedFingers, painAreas, isRestDay }}
           date={targetDate}
           streak={streak}
         />

@@ -10,8 +10,6 @@ import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate,
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
-const today = getTodayDate();
-
 function Card({ label, labelColor, accentColor, bgColor, children, style }: {
   label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
 }) {
@@ -96,12 +94,13 @@ function calculateRES(gradeCounts, maxGrade, selectedHolds) {
 export default function SessionScreen() {
   const { C, gradeSystem } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
-  const [targetDate, setTargetDate] = useState(today);
+  const [targetDate, setTargetDate] = useState(getTodayDate());
   const [isEditing, setIsEditing] = useState(false);
   const [gradeCounts, setGradeCounts] = useState({});
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
   const [notes, setNotes] = useState('');
+  const [savedMedia, setSavedMedia] = useState<string[]>([]);
   const [pendingMedia, setPendingMedia] = useState<string[]>([]);
   const [maxGrade, setMaxGrade] = useState('');
   const [alreadySaved, setAlreadySaved] = useState(false);
@@ -136,12 +135,15 @@ export default function SessionScreen() {
       setHoldTypes(existing.holdTypes || []);
       setMovementTypes(existing.movementTypes || []);
       setNotes(existing.notes || '');
+      setSavedMedia(existing.mediaUris || []);
     } else {
       setGradeCounts({});
       setHoldTypes([]);
       setMovementTypes([]);
       setNotes('');
+      setSavedMedia([]);
     }
+    setPendingMedia([]);
     setIsRestDay(checkIn?.isRestDay || false);
   };
 
@@ -184,18 +186,19 @@ export default function SessionScreen() {
   };
 
   const removeMedia = (uri: string) => {
+    setSavedMedia(prev => prev.filter(u => u !== uri));
     setPendingMedia(prev => prev.filter(u => u !== uri));
   };
 
   const handleSave = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const persistedUris = await Promise.all(pendingMedia.map(uri => copyMediaToStorage(uri)));
-    const existing = savedSession;
-    const mergedMedia = [...(existing?.mediaUris || []), ...persistedUris];
+    const mergedMedia = [...savedMedia, ...persistedUris];
     await saveSession({ date: targetDate, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
     if (!isEditing) scheduleRecoveryReminder(res).catch(() => {});
     setAlreadySaved(true);
     setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
+    setSavedMedia(mergedMedia);
     setPendingMedia([]);
     if (isEditing) router.navigate('/(tabs)/calendar');
   };
@@ -421,10 +424,10 @@ export default function SessionScreen() {
             {/* Media */}
             <Card label="Photos & Videos · optional">
               <View style={styles.sectionInner}>
-                {pendingMedia.length > 0 && (
+                {(savedMedia.length > 0 || pendingMedia.length > 0) && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {pendingMedia.map(uri => (
+                      {[...savedMedia, ...pendingMedia].map(uri => (
                         <View key={uri} style={styles.mediaThumbnailWrap}>
                           <Image source={{ uri }} style={styles.mediaThumbnail} />
                           <TouchableOpacity style={styles.mediaRemoveBtn} onPress={() => removeMedia(uri)}>
