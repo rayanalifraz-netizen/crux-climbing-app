@@ -200,6 +200,7 @@ export default function SessionScreen() {
     if (isEditing) router.navigate('/(tabs)/calendar');
   };
 
+  const locked = alreadySaved && !isEditing;
   const hasGrades = Object.keys(gradeCounts).length > 0;
   const totalAttempts = Object.values(gradeCounts).reduce((a, b) => a + b, 0);
   const res = maxGrade ? calculateRES(gradeCounts, maxGrade, holdTypes) : 0;
@@ -212,7 +213,7 @@ export default function SessionScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, hasGrades && !alreadySaved && !isRestDay && { paddingBottom: 88 }]} keyboardShouldPersistTaps="handled">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, hasGrades && !locked && !isRestDay && { paddingBottom: 88 }]} keyboardShouldPersistTaps="handled">
 
         {/* Header */}
         <View style={styles.header}>
@@ -223,7 +224,7 @@ export default function SessionScreen() {
           </Text>
           <View style={styles.titleRow}>
             <Text style={styles.title}>{isEditing ? 'Edit Session' : 'Log Session'}</Text>
-            {alreadySaved && (
+            {locked && (
               <View style={[styles.statusBadge, { borderColor: C.terraBorder, backgroundColor: C.terraBg }]}>
                 <Text style={[styles.statusBadgeText, { color: C.terra }]}>✓ Logged</Text>
               </View>
@@ -237,8 +238,8 @@ export default function SessionScreen() {
         </View>
 
         {/* Rest Day Block */}
-        {isRestDay && !alreadySaved && (
-          <Card label="Today" accentColor={C.green} bgColor={C.greenBg} labelColor={C.green}>
+        {isRestDay && !locked && (
+          <Card label={isEditing ? new Date(targetDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Today'} accentColor={C.green} bgColor={C.greenBg} labelColor={C.green}>
             <View style={styles.restDayInner}>
               <Text style={styles.restDayTitle}>Rest Day</Text>
               <Text style={styles.restDayText}>
@@ -249,8 +250,8 @@ export default function SessionScreen() {
         )}
 
         {/* Already Saved */}
-        {alreadySaved && savedSession && (
-          <Card label="Today's Session" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra}>
+        {locked && savedSession && (
+          <Card label={isEditing ? 'Session' : "Today's Session"} accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra}>
             <View style={styles.savedInner}>
               <View style={styles.savedTopRow}>
                 <Text style={styles.savedAttempts}>
@@ -288,7 +289,7 @@ export default function SessionScreen() {
         )}
 
         {/* Main Form */}
-        {!alreadySaved && !isRestDay && (
+        {!locked && !isRestDay && (
           <>
             {!maxGrade && (
               <Card label="Notice" accentColor={C.amber} bgColor={C.amberBg} labelColor={C.amber}>
@@ -447,7 +448,7 @@ export default function SessionScreen() {
       </ScrollView>
       </KeyboardAvoidingView>
 
-      {hasGrades && !alreadySaved && !isRestDay && (
+      {hasGrades && !locked && !isRestDay && (
         <View style={styles.stickyFooter}>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
             <Text style={styles.saveBtnText}>Save Session →</Text>
@@ -455,13 +456,13 @@ export default function SessionScreen() {
         </View>
       )}
 
-      {alreadySaved && savedSession && (
+      {locked && savedSession && (
         <ShareCardModal
           visible={showShareCard}
           onClose={() => setShowShareCard(false)}
           type="session"
           session={savedSession}
-          date={today}
+          date={targetDate}
         />
       )}
     </SafeAreaView>
