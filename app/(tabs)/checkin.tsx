@@ -136,12 +136,13 @@ export default function CheckInScreen() {
   const styles = useMemo(() => makeStyles(C), [C]);
   const { editDate } = useLocalSearchParams<{ editDate?: string }>();
   const targetDate = editDate || today;
-  const isEditing = !!editDate && editDate !== today;
+  const isEditing = !!editDate;
 
   const [soreness, setSoreness] = useState(null);
   const [affectedFingers, setAffectedFingers] = useState([]);
   const [painAreas, setPainAreas] = useState([]);
   const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
+  const locked = alreadyCheckedIn && !isEditing;
   const [isRestDay, setIsRestDay] = useState(false);
   const [drs, setDrs] = useState(null);
   const [recentSessions, setRecentSessions] = useState([]);
@@ -184,7 +185,7 @@ export default function CheckInScreen() {
   };
 
   const toggleFinger = (id) => {
-    if (alreadyCheckedIn) return;
+    if (locked) return;
     Haptics.selectionAsync();
     setAffectedFingers(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   };
@@ -207,7 +208,7 @@ export default function CheckInScreen() {
   };
 
   const togglePain = (id) => {
-    if (alreadyCheckedIn) return;
+    if (locked) return;
     Haptics.selectionAsync();
     setPainAreas(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
@@ -221,7 +222,7 @@ export default function CheckInScreen() {
     const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, false);
     setDrs(score);
     setAlreadyCheckedIn(true);
-    if (isEditing) router.back();
+    if (isEditing) router.navigate('/(tabs)/calendar');
   };
 
   const handleRestDay = async () => {
@@ -231,20 +232,20 @@ export default function CheckInScreen() {
     setIsRestDay(true);
     setDrs(100);
     setAlreadyCheckedIn(true);
-    if (isEditing) router.back();
+    if (isEditing) router.navigate('/(tabs)/calendar');
   };
 
   const verdict = drs !== null ? getDRSVerdict(C, drs) : null;
-  const liveScore = !alreadyCheckedIn && soreness
+  const liveScore = !locked && soreness
     ? calculateDRS(soreness, painAreas, affectedFingers, recentSessions, false)
     : null;
   const liveVerdict = liveScore !== null ? getDRSVerdict(C, liveScore) : null;
-  const displayVerdict = alreadyCheckedIn ? verdict : liveVerdict;
-  const displayScore = alreadyCheckedIn ? drs : liveScore;
+  const displayVerdict = locked ? verdict : liveVerdict;
+  const displayScore = locked ? drs : liveScore;
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, soreness && !alreadyCheckedIn && { paddingBottom: 88 }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, soreness && !locked && { paddingBottom: 88 }]}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -255,7 +256,7 @@ export default function CheckInScreen() {
           </Text>
           <View style={styles.titleRow}>
             <Text style={styles.title}>{isEditing ? 'Edit Check-in' : 'Check-in'}</Text>
-            {alreadyCheckedIn && (
+            {locked && (
               <View style={styles.doneBadge}>
                 <Text style={styles.doneBadgeText}>✓ Done</Text>
               </View>
@@ -283,7 +284,7 @@ export default function CheckInScreen() {
         )}
 
         {/* Rest Day Button */}
-        {!alreadyCheckedIn && (
+        {!locked && (
           <Card
             label="Rest Day"
             accentColor={C.green}
@@ -301,7 +302,7 @@ export default function CheckInScreen() {
         )}
 
         {/* Rest Day Confirmed */}
-        {isRestDay && alreadyCheckedIn ? (
+        {isRestDay && locked ? (
           <Card
             label="Today"
             accentColor={C.green}
@@ -330,7 +331,7 @@ export default function CheckInScreen() {
                       <TouchableOpacity
                         key={level}
                         style={[styles.sorenessBtn, selected && { backgroundColor: color, borderColor: color }]}
-                        onPress={() => { if (!alreadyCheckedIn) { Haptics.selectionAsync(); setSoreness(level); } }}
+                        onPress={() => { if (!locked) { Haptics.selectionAsync(); setSoreness(level); } }}
                       >
                         <Text style={[styles.sorenessBtnText, selected && { color: '#fff' }]}>{level}</Text>
                       </TouchableOpacity>
@@ -402,7 +403,7 @@ export default function CheckInScreen() {
             {/* Photos */}
             <Card label="Photos · optional" accentColor={C.dust} bgColor={C.surface} labelColor={C.dust}>
               <View style={styles.sectionInner}>
-                {!alreadyCheckedIn && (
+                {!locked && (
                   <Text style={styles.sectionHint}>Skin condition, tape jobs, or injury photos</Text>
                 )}
                 {mediaUris.length > 0 && (
@@ -411,7 +412,7 @@ export default function CheckInScreen() {
                       {mediaUris.map((uri) => (
                         <View key={uri} style={styles.mediaThumbnailWrap}>
                           <Image source={{ uri }} style={styles.mediaThumbnail} />
-                          {!alreadyCheckedIn && (
+                          {!locked && (
                             <TouchableOpacity style={styles.mediaRemove} onPress={() => removeMedia(uri)}>
                               <Text style={styles.mediaRemoveText}>✕</Text>
                             </TouchableOpacity>
@@ -421,7 +422,7 @@ export default function CheckInScreen() {
                     </View>
                   </ScrollView>
                 )}
-                {!alreadyCheckedIn && (
+                {!locked && (
                   <TouchableOpacity style={styles.mediaAddBtn} onPress={pickMedia}>
                     <Text style={styles.mediaAddText}>+ Add Photos</Text>
                   </TouchableOpacity>
@@ -432,7 +433,7 @@ export default function CheckInScreen() {
             {/* DRS */}
             {displayVerdict && displayScore !== null && (
               <Card
-                label={alreadyCheckedIn ? 'Daily Readiness Score' : 'Readiness Preview'}
+                label={locked ? 'Daily Readiness Score' : 'Readiness Preview'}
                 accentColor={displayVerdict.color}
                 bgColor={displayVerdict.bg}
                 labelColor={displayVerdict.color}
@@ -447,7 +448,7 @@ export default function CheckInScreen() {
                     </View>
                   </View>
 
-                  {alreadyCheckedIn && (
+                  {locked && (
                     <View style={[styles.drsBreakdown, { borderTopColor: displayVerdict.border + '60' }]}>
                       {[
                         { label: 'Soreness', val: `${soreness}/10` },
@@ -469,7 +470,7 @@ export default function CheckInScreen() {
                     </View>
                   )}
 
-                  {!alreadyCheckedIn && (
+                  {!locked && (
                     <Text style={[styles.drsHint, { color: displayVerdict.color + 'aa' }]}>
                       → Save check-in to confirm
                     </Text>
@@ -491,7 +492,7 @@ export default function CheckInScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {soreness && !alreadyCheckedIn && (
+      {soreness && !locked && (
         <View style={styles.stickyFooter}>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
             <Text style={styles.saveBtnText}>Save Check-in →</Text>
