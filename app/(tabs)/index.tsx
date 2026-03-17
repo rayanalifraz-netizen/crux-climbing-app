@@ -93,7 +93,7 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
     if (checkIns[ds]?.isRestDay) restCount++;
   }
   if (sessionCount === 0) {
-    load = 65;
+    load = 100;
   } else {
     // Penalise most recent session intensity directly
     for (let i = 0; i < 3; i++) {
