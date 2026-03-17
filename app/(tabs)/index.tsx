@@ -586,8 +586,52 @@ export default function ProfileScreen() {
       lines.push('');
     }
 
+    // Body part stress load (14-day window, mirrors heatmap)
+    const [checkIns, allSessions] = await Promise.all([getCheckIns(), getSessions()]);
+    const windowStart = new Date(now); windowStart.setDate(windowStart.getDate() - 14);
+    const bodyLoads: Record<string, number> = {};
+    Object.entries(allSessions).forEach(([ds, sess]: [string, any]) => {
+      if (new Date(ds) < windowStart) return;
+      sess.holdTypes?.forEach(h => {
+        if (h === 'crimps' || h === 'pockets') bodyLoads.fingers = (bodyLoads.fingers || 0) + 1;
+        if (h === 'pinches') bodyLoads.thumb = (bodyLoads.thumb || 0) + 1;
+        if (h === 'slopers') bodyLoads.shoulder = (bodyLoads.shoulder || 0) + 1;
+      });
+      sess.movementTypes?.forEach(m => {
+        if (m === 'dynos') bodyLoads.shoulder = (bodyLoads.shoulder || 0) + 1;
+        if (m === 'heelhooks') bodyLoads.knee = (bodyLoads.knee || 0) + 1;
+        if (m === 'toehooks') bodyLoads.ankle = (bodyLoads.ankle || 0) + 1;
+        if (m === 'compression') bodyLoads.hip = (bodyLoads.hip || 0) + 1;
+        if (m === 'mantles') bodyLoads.wrist = (bodyLoads.wrist || 0) + 1;
+      });
+    });
+    Object.entries(checkIns).forEach(([ds, ci]: [string, any]) => {
+      if (new Date(ds) < windowStart) return;
+      ci.painAreas?.forEach(area => {
+        if (['shoulder', 'elbow', 'wrist', 'knee', 'hip'].includes(area))
+          bodyLoads[area] = (bodyLoads[area] || 0) + 1;
+      });
+      ci.affectedFingers?.forEach(() => { bodyLoads.fingers = (bodyLoads.fingers || 0) + 1; });
+    });
+    const BODY_PARTS_RPT = [
+      { id: 'fingers',  label: 'Fingers',  t: [3, 6] },
+      { id: 'thumb',    label: 'Thumb',    t: [3, 6] },
+      { id: 'shoulder', label: 'Shoulder', t: [4, 8] },
+      { id: 'elbow',    label: 'Elbow',    t: [2, 4] },
+      { id: 'wrist',    label: 'Wrist',    t: [3, 6] },
+      { id: 'hip',      label: 'Hip',      t: [3, 6] },
+      { id: 'knee',     label: 'Knee',     t: [3, 6] },
+      { id: 'ankle',    label: 'Ankle',    t: [3, 6] },
+    ];
+    lines.push('BODY PART STRESS LOAD — LAST 14 DAYS');
+    BODY_PARTS_RPT.forEach(p => {
+      const load = bodyLoads[p.id] || 0;
+      const status = load === 0 ? 'No strain' : load < p.t[0] ? 'Light' : load < p.t[1] ? 'Moderate ⚠' : 'High load ⚠⚠';
+      lines.push(`  ${p.label.padEnd(10)} ${String(load).padStart(2)} signal(s)  —  ${status}`);
+    });
+    lines.push('');
+
     // Check-in pain log
-    const checkIns = await getCheckIns();
     const recentDates = Array.from({ length: 14 }, (_, i) => {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
@@ -610,20 +654,20 @@ export default function ProfileScreen() {
       lines.push('');
     }
 
-    // Injury alerts
-    if (injuryAlerts.length > 0) {
-      lines.push('HIGH-LOAD BODY AREAS (14-day window)');
-      injuryAlerts.forEach(a => {
-        lines.push(`  ⚠ ${a.partName}: ${a.count} exposures (threshold: ${a.threshold})`);
-      });
-      lines.push('');
-    }
-
     // Recovery
     if (recovery) {
       lines.push('CURRENT RECOVERY STATUS');
       if (recovery.isReady) {
-        lines.push(`  Status: Ready to train  (last session RES ${recovery.res})`);
+        const injuryScore = chiData?.injury ?? 100;
+        if (injuryScore >= 75) {
+          lines.push(`  Status: Cleared for training  (last session RES ${recovery.res})`);
+        } else if (injuryScore >= 55) {
+          lines.push(`  Status: Cleared with caution — elevated training load detected`);
+          lines.push(`  Injury status: ${injuryScore}/100. Monitor high-load body parts above.`);
+        } else {
+          lines.push(`  Status: Consider additional rest — body load is elevated`);
+          lines.push(`  Injury status: ${injuryScore}/100. Review body part stress load above.`);
+        }
       } else {
         lines.push(`  Status: Recovery recommended — ${recovery.days} day(s) rest suggested`);
         lines.push(`  Earliest return: ${recovery.earliestDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`);
