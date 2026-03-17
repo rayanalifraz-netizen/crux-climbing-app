@@ -1,4 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
+import { editStore } from '../../lib/editStore';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
@@ -530,12 +531,12 @@ export default function CalendarScreen() {
           </Card>
         )}
 
-        {/* Edit buttons row */}
-        {selectedDate && (
+        {/* Edit buttons row — only for today and past dates */}
+        {selectedDate && selectedDate <= todayStr && (
           <View style={styles.editBtnRow}>
             <TouchableOpacity
               style={[styles.editBtnStandalone, { borderColor: C.terraBorder, flex: 1 }]}
-              onPress={() => router.navigate({ pathname: '/(tabs)/session', params: { editDate: selectedDate } })}
+              onPress={() => { editStore.sessionDate = selectedDate; router.navigate('/(tabs)/session'); }}
             >
               <Text style={[styles.editBtnText, { color: C.terra }]}>
                 {selectedSession ? 'Edit Session →' : '+ Log Session'}
@@ -543,7 +544,7 @@ export default function CalendarScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.editBtnStandalone, { borderColor: C.greenBorder, flex: 1 }]}
-              onPress={() => router.navigate({ pathname: '/(tabs)/checkin', params: { editDate: selectedDate } })}
+              onPress={() => { editStore.checkinDate = selectedDate; router.navigate('/(tabs)/checkin'); }}
             >
               <Text style={[styles.editBtnText, { color: C.green }]}>
                 {selectedCheckIn ? 'Edit Check-in →' : '+ Log Check-in'}

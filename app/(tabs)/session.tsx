@@ -1,7 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { editStore } from '../../lib/editStore';
 import { Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { scheduleRecoveryReminder } from '../../notifications';
@@ -95,10 +96,8 @@ function calculateRES(gradeCounts, maxGrade, selectedHolds) {
 export default function SessionScreen() {
   const { C, gradeSystem } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
-  const { editDate } = useLocalSearchParams<{ editDate?: string }>();
-  const targetDate = editDate || today;
-  const isEditing = !!editDate && editDate !== today;
-
+  const [targetDate, setTargetDate] = useState(today);
+  const [isEditing, setIsEditing] = useState(false);
   const [gradeCounts, setGradeCounts] = useState({});
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
@@ -110,18 +109,26 @@ export default function SessionScreen() {
   const [isRestDay, setIsRestDay] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
 
-  useEffect(() => { loadProfile(); checkTodaySession(); }, [targetDate]);
-  useFocusEffect(useCallback(() => { loadProfile(); checkTodaySession(); }, [targetDate]));
+  useFocusEffect(useCallback(() => {
+    const editDate = editStore.sessionDate;
+    editStore.sessionDate = null;
+    const date = editDate || today;
+    const editing = !!editDate;
+    setTargetDate(date);
+    setIsEditing(editing);
+    loadProfile();
+    loadSession(date);
+  }, []));
 
   const loadProfile = async () => {
     const profile = await getProfile();
     if (profile) setMaxGrade(profile.maxGrade);
   };
 
-  const checkTodaySession = async () => {
+  const loadSession = async (date: string) => {
     const [sessions, checkIns] = await Promise.all([getSessions(), getCheckIns()]);
-    const existing = sessions[targetDate];
-    const checkIn = checkIns[targetDate];
+    const existing = sessions[date];
+    const checkIn = checkIns[date];
     setAlreadySaved(!!existing);
     setSavedSession(existing || null);
     if (existing) {
@@ -129,6 +136,11 @@ export default function SessionScreen() {
       setHoldTypes(existing.holdTypes || []);
       setMovementTypes(existing.movementTypes || []);
       setNotes(existing.notes || '');
+    } else {
+      setGradeCounts({});
+      setHoldTypes([]);
+      setMovementTypes([]);
+      setNotes('');
     }
     setIsRestDay(checkIn?.isRestDay || false);
   };
@@ -185,7 +197,7 @@ export default function SessionScreen() {
     setAlreadySaved(true);
     setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
     setPendingMedia([]);
-    if (isEditing) router.back();
+    if (isEditing) router.navigate('/(tabs)/calendar');
   };
 
   const hasGrades = Object.keys(gradeCounts).length > 0;

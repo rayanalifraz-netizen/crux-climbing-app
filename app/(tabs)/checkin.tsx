@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { editStore } from '../../lib/editStore';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
@@ -134,9 +135,8 @@ function getSorenessColor(C, level) {
 export default function CheckInScreen() {
   const { C } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
-  const { editDate } = useLocalSearchParams<{ editDate?: string }>();
-  const targetDate = editDate || today;
-  const isEditing = !!editDate;
+  const [targetDate, setTargetDate] = useState(today);
+  const [isEditing, setIsEditing] = useState(false);
 
   const [soreness, setSoreness] = useState(null);
   const [affectedFingers, setAffectedFingers] = useState([]);
@@ -152,9 +152,17 @@ export default function CheckInScreen() {
   const [showShareCard, setShowShareCard] = useState(false);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] }>({ current: 0, last7: Array(7).fill(false) });
 
-  useFocusEffect(useCallback(() => { loadData(); }, [targetDate]));
+  useFocusEffect(useCallback(() => {
+    const editDate = editStore.checkinDate;
+    editStore.checkinDate = null;
+    const date = editDate || today;
+    const editing = !!editDate;
+    setTargetDate(date);
+    setIsEditing(editing);
+    loadData(date);
+  }, []));
 
-  const loadData = async () => {
+  const loadData = async (date = targetDate) => {
     const [checkIns, sessions, alerts, alertPrefs] = await Promise.all([
       getCheckIns(), getSessions(), getInjuryAlerts(), getAlertSettings(),
     ]);
@@ -164,9 +172,9 @@ export default function CheckInScreen() {
     setAlertSettings(alertPrefs);
     setStreak(computeStreak(checkIns));
 
-    if (checkIns[targetDate]) {
+    if (checkIns[date]) {
       setAlreadyCheckedIn(true);
-      const ci = checkIns[targetDate];
+      const ci = checkIns[date];
       setSoreness(ci.soreness);
       setAffectedFingers(ci.affectedFingers || []);
       setPainAreas(ci.painAreas || []);
