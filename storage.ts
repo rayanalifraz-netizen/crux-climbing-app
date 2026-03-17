@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import { syncCheckIn, syncProfile, syncSession } from './lib/supabase';
+import { signOut as supabaseSignOut, syncCheckIn, syncProfile, syncSession } from './lib/supabase';
 
 export type Session = {
   date: string;
@@ -198,6 +198,7 @@ export const clearAllData = async (): Promise<void> => {
     'profile', 'goalDate', 'darkMode', 'alertSettings',
     'onboardingComplete', 'sessions', 'checkins', 'reminderSettings',
   ]);
+  await supabaseSignOut().catch(() => {});
 };
 
 // ─── Date helper ──────────────────────────────────────────────────────────────
