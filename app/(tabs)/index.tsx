@@ -904,7 +904,7 @@ export default function ProfileScreen() {
                 ].map((stat, i) => (
                   <View key={stat.label} style={styles.statCell}>
                     <Text style={styles.statEyebrow}>{stat.label}</Text>
-                    <Text style={[styles.statBig, i === 2 && allTimeHard >= 3 && { color: C.red }]}>{stat.val}</Text>
+                    <Text style={styles.statBig}>{stat.val}</Text>
                   </View>
                 ))}
               </View>
