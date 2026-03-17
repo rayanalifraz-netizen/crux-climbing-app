@@ -8,6 +8,7 @@ import { applyReminderSettings, getReminderSettings, saveReminderSettings, type 
 import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
 import { gradeColor, useTheme } from '../../context/ThemeContext';
 import { getCurrentUser, signOut } from '../../lib/supabase';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 const GAUGE_R = 85;
 const GAUGE_SW = 16;
@@ -59,6 +60,7 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
 
   // 1. Body Readiness (35%) — from latest check-in (today or yesterday)
   let readiness = 65;
+  let recentSoreness = 0;
   for (let i = 0; i <= 2; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
@@ -67,7 +69,8 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
     if (ci.isRestDay) { readiness = 100; break; }
     let score = 100;
     const s = parseInt(ci.soreness || '0');
-    if (s >= 8) score -= 40; else if (s >= 6) score -= 25; else if (s >= 4) score -= 10;
+    recentSoreness = s;
+    if (s >= 9) score -= 60; else if (s >= 7) score -= 40; else if (s >= 5) score -= 20; else if (s >= 3) score -= 8;
     const p = ci.painAreas?.length || 0;
     if (p >= 3) score -= 30; else if (p >= 2) score -= 20; else if (p >= 1) score -= 10;
     const f = ci.affectedFingers?.length || 0;
@@ -76,7 +79,7 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
     break;
   }
 
-  // 2. Load Balance (35%) — last 7 days
+  // 2. Load Balance (35%) — last 7 days + most recent session intensity
   let load = 100;
   let sessionCount = 0, totalRES = 0, restCount = 0, consec = 0, maxConsec = 0;
   for (let i = 0; i < 7; i++) {
@@ -92,6 +95,16 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
   if (sessionCount === 0) {
     load = 65;
   } else {
+    // Penalise most recent session intensity directly
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const recentSess = sessions[d.toISOString().split('T')[0]];
+      if (recentSess) {
+        if (recentSess.res >= 85) load -= 35; else if (recentSess.res >= 70) load -= 20;
+        break;
+      }
+    }
     if (totalRES >= 300) load -= 30; else if (totalRES >= 240) load -= 15;
     if (maxConsec >= 3) load -= 25; else if (maxConsec >= 2) load -= 10;
     if (restCount === 0 && sessionCount >= 4) load -= 15;
@@ -99,8 +112,9 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
   }
   load = Math.max(0, Math.min(100, load));
 
-  // 3. Injury Status (30%) — injury alerts + recent check-in pain
+  // 3. Injury Status (30%) — injury alerts + recent check-in pain + high soreness signal
   let injury = 100 - injuryAlerts.length * 25;
+  if (recentSoreness >= 8) injury -= 20;
   for (let i = 0; i <= 2; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
@@ -400,7 +414,7 @@ function SendsModal({ visible, current, onClose, onSave }) {
 }
 
 export default function ProfileScreen() {
-  const { C } = useTheme();
+  const { C, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
   const [profile, setProfile] = useState(null);
   const [totalSessions, setTotalSessions] = useState(0);
@@ -940,13 +954,15 @@ export default function ProfileScreen() {
               <Text style={styles.accountNoAccountText}>
                 Sign in to back up your data and restore it on any device.
               </Text>
-              <TouchableOpacity
-                style={styles.accountSignInBtn}
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={isDark
+                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={12}
+                style={{ width: '100%', height: 48 }}
                 onPress={() => router.navigate('/signin')}
-              >
-                <Ionicons name="logo-apple" size={16} color="#fff" />
-                <Text style={styles.accountSignInText}>Sign in with Apple</Text>
-              </TouchableOpacity>
+              />
             </View>
           )}
         </Card>
@@ -1062,8 +1078,6 @@ function makeStyles(C) {
     accountSignOutBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 12, alignItems: 'center' },
     accountSignOutText: { fontSize: 12, fontWeight: '600', color: C.dust },
     accountNoAccountText: { fontSize: 13, color: C.sand, lineHeight: 19, marginBottom: 14 },
-    accountSignInBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.ink, paddingVertical: 13, borderRadius: 12 },
-    accountSignInText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
     shareBtnRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 4 },
     shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, borderWidth: 1, borderColor: C.borderLight, borderRadius: 14 },

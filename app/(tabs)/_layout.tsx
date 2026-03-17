@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function TabLayout() {
   const { C } = useTheme();
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
@@ -16,8 +18,8 @@ export default function TabLayout() {
           shadowOpacity: 0.06,
           shadowRadius: 12,
           elevation: 8,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
         },
         tabBarActiveTintColor: C.terra,
         tabBarInactiveTintColor: C.dust,
@@ -78,12 +80,8 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="onboarding"
-        options={{
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="onboarding" options={{ href: null }} />
+      <Tabs.Screen name="gradeupdate" options={{ href: null }} />
     </Tabs>
   );
 }
