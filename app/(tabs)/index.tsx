@@ -421,6 +421,7 @@ export default function ProfileScreen() {
   const styles = useMemo(() => makeStyles(C), [C]);
   const [profile, setProfile] = useState(null);
   const [totalSessions, setTotalSessions] = useState(0);
+  const [totalCheckIns, setTotalCheckIns] = useState(0);
   const [progressCount, setProgressCount] = useState(0);
   const [progressMax, setProgressMax] = useState(10);
   const [showSendsModal, setShowSendsModal] = useState(false);
@@ -445,6 +446,7 @@ export default function ProfileScreen() {
     setProfile(prof);
     setProgressMax(prof.sendsToUnlock ?? 10);
     setTotalSessions(Object.keys(sessions).length);
+    setTotalCheckIns(Object.keys(checkIns).length);
     setWeeklySummary(getWeeklySummary(sessions, checkIns));
     setInjuryAlerts(alerts);
     setAlertSettings(alertPrefs);
@@ -653,7 +655,7 @@ export default function ProfileScreen() {
           <>
             {/* Alerts */}
             {/* ── Getting started (no sessions yet) ── */}
-            {totalSessions === 0 && (
+            {totalSessions === 0 && totalCheckIns === 0 && (
               <Card label="Getting Started" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra} style={{ marginTop: 8 }}>
                 <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 }}>
                   <Text style={{ fontSize: 13, color: C.sand, lineHeight: 19, marginBottom: 16 }}>
@@ -724,7 +726,7 @@ export default function ProfileScreen() {
             )}
 
             {/* CHI */}
-            {totalSessions > 0 && chiData && <CHICard data={chiData} />}
+            {(totalSessions > 0 || totalCheckIns > 0) && chiData && <CHICard data={chiData} />}
 
             {/* Streak */}
             {streak !== null && (
