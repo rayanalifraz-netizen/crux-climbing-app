@@ -322,8 +322,8 @@ export default function CheckInScreen() {
               <Text style={styles.restDayConfirmedTitle}>Rest Day</Text>
               <Text style={styles.restDayConfirmedSub}>Recovery mode — your body is thanking you</Text>
               <View style={styles.restDayDRS}>
-                <Text style={styles.restDayDRSLabel}>DRS</Text>
-                <Text style={styles.restDayDRSScore}>100</Text>
+                <Text style={styles.restDayDRSLabel}>Status</Text>
+                <Text style={styles.restDayDRSScore}>Recovering</Text>
               </View>
             </View>
           </Card>
@@ -549,7 +549,7 @@ function makeStyles(C) {
     restDayConfirmedSub: { color: C.sand, fontSize: 12, textAlign: 'center' },
     restDayDRS: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 8 },
     restDayDRSLabel: { fontSize: 10, fontWeight: '800', color: C.green, letterSpacing: 2, textTransform: 'uppercase' },
-    restDayDRSScore: { fontSize: 28, fontWeight: '800', color: C.green, letterSpacing: -1 },
+    restDayDRSScore: { fontSize: 16, fontWeight: '800', color: C.green, letterSpacing: 0.5 },
 
     sectionInner: { padding: 16, paddingTop: 14 },
     sectionHint: { color: C.dust, fontSize: 12, marginBottom: 12 },
