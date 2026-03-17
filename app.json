@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ClimbingRecoveryApp",
+    "name": "Crux",
     "slug": "ClimbingRecoveryApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.ClimbingRecoveryApp"
+      "bundleIdentifier": "com.cruxapp.crux"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,22 +32,30 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 280,
+          "imageWidth": 260,
           "resizeMode": "contain",
-          "backgroundColor": "#F2F0ED",
+          "backgroundColor": "#000000",
           "dark": {
-            "backgroundColor": "#111110"
+            "backgroundColor": "#000000"
           }
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#C8622A",
+          "sounds": []
+        }
+      ],
       [
         "expo-image-picker",
         {
           "photosPermission": "Crux needs access to your photos so you can attach climbing clips to sessions.",
           "cameraPermission": "Crux needs camera access to capture climbing clips."
         }
-      ]
+      ],
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,

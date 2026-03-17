@@ -3,8 +3,11 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveProfile } from '../../storage';
+import ShareCardModal from '../../components/ShareCardModal';
+import { applyReminderSettings, getReminderSettings, saveReminderSettings, type ReminderSettings, scheduleStreakProtection } from '../../notifications';
+import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
 import { gradeColor, useTheme } from '../../context/ThemeContext';
+import { getCurrentUser, signOut } from '../../lib/supabase';
 
 const GAUGE_R = 85;
 const GAUGE_SW = 16;
@@ -412,6 +415,10 @@ export default function ProfileScreen() {
   const [recovery, setRecovery] = useState(null);
   const [chiData, setChiData] = useState(null);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] } | null>(null);
+  const [todayCheckIn, setTodayCheckIn] = useState(null);
+  const [showShareCard, setShowShareCard] = useState(false);
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ enabled: false, hour: 8, minute: 0 });
+  const [currentUser, setCurrentUser] = useState<{ email?: string | null } | null>(null);
 
   const loadData = useCallback(async () => {
     const [prof, sessions, checkIns, alerts, alertPrefs] = await Promise.all([
@@ -427,6 +434,11 @@ export default function ProfileScreen() {
     setRecovery(computeRecovery(sessions, checkIns));
     setChiData(computeCHI(sessions, checkIns, alerts));
     setStreak(computeCheckInStreak(checkIns));
+    const todayStr = new Date().toISOString().split('T')[0];
+    setTodayCheckIn(checkIns[todayStr] || null);
+    setReminderSettings(await getReminderSettings());
+    if (!checkIns[todayStr]) scheduleStreakProtection().catch(() => {});
+    setCurrentUser(await getCurrentUser());
 
     let count = 0;
     if (prof.projectGrade) {
@@ -468,6 +480,20 @@ export default function ProfileScreen() {
     await saveProfile({ ...profile, sendsToUnlock: n });
     setShowSendsModal(false);
     loadData();
+  };
+
+  const handleReminderToggle = async () => {
+    const next = { ...reminderSettings, enabled: !reminderSettings.enabled };
+    setReminderSettings(next);
+    await saveReminderSettings(next);
+    await applyReminderSettings(next);
+  };
+
+  const handleReminderTime = async (hour: number) => {
+    const next = { ...reminderSettings, hour, minute: 0 };
+    setReminderSettings(next);
+    await saveReminderSettings(next);
+    if (next.enabled) await applyReminderSettings(next);
   };
 
   const getAvgResColor = (res) => {
@@ -849,16 +875,112 @@ export default function ProfileScreen() {
           </>
         )}
 
-        {/* Share with provider */}
+        {/* Reminders */}
         {profile && (
-          <TouchableOpacity style={styles.shareBtn} onPress={handleShareReport}>
-            <Ionicons name="share-outline" size={16} color={C.sand} />
-            <Text style={styles.shareBtnText}>Share health report with provider</Text>
-          </TouchableOpacity>
+          <Card label="Reminders">
+            <View style={styles.reminderInner}>
+              <TouchableOpacity style={styles.reminderToggleRow} onPress={handleReminderToggle}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.reminderToggleTitle}>Daily Check-in Reminder</Text>
+                  <Text style={styles.reminderToggleSub}>Get a nudge to log your morning check-in</Text>
+                </View>
+                <View style={[styles.toggle, reminderSettings.enabled && { backgroundColor: C.terra }]}>
+                  <View style={[styles.toggleThumb, reminderSettings.enabled && { transform: [{ translateX: 18 }] }]} />
+                </View>
+              </TouchableOpacity>
+              {reminderSettings.enabled && (
+                <View style={styles.reminderTimeRow}>
+                  <Text style={styles.reminderTimeLabel}>Remind me at</Text>
+                  <View style={styles.reminderTimeChips}>
+                    {[6, 7, 8, 9, 10].map(h => (
+                      <TouchableOpacity
+                        key={h}
+                        style={[styles.timeChip, reminderSettings.hour === h && { backgroundColor: C.terraBg, borderColor: C.terraBorder }]}
+                        onPress={() => handleReminderTime(h)}
+                      >
+                        <Text style={[styles.timeChipText, reminderSettings.hour === h && { color: C.terra }]}>
+                          {h <= 12 ? h : h - 12}{h < 12 ? 'am' : 'pm'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
+          </Card>
+        )}
+
+        {/* Account */}
+        <Card label="Account">
+          {currentUser ? (
+            <View style={styles.accountInner}>
+              <View style={styles.accountRow}>
+                <View style={styles.accountIconWrap}>
+                  <Ionicons name="person-circle-outline" size={28} color={C.terra} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.accountEmail} numberOfLines={1}>
+                    {currentUser.email ?? 'Signed in with Apple'}
+                  </Text>
+                  <Text style={styles.accountSub}>Data syncing to cloud</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.accountSignOutBtn}
+                onPress={async () => {
+                  await signOut();
+                  setCurrentUser(null);
+                }}
+              >
+                <Text style={styles.accountSignOutText}>Sign out</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.accountInner}>
+              <Text style={styles.accountNoAccountText}>
+                Sign in to back up your data and restore it on any device.
+              </Text>
+              <TouchableOpacity
+                style={styles.accountSignInBtn}
+                onPress={() => router.navigate('/signin')}
+              >
+                <Ionicons name="logo-apple" size={16} color="#fff" />
+                <Text style={styles.accountSignInText}>Sign in with Apple</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </Card>
+
+        {/* Share buttons */}
+        {profile && (
+          <View style={styles.shareBtnRow}>
+            <TouchableOpacity style={[styles.shareBtn, { flex: 1 }]} onPress={handleShareReport}>
+              <Ionicons name="document-text-outline" size={15} color={C.sand} />
+              <Text style={styles.shareBtnText}>Provider Report</Text>
+            </TouchableOpacity>
+            {todayCheckIn && streak && (
+              <TouchableOpacity style={[styles.shareBtn, { flex: 1 }]} onPress={() => setShowShareCard(true)}>
+                <Ionicons name="share-outline" size={15} color={C.sand} />
+                <Text style={styles.shareBtnText}>Share Card</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      {todayCheckIn && streak && (
+        <ShareCardModal
+          visible={showShareCard}
+          onClose={() => setShowShareCard(false)}
+          type="recovery"
+          checkIn={todayCheckIn}
+          date={new Date().toISOString().split('T')[0]}
+          streak={streak}
+          chiData={chiData ?? undefined}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -920,7 +1042,31 @@ function makeStyles(C) {
     weeklySmall: { fontSize: 8, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
     weeklyDivider: { width: 1, height: 30, backgroundColor: C.borderLight },
 
-    shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, marginHorizontal: 16, marginTop: 4 },
+    reminderInner: { padding: 16, paddingTop: 12 },
+    reminderToggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+    reminderToggleTitle: { fontSize: 13, fontWeight: '700', color: C.ink, marginBottom: 2 },
+    reminderToggleSub: { fontSize: 11, color: C.dust },
+    toggle: { width: 44, height: 26, borderRadius: 13, backgroundColor: C.borderLight, padding: 3, justifyContent: 'center' },
+    toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.surface, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
+    reminderTimeRow: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.borderLight },
+    reminderTimeLabel: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
+    reminderTimeChips: { flexDirection: 'row', gap: 8 },
+    timeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight, backgroundColor: C.surfaceAlt },
+    timeChipText: { fontSize: 12, fontWeight: '700', color: C.sand },
+
+    accountInner: { padding: 16 },
+    accountRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+    accountIconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.terraBg, alignItems: 'center', justifyContent: 'center' },
+    accountEmail: { fontSize: 13, fontWeight: '700', color: C.ink, marginBottom: 2 },
+    accountSub: { fontSize: 11, color: C.dust },
+    accountSignOutBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 12, alignItems: 'center' },
+    accountSignOutText: { fontSize: 12, fontWeight: '600', color: C.dust },
+    accountNoAccountText: { fontSize: 13, color: C.sand, lineHeight: 19, marginBottom: 14 },
+    accountSignInBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.ink, paddingVertical: 13, borderRadius: 12 },
+    accountSignInText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+
+    shareBtnRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 4 },
+    shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, borderWidth: 1, borderColor: C.borderLight, borderRadius: 14 },
     shareBtnText: { fontSize: 12, fontWeight: '600', color: C.sand, letterSpacing: 0.3 },
 
     streakInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },

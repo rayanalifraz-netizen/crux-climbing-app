@@ -1,8 +1,11 @@
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
+import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ShareCardModal from '../../components/ShareCardModal';
+import { cancelStreakProtection, scheduleStreakProtection } from '../../notifications';
+import { copyMediaToStorage, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
 const today = getTodayDate();
@@ -66,6 +69,23 @@ const PAIN_AREAS = [
   { id: 'hip', label: 'Hip' },
 ];
 
+function computeStreak(checkIns: Record<string, any>) {
+  const t = new Date();
+  const todayStr = t.toISOString().split('T')[0];
+  const startOffset = checkIns[todayStr] ? 0 : 1;
+  let current = 0;
+  for (let i = startOffset; i < 365; i++) {
+    const d = new Date(t); d.setDate(d.getDate() - i);
+    if (checkIns[d.toISOString().split('T')[0]]) current++;
+    else break;
+  }
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(t); d.setDate(d.getDate() - (6 - i));
+    return !!checkIns[d.toISOString().split('T')[0]];
+  });
+  return { current, last7 };
+}
+
 function calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRestDay = false) {
   if (isRestDay) return 100;
   let score = 100;
@@ -123,6 +143,9 @@ export default function CheckInScreen() {
   const [recentSessions, setRecentSessions] = useState([]);
   const [injuryAlerts, setInjuryAlerts] = useState([]);
   const [alertSettings, setAlertSettings] = useState({ injuryOverload: true });
+  const [mediaUris, setMediaUris] = useState<string[]>([]);
+  const [showShareCard, setShowShareCard] = useState(false);
+  const [streak, setStreak] = useState<{ current: number; last7: boolean[] }>({ current: 0, last7: Array(7).fill(false) });
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
@@ -134,6 +157,7 @@ export default function CheckInScreen() {
     setRecentSessions(last7);
     setInjuryAlerts(alerts);
     setAlertSettings(alertPrefs);
+    setStreak(computeStreak(checkIns));
 
     if (checkIns[today]) {
       setAlreadyCheckedIn(true);
@@ -142,6 +166,7 @@ export default function CheckInScreen() {
       setAffectedFingers(ci.affectedFingers || []);
       setPainAreas(ci.painAreas || []);
       setIsRestDay(ci.isRestDay || false);
+      setMediaUris(ci.mediaUris || []);
       setDrs(calculateDRS(ci.soreness, ci.painAreas, ci.affectedFingers, last7, ci.isRestDay));
     } else {
       setAlreadyCheckedIn(false);
@@ -149,6 +174,7 @@ export default function CheckInScreen() {
       setAffectedFingers([]);
       setPainAreas([]);
       setIsRestDay(false);
+      setMediaUris([]);
       setDrs(null);
     }
   };
@@ -159,6 +185,23 @@ export default function CheckInScreen() {
     setAffectedFingers(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   };
 
+  const pickMedia = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'],
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      setMediaUris(prev => [...prev, ...result.assets.map(a => a.uri)]);
+    }
+  };
+
+  const removeMedia = (uri: string) => {
+    setMediaUris(prev => prev.filter(u => u !== uri));
+  };
+
   const togglePain = (id) => {
     if (alreadyCheckedIn) return;
     Haptics.selectionAsync();
@@ -167,7 +210,10 @@ export default function CheckInScreen() {
 
   const handleSave = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await saveCheckIn({ date: today, soreness, affectedFingers, painAreas, isRestDay: false });
+    const savedUris = await Promise.all(mediaUris.map(copyMediaToStorage));
+    await saveCheckIn({ date: today, soreness, affectedFingers, painAreas, isRestDay: false, mediaUris: savedUris });
+    cancelStreakProtection().catch(() => {});
+    setMediaUris(savedUris);
     const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, false);
     setDrs(score);
     setAlreadyCheckedIn(true);
@@ -176,6 +222,7 @@ export default function CheckInScreen() {
   const handleRestDay = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await saveCheckIn({ date: today, soreness: '0', affectedFingers: [], painAreas: [], isRestDay: true });
+    cancelStreakProtection().catch(() => {});
     setIsRestDay(true);
     setDrs(100);
     setAlreadyCheckedIn(true);
@@ -344,6 +391,36 @@ export default function CheckInScreen() {
               </View>
             </Card>
 
+            {/* Photos */}
+            <Card label="Photos · optional" accentColor={C.dust} bgColor={C.surface} labelColor={C.dust}>
+              <View style={styles.sectionInner}>
+                {!alreadyCheckedIn && (
+                  <Text style={styles.sectionHint}>Skin condition, tape jobs, or injury photos</Text>
+                )}
+                {mediaUris.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {mediaUris.map((uri) => (
+                        <View key={uri} style={styles.mediaThumbnailWrap}>
+                          <Image source={{ uri }} style={styles.mediaThumbnail} />
+                          {!alreadyCheckedIn && (
+                            <TouchableOpacity style={styles.mediaRemove} onPress={() => removeMedia(uri)}>
+                              <Text style={styles.mediaRemoveText}>✕</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+                {!alreadyCheckedIn && (
+                  <TouchableOpacity style={styles.mediaAddBtn} onPress={pickMedia}>
+                    <Text style={styles.mediaAddText}>+ Add Photos</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </Card>
+
             {/* DRS */}
             {displayVerdict && displayScore !== null && (
               <Card
@@ -393,6 +470,13 @@ export default function CheckInScreen() {
               </Card>
             )}
 
+          {/* Share button after check-in saved */}
+          {alreadyCheckedIn && !isRestDay && (
+            <TouchableOpacity style={styles.shareCardBtn} onPress={() => setShowShareCard(true)}>
+              <Text style={styles.shareCardBtnText}>Share Recovery Card</Text>
+            </TouchableOpacity>
+          )}
+
           </>
         )}
 
@@ -405,6 +489,17 @@ export default function CheckInScreen() {
             <Text style={styles.saveBtnText}>Save Check-in →</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {alreadyCheckedIn && !isRestDay && (
+        <ShareCardModal
+          visible={showShareCard}
+          onClose={() => setShowShareCard(false)}
+          type="recovery"
+          checkIn={{ date: today, soreness, affectedFingers, painAreas, isRestDay: false }}
+          date={today}
+          streak={streak}
+        />
       )}
     </SafeAreaView>
   );
@@ -468,6 +563,16 @@ function makeStyles(C) {
     drsBreakdownVal: { fontSize: 18, fontWeight: '800' },
     drsBreakdownTick: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 1 },
     drsHint: { fontSize: 11, fontWeight: '600' },
+
+    shareCardBtn: { marginHorizontal: 16, marginBottom: 14, borderWidth: 1, borderColor: C.borderLight, borderRadius: 12, padding: 14, alignItems: 'center' },
+    shareCardBtnText: { fontSize: 12, fontWeight: '700', color: C.sand, letterSpacing: 0.3 },
+
+    mediaThumbnailWrap: { position: 'relative' },
+    mediaThumbnail: { width: 88, height: 88, borderRadius: 10, backgroundColor: C.borderLight },
+    mediaRemove: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
+    mediaRemoveText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+    mediaAddBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 10, borderStyle: 'dashed', padding: 12, alignItems: 'center' },
+    mediaAddText: { color: C.dust, fontSize: 12, fontWeight: '700' },
 
     stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 16, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
     saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 12, alignItems: 'center' },

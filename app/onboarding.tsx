@@ -65,7 +65,7 @@ export default function OnboardingScreen() {
     setSaving(true);
     await saveProfile({ name: name.trim() || 'Climber', maxGrade: maxGrade!, projectGrade: projectGrade! });
     await markOnboardingComplete();
-    router.replace('/(tabs)');
+    router.replace('/signin');
   };
 
   const handleMaxGrade = (grade: string) => {

@@ -6,6 +6,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet, Text } from 'react-native';
 import 'react-native-reanimated';
 import { ThemeProvider as AppThemeProvider } from '../context/ThemeContext';
+import { configureNotifications } from '../notifications';
+
+configureNotifications();
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -33,7 +36,7 @@ function CustomSplash({ onDone }: { onDone: () => void }) {
         resizeMode="contain"
       />
       <Text style={styles.splashTitle}>CRUX</Text>
-      <Text style={styles.splashSubtitle}>The Climbing Recovery App</Text>
+      <Text style={styles.splashSubtitle}>Climbing Recovery</Text>
     </Animated.View>
   );
 }
@@ -52,6 +55,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="signin" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style="auto" />
@@ -64,27 +68,28 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   splash: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F2F0ED',
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
   },
   splashImage: {
-    width: 280,
-    height: 280,
+    width: 220,
+    height: 220,
   },
   splashTitle: {
-    marginTop: 24,
+    marginTop: 28,
     fontSize: 42,
     fontWeight: '900',
-    letterSpacing: 6,
-    color: '#c8622a',
+    letterSpacing: 8,
+    color: '#C8622A',
   },
   splashSubtitle: {
     marginTop: 6,
-    fontSize: 15,
-    fontWeight: '500',
-    letterSpacing: 1.5,
-    color: '#c8622a',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 3,
+    color: '#6A6560',
+    textTransform: 'uppercase',
   },
 });

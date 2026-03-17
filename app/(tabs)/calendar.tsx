@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ShareCardModal from '../../components/ShareCardModal';
 import { deleteGoalDate, getCheckIns, getGoalDate, getSessions, saveGoalDate } from '../../storage';
 import { gradeColor, gradeColorBg, useTheme } from '../../context/ThemeContext';
 
@@ -104,6 +105,7 @@ export default function CalendarScreen() {
   const [viewerUris, setViewerUris] = useState<string[]>([]);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [showViewer, setShowViewer] = useState(false);
+  const [showShareCard, setShowShareCard] = useState(false);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
@@ -358,6 +360,16 @@ export default function CalendarScreen() {
             style={{ marginTop: 4 }}
           >
             <View style={styles.detailInner}>
+              {/* Share button */}
+              {selectedSession && (
+                <TouchableOpacity
+                  style={[styles.shareCardBtn, { borderColor: getResBorder(C, selectedSession.res) }]}
+                  onPress={() => setShowShareCard(true)}
+                >
+                  <Text style={[styles.shareCardBtnText, { color: getResColor(C, selectedSession.res) }]}>↑ Share Session</Text>
+                </TouchableOpacity>
+              )}
+
               {/* Rest Day Badge */}
               {isRestDay && (
                 <View style={[styles.restBadge, { borderColor: C.greenBorder }]}>
@@ -463,7 +475,28 @@ export default function CalendarScreen() {
           </Card>
         )}
 
-        {selectedDate && !isRestDay && !selectedSession && (
+        {/* Check-in Photos */}
+        {selectedDate && selectedCheckIn && !selectedCheckIn.isRestDay && (selectedCheckIn.mediaUris?.length ?? 0) > 0 && (
+          <Card label="Check-in Photos" accentColor={C.green} bgColor={C.greenBg} labelColor={C.green} style={{ marginTop: 0 }}>
+            <View style={styles.detailInner}>
+              <Text style={styles.detailSectionLabel}>Skin &amp; Injury Photos</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+                  {selectedCheckIn.mediaUris!.map((uri, idx) => (
+                    <TouchableOpacity
+                      key={uri}
+                      onPress={() => { setViewerUris(selectedCheckIn.mediaUris!); setViewerIndex(idx); setShowViewer(true); }}
+                    >
+                      <Image source={{ uri }} style={styles.mediaThumbnail} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          </Card>
+        )}
+
+        {selectedDate && !isRestDay && !selectedSession && !(selectedCheckIn?.mediaUris?.length) && (
           <Card style={{ marginTop: 4 }}>
             <View style={styles.emptyDayInner}>
               <Text style={styles.emptyDayText}>No activity logged for this day</Text>
@@ -473,6 +506,17 @@ export default function CalendarScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      {/* Session share card */}
+      {selectedSession && selectedDate && (
+        <ShareCardModal
+          visible={showShareCard}
+          onClose={() => setShowShareCard(false)}
+          type="session"
+          session={selectedSession}
+          date={selectedDate}
+        />
+      )}
 
       {/* Full-screen media viewer */}
       <Modal visible={showViewer} transparent animationType="fade" onRequestClose={() => setShowViewer(false)}>
@@ -585,6 +629,9 @@ function makeStyles(C) {
 
     emptyDayInner: { padding: 20, alignItems: 'center' },
     emptyDayText: { color: C.dust, fontSize: 12, fontWeight: '600' },
+
+    shareCardBtn: { alignSelf: 'flex-end', borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 12 },
+    shareCardBtnText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
 
     mediaThumbnail: { width: 88, height: 88, borderRadius: 10, backgroundColor: C.borderLight },
 

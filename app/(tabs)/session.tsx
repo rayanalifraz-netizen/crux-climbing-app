@@ -3,6 +3,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import ShareCardModal from '../../components/ShareCardModal';
+import { scheduleRecoveryReminder } from '../../notifications';
 import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
 import { gradeColor, gradeColorBg, useTheme } from '../../context/ThemeContext';
 
@@ -102,6 +104,7 @@ export default function SessionScreen() {
   const [alreadySaved, setAlreadySaved] = useState(false);
   const [savedSession, setSavedSession] = useState(null);
   const [isRestDay, setIsRestDay] = useState(false);
+  const [showShareCard, setShowShareCard] = useState(false);
 
   useEffect(() => { loadProfile(); checkTodaySession(); }, []);
   useFocusEffect(useCallback(() => { loadProfile(); checkTodaySession(); }, []));
@@ -164,9 +167,9 @@ export default function SessionScreen() {
 
   const handleSave = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Copy temp picker URIs to persistent storage
     const persistedUris = await Promise.all(pendingMedia.map(uri => copyMediaToStorage(uri)));
     await saveSession({ date: today, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: persistedUris });
+    scheduleRecoveryReminder(res).catch(() => {});
     setAlreadySaved(true);
     setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: persistedUris });
     setGradeCounts({});
@@ -251,6 +254,12 @@ export default function SessionScreen() {
                 </View>
               ) : null}
               <Text style={styles.savedHint}>Clear from Settings to re-log today</Text>
+              <TouchableOpacity
+                style={[styles.shareCardBtn, { borderColor: getResBorder(savedSession.res) }]}
+                onPress={() => setShowShareCard(true)}
+              >
+                <Text style={[styles.shareCardBtnText, { color: getResColor(savedSession.res) }]}>↑ Share Session</Text>
+              </TouchableOpacity>
             </View>
           </Card>
         )}
@@ -422,6 +431,16 @@ export default function SessionScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {alreadySaved && savedSession && (
+        <ShareCardModal
+          visible={showShareCard}
+          onClose={() => setShowShareCard(false)}
+          type="session"
+          session={savedSession}
+          date={today}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -454,7 +473,9 @@ function makeStyles(C) {
     savedGradeCount: { color: C.dust, fontSize: 11 },
     savedNotesBox: { backgroundColor: C.surface, borderRadius: 12, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: C.borderLight },
     savedNotesText: { color: C.sand, fontSize: 12, lineHeight: 18 },
-    savedHint: { color: C.dust, fontSize: 10, textAlign: 'center' },
+    savedHint: { color: C.dust, fontSize: 10, textAlign: 'center', marginBottom: 12 },
+    shareCardBtn: { borderWidth: 1.5, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+    shareCardBtnText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
 
     mediaThumbnailWrap: { position: 'relative' },
     mediaThumbnail: { width: 90, height: 90, borderRadius: 10, backgroundColor: C.borderLight },

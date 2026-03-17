@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as SecureStore from 'expo-secure-store';
+import { syncCheckIn, syncProfile, syncSession } from './lib/supabase';
 
 export type Session = {
   date: string;
@@ -9,6 +10,38 @@ export type Session = {
   res: number;
   notes?: string;
   mediaUris?: string[];
+};
+
+export type CheckIn = {
+  date: string;
+  soreness: string;
+  affectedFingers: string[];
+  painAreas: string[];
+  isRestDay?: boolean;
+  mediaUris?: string[];
+};
+
+export type UserProfile = {
+  maxGrade: string;
+  projectGrade: string;
+  name?: string;
+  sendsToUnlock?: number;
+};
+
+export type BodyPartCounts = Record<string, number>;
+
+export type AlertSettings = {
+  weeklyLoad: boolean;
+  injuryOverload: boolean;
+  bodyHighLoad: boolean;
+};
+
+export type BodyAlert = {
+  partId: string;
+  partName: string;
+  count: number;
+  threshold: number;
+  suggestion: string;
 };
 
 // ─── Media file helpers ───────────────────────────────────────────────────────
@@ -35,28 +68,24 @@ export const deleteMediaFiles = async (uris: string[]): Promise<void> => {
   ));
 };
 
-export type CheckIn = {
-  date: string;
-  soreness: string;
-  affectedFingers: string[];
-  painAreas: string[];
-  isRestDay?: boolean;
+// ─── AsyncStorage helpers ─────────────────────────────────────────────────────
+
+const get = async (key: string): Promise<string | null> => {
+  try { return await AsyncStorage.getItem(key); }
+  catch { return null; }
 };
 
-export type UserProfile = {
-  maxGrade: string;
-  projectGrade: string;
-  name?: string;
-  sendsToUnlock?: number;
+const set = async (key: string, value: string): Promise<void> => {
+  try { await AsyncStorage.setItem(key, value); }
+  catch (e) { console.error(`AsyncStorage set error [${key}]`, e); }
 };
 
-export type BodyPartCounts = Record<string, number>;
-
-export type AlertSettings = {
-  weeklyLoad: boolean;
-  injuryOverload: boolean;
-  bodyHighLoad: boolean;
+const remove = async (key: string): Promise<void> => {
+  try { await AsyncStorage.removeItem(key); }
+  catch {}
 };
+
+// ─── Alert Settings ───────────────────────────────────────────────────────────
 
 const DEFAULT_ALERT_SETTINGS: AlertSettings = {
   weeklyLoad: true,
@@ -65,182 +94,110 @@ const DEFAULT_ALERT_SETTINGS: AlertSettings = {
 };
 
 export const getAlertSettings = async (): Promise<AlertSettings> => {
-  const data = await secureGet('alertSettings');
+  const data = await get('alertSettings');
   return data ? { ...DEFAULT_ALERT_SETTINGS, ...JSON.parse(data) } : DEFAULT_ALERT_SETTINGS;
 };
 
 export const saveAlertSettings = async (settings: AlertSettings): Promise<void> => {
-  await secureSet('alertSettings', JSON.stringify(settings));
+  await set('alertSettings', JSON.stringify(settings));
 };
 
-export type BodyAlert = {
-  partId: string;
-  partName: string;
-  count: number;
-  threshold: number;
-  suggestion: string;
-};
-
-// ─── SecureStore helpers (handles >2KB by chunking) ──────────────────────────
-
-const CHUNK_SIZE = 1800;
-
-const secureSetLarge = async (key: string, value: string): Promise<void> => {
-  try {
-    const chunks = Math.ceil(value.length / CHUNK_SIZE);
-    await SecureStore.setItemAsync(`${key}__count`, String(chunks));
-    for (let i = 0; i < chunks; i++) {
-      await SecureStore.setItemAsync(`${key}__${i}`, value.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
-    }
-  } catch (e) {
-    console.error(`secureSetLarge error [${key}]`, e);
-  }
-};
-
-const secureGetLarge = async (key: string): Promise<string | null> => {
-  try {
-    const countStr = await SecureStore.getItemAsync(`${key}__count`);
-    if (!countStr) return null;
-    const count = parseInt(countStr);
-    let result = '';
-    for (let i = 0; i < count; i++) {
-      const chunk = await SecureStore.getItemAsync(`${key}__${i}`);
-      result += chunk || '';
-    }
-    return result;
-  } catch {
-    return null;
-  }
-};
-
-const secureDeleteLarge = async (key: string): Promise<void> => {
-  try {
-    const countStr = await SecureStore.getItemAsync(`${key}__count`);
-    if (!countStr) return;
-    const count = parseInt(countStr);
-    await SecureStore.deleteItemAsync(`${key}__count`);
-    for (let i = 0; i < count; i++) {
-      await SecureStore.deleteItemAsync(`${key}__${i}`);
-    }
-  } catch {}
-};
-
-const secureGet = async (key: string): Promise<string | null> => {
-  try {
-    return await SecureStore.getItemAsync(key);
-  } catch {
-    return null;
-  }
-};
-
-const secureSet = async (key: string, value: string): Promise<void> => {
-  try {
-    await SecureStore.setItemAsync(key, value);
-  } catch (e) {
-    console.error(`SecureStore set error [${key}]`, e);
-  }
-};
-
-const secureDelete = async (key: string): Promise<void> => {
-  try {
-    await SecureStore.deleteItemAsync(key);
-  } catch {}
-};
-
-// ─── Profile (small — direct SecureStore) ────────────────────────────────────
+// ─── Profile ──────────────────────────────────────────────────────────────────
 
 export const saveProfile = async (profile: UserProfile): Promise<void> => {
-  await secureSet('profile', JSON.stringify(profile));
+  await set('profile', JSON.stringify(profile));
+  syncProfile(profile).catch(() => {});
 };
 
 export const getProfile = async (): Promise<UserProfile | null> => {
-  const data = await secureGet('profile');
+  const data = await get('profile');
   return data ? JSON.parse(data) : null;
 };
 
-// ─── Sessions (large — chunked SecureStore) ───────────────────────────────────
+// ─── Sessions ─────────────────────────────────────────────────────────────────
 
 export const saveSession = async (session: Session): Promise<void> => {
   const existing = await getSessions();
   const updated = { ...existing, [session.date]: session };
-  await secureSetLarge('sessions', JSON.stringify(updated));
+  await set('sessions', JSON.stringify(updated));
+  syncSession(session.date, session).catch(() => {});
 };
 
 export const getSessions = async (): Promise<Record<string, Session>> => {
-  const data = await secureGetLarge('sessions');
+  const data = await get('sessions');
   return data ? JSON.parse(data) : {};
 };
 
 export const deleteSessionsByKey = async (dateKey: string): Promise<void> => {
   const existing = await getSessions();
   delete existing[dateKey];
-  await secureSetLarge('sessions', JSON.stringify(existing));
+  await set('sessions', JSON.stringify(existing));
 };
 
-// ─── Check-ins (large — chunked SecureStore) ──────────────────────────────────
+// ─── Check-ins ────────────────────────────────────────────────────────────────
 
 export const saveCheckIn = async (checkIn: CheckIn): Promise<void> => {
   const existing = await getCheckIns();
   const updated = { ...existing, [checkIn.date]: checkIn };
-  await secureSetLarge('checkins', JSON.stringify(updated));
+  await set('checkins', JSON.stringify(updated));
+  syncCheckIn(checkIn.date, checkIn).catch(() => {});
 };
 
 export const getCheckIns = async (): Promise<Record<string, CheckIn>> => {
-  const data = await secureGetLarge('checkins');
+  const data = await get('checkins');
   return data ? JSON.parse(data) : {};
 };
 
 export const deleteCheckInByKey = async (dateKey: string): Promise<void> => {
   const existing = await getCheckIns();
   delete existing[dateKey];
-  await secureSetLarge('checkins', JSON.stringify(existing));
+  await set('checkins', JSON.stringify(existing));
 };
 
-// ─── Goal Date (small — direct SecureStore) ───────────────────────────────────
+// ─── Goal Date ────────────────────────────────────────────────────────────────
 
 export const saveGoalDate = async (dateStr: string): Promise<void> => {
-  await secureSet('goalDate', dateStr);
+  await set('goalDate', dateStr);
 };
 
 export const getGoalDate = async (): Promise<string | null> => {
-  return await secureGet('goalDate');
+  return await get('goalDate');
 };
 
 export const deleteGoalDate = async (): Promise<void> => {
-  await secureDelete('goalDate');
+  await remove('goalDate');
 };
 
-// ─── Clear all ────────────────────────────────────────────────────────────────
+// ─── Dark Mode ────────────────────────────────────────────────────────────────
 
 export const getDarkMode = async (): Promise<boolean> => {
-  const val = await secureGet('darkMode');
+  const val = await get('darkMode');
   return val === 'true';
 };
 
 export const saveDarkMode = async (val: boolean): Promise<void> => {
-  await secureSet('darkMode', val ? 'true' : 'false');
+  await set('darkMode', val ? 'true' : 'false');
 };
 
-export const clearAllData = async (): Promise<void> => {
-  await FileSystem.deleteAsync(MEDIA_DIR, { idempotent: true }).catch(() => {});
-  await Promise.all([
-    secureDelete('profile'),
-    secureDelete('goalDate'),
-    secureDelete('darkMode'),
-    secureDelete('alertSettings'),
-    secureDelete('onboardingComplete'),
-    secureDeleteLarge('sessions'),
-    secureDeleteLarge('checkins'),
-  ]);
-};
+// ─── Onboarding ───────────────────────────────────────────────────────────────
 
 export const getOnboardingComplete = async (): Promise<boolean> => {
-  try { return (await SecureStore.getItemAsync('onboardingComplete')) === 'true'; }
+  try { return (await AsyncStorage.getItem('onboardingComplete')) === 'true'; }
   catch { return false; }
 };
 
 export const markOnboardingComplete = async (): Promise<void> => {
-  await SecureStore.setItemAsync('onboardingComplete', 'true');
+  await AsyncStorage.setItem('onboardingComplete', 'true');
+};
+
+// ─── Clear all ────────────────────────────────────────────────────────────────
+
+export const clearAllData = async (): Promise<void> => {
+  await FileSystem.deleteAsync(MEDIA_DIR, { idempotent: true }).catch(() => {});
+  await AsyncStorage.multiRemove([
+    'profile', 'goalDate', 'darkMode', 'alertSettings',
+    'onboardingComplete', 'sessions', 'checkins', 'reminderSettings',
+  ]);
 };
 
 // ─── Date helper ──────────────────────────────────────────────────────────────
