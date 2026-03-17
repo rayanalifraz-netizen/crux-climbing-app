@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
@@ -95,6 +95,10 @@ function calculateRES(gradeCounts, maxGrade, selectedHolds) {
 export default function SessionScreen() {
   const { C, gradeSystem } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
+  const { editDate } = useLocalSearchParams<{ editDate?: string }>();
+  const targetDate = editDate || today;
+  const isEditing = !!editDate && editDate !== today;
+
   const [gradeCounts, setGradeCounts] = useState({});
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
@@ -106,8 +110,8 @@ export default function SessionScreen() {
   const [isRestDay, setIsRestDay] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
 
-  useEffect(() => { loadProfile(); checkTodaySession(); }, []);
-  useFocusEffect(useCallback(() => { loadProfile(); checkTodaySession(); }, []));
+  useEffect(() => { loadProfile(); checkTodaySession(); }, [targetDate]);
+  useFocusEffect(useCallback(() => { loadProfile(); checkTodaySession(); }, [targetDate]));
 
   const loadProfile = async () => {
     const profile = await getProfile();
@@ -116,11 +120,17 @@ export default function SessionScreen() {
 
   const checkTodaySession = async () => {
     const [sessions, checkIns] = await Promise.all([getSessions(), getCheckIns()]);
-    const todaySession = sessions[today];
-    const todayCheckIn = checkIns[today];
-    setAlreadySaved(!!todaySession);
-    setSavedSession(todaySession || null);
-    setIsRestDay(todayCheckIn?.isRestDay || false);
+    const existing = sessions[targetDate];
+    const checkIn = checkIns[targetDate];
+    setAlreadySaved(!!existing);
+    setSavedSession(existing || null);
+    if (existing) {
+      setGradeCounts(existing.gradeCounts || {});
+      setHoldTypes(existing.holdTypes || []);
+      setMovementTypes(existing.movementTypes || []);
+      setNotes(existing.notes || '');
+    }
+    setIsRestDay(checkIn?.isRestDay || false);
   };
 
   const incrementGrade = (grade) => {
@@ -168,15 +178,14 @@ export default function SessionScreen() {
   const handleSave = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const persistedUris = await Promise.all(pendingMedia.map(uri => copyMediaToStorage(uri)));
-    await saveSession({ date: today, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: persistedUris });
-    scheduleRecoveryReminder(res).catch(() => {});
+    const existing = savedSession;
+    const mergedMedia = [...(existing?.mediaUris || []), ...persistedUris];
+    await saveSession({ date: targetDate, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
+    if (!isEditing) scheduleRecoveryReminder(res).catch(() => {});
     setAlreadySaved(true);
-    setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: persistedUris });
-    setGradeCounts({});
-    setHoldTypes([]);
-    setMovementTypes([]);
-    setNotes('');
+    setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
     setPendingMedia([]);
+    if (isEditing) router.back();
   };
 
   const hasGrades = Object.keys(gradeCounts).length > 0;
@@ -196,10 +205,12 @@ export default function SessionScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.greeting}>
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {isEditing
+              ? new Date(targetDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+              : new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>Log Session</Text>
+            <Text style={styles.title}>{isEditing ? 'Edit Session' : 'Log Session'}</Text>
             {alreadySaved && (
               <View style={[styles.statusBadge, { borderColor: C.terraBorder, backgroundColor: C.terraBg }]}>
                 <Text style={[styles.statusBadgeText, { color: C.terra }]}>✓ Logged</Text>

@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
@@ -472,6 +472,16 @@ export default function CalendarScreen() {
                 <Text style={styles.restMsg}>Recovery logged — no session this day.</Text>
               )}
             </View>
+            {selectedDate && (
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => router.navigate({ pathname: '/(tabs)/session', params: { editDate: selectedDate } })}
+              >
+                <Text style={styles.editBtnText}>
+                  {selectedSession ? 'Edit Session →' : '+ Log Session'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </Card>
         )}
 
@@ -494,6 +504,24 @@ export default function CalendarScreen() {
               </ScrollView>
             </View>
           </Card>
+        )}
+
+        {/* Edit check-in button */}
+        {selectedDate && selectedCheckIn && (
+          <TouchableOpacity
+            style={[styles.editBtnStandalone, { borderColor: C.greenBorder, backgroundColor: C.greenBg }]}
+            onPress={() => router.navigate({ pathname: '/(tabs)/checkin', params: { editDate: selectedDate } })}
+          >
+            <Text style={[styles.editBtnText, { color: C.green }]}>Edit Check-in →</Text>
+          </TouchableOpacity>
+        )}
+        {selectedDate && !selectedCheckIn && (
+          <TouchableOpacity
+            style={[styles.editBtnStandalone, { borderColor: C.borderLight }]}
+            onPress={() => router.navigate({ pathname: '/(tabs)/checkin', params: { editDate: selectedDate } })}
+          >
+            <Text style={[styles.editBtnText, { color: C.sand }]}>+ Log Check-in</Text>
+          </TouchableOpacity>
         )}
 
         {selectedDate && !isRestDay && !selectedSession && !(selectedCheckIn?.mediaUris?.length) && (
@@ -626,6 +654,9 @@ function makeStyles(C) {
     restBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
     restBadgeText: { color: C.green, fontSize: 11, fontWeight: '800' },
     restMsg: { color: C.sand, fontSize: 12 },
+    editBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, padding: 14, alignItems: 'center' },
+    editBtnStandalone: { marginHorizontal: 16, marginTop: 0, marginBottom: 10, padding: 14, borderWidth: 1, borderRadius: 16, alignItems: 'center' },
+    editBtnText: { fontSize: 12, fontWeight: '700', color: C.sand, letterSpacing: 0.3 },
 
     emptyDayInner: { padding: 20, alignItems: 'center' },
     emptyDayText: { color: C.dust, fontSize: 12, fontWeight: '600' },

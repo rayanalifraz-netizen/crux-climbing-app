@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
@@ -134,6 +134,10 @@ function getSorenessColor(C, level) {
 export default function CheckInScreen() {
   const { C } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
+  const { editDate } = useLocalSearchParams<{ editDate?: string }>();
+  const targetDate = editDate || today;
+  const isEditing = !!editDate && editDate !== today;
+
   const [soreness, setSoreness] = useState(null);
   const [affectedFingers, setAffectedFingers] = useState([]);
   const [painAreas, setPainAreas] = useState([]);
@@ -147,7 +151,7 @@ export default function CheckInScreen() {
   const [showShareCard, setShowShareCard] = useState(false);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] }>({ current: 0, last7: Array(7).fill(false) });
 
-  useFocusEffect(useCallback(() => { loadData(); }, []));
+  useFocusEffect(useCallback(() => { loadData(); }, [targetDate]));
 
   const loadData = async () => {
     const [checkIns, sessions, alerts, alertPrefs] = await Promise.all([
@@ -159,9 +163,9 @@ export default function CheckInScreen() {
     setAlertSettings(alertPrefs);
     setStreak(computeStreak(checkIns));
 
-    if (checkIns[today]) {
+    if (checkIns[targetDate]) {
       setAlreadyCheckedIn(true);
-      const ci = checkIns[today];
+      const ci = checkIns[targetDate];
       setSoreness(ci.soreness);
       setAffectedFingers(ci.affectedFingers || []);
       setPainAreas(ci.painAreas || []);
@@ -211,21 +215,23 @@ export default function CheckInScreen() {
   const handleSave = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const savedUris = await Promise.all(mediaUris.map(copyMediaToStorage));
-    await saveCheckIn({ date: today, soreness, affectedFingers, painAreas, isRestDay: false, mediaUris: savedUris });
-    cancelStreakProtection().catch(() => {});
+    await saveCheckIn({ date: targetDate, soreness, affectedFingers, painAreas, isRestDay: false, mediaUris: savedUris });
+    if (!isEditing) cancelStreakProtection().catch(() => {});
     setMediaUris(savedUris);
     const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, false);
     setDrs(score);
     setAlreadyCheckedIn(true);
+    if (isEditing) router.back();
   };
 
   const handleRestDay = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await saveCheckIn({ date: today, soreness: '0', affectedFingers: [], painAreas: [], isRestDay: true });
-    cancelStreakProtection().catch(() => {});
+    await saveCheckIn({ date: targetDate, soreness: '0', affectedFingers: [], painAreas: [], isRestDay: true });
+    if (!isEditing) cancelStreakProtection().catch(() => {});
     setIsRestDay(true);
     setDrs(100);
     setAlreadyCheckedIn(true);
+    if (isEditing) router.back();
   };
 
   const verdict = drs !== null ? getDRSVerdict(C, drs) : null;
@@ -243,10 +249,12 @@ export default function CheckInScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.greeting}>
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {isEditing
+              ? new Date(targetDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+              : new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>Check-in</Text>
+            <Text style={styles.title}>{isEditing ? 'Edit Check-in' : 'Check-in'}</Text>
             {alreadyCheckedIn && (
               <View style={styles.doneBadge}>
                 <Text style={styles.doneBadgeText}>✓ Done</Text>

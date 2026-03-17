@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://kfheoistdhwnpmggoqpu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_KhLHp-V277YyR55_B-pQcQ_MBcJojIj"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://kfheoistdhwnpmggoqpu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_KhLHp-V277YyR55_B-pQcQ_MBcJojIj"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://kfheoistdhwnpmggoqpu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_KhLHp-V277YyR55_B-pQcQ_MBcJojIj"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "",
+        "ascAppId": "",
+        "appleTeamId": ""
+      }
+    }
+  }
+}

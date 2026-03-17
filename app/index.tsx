@@ -9,11 +9,16 @@ export default function Index() {
 
   useEffect(() => {
     async function check() {
-      // If already signed in to Supabase, restore any cloud data then go to tabs
+      // If already signed in to Supabase, restore cloud data
       const user = await getCurrentUser();
       if (user) {
-        await restoreFromSupabase();
-        setDestination('/(tabs)');
+        const hasCloudData = await restoreFromSupabase();
+        if (hasCloudData) {
+          setDestination('/(tabs)');
+        } else {
+          // Signed in but no cloud data — new account, go through onboarding
+          setDestination('/onboarding');
+        }
         return;
       }
 
