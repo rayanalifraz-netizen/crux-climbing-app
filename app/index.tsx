@@ -2,13 +2,14 @@ import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { getCurrentUser, restoreFromSupabase } from '../lib/supabase';
-import { getOnboardingComplete, getProfile, markOnboardingComplete } from '../storage';
+import { getOnboardingComplete, getProfile, markOnboardingComplete, purgeFutureDates } from '../storage';
 
 export default function Index() {
   const [destination, setDestination] = useState<'/(tabs)' | '/onboarding' | null>(null);
 
   useEffect(() => {
     async function check() {
+      await purgeFutureDates();
       // If already signed in to Supabase, restore cloud data
       const user = await getCurrentUser();
       if (user) {

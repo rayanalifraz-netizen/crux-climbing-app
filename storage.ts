@@ -222,6 +222,21 @@ export const getTodayDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+export const purgeFutureDates = async (): Promise<void> => {
+  const today = getTodayDate();
+  const [sessions, checkIns] = await Promise.all([getSessions(), getCheckIns()]);
+  const futureSessions = Object.keys(sessions).filter(d => d > today);
+  const futureCheckIns = Object.keys(checkIns).filter(d => d > today);
+  if (futureSessions.length > 0) {
+    futureSessions.forEach(d => delete sessions[d]);
+    await set('sessions', JSON.stringify(sessions));
+  }
+  if (futureCheckIns.length > 0) {
+    futureCheckIns.forEach(d => delete checkIns[d]);
+    await set('checkins', JSON.stringify(checkIns));
+  }
+};
+
 // ─── Injury tracking ──────────────────────────────────────────────────────────
 
 const ID_TO_PART: Record<string, { id: string; name: string }> = {
