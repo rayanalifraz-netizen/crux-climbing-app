@@ -708,7 +708,7 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.greeting}>{greeting}</Text>
-          <Text style={styles.title}>Profile</Text>
+          <Text style={styles.title}>Crux</Text>
         </View>
 
         {!profile ? (
