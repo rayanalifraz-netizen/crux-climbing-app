@@ -59,4 +59,4 @@ We may update this privacy policy from time to time. We will notify you of signi
 
 If you have questions about this privacy policy or how your data is handled, please contact us at:
 
-**[your contact email here]**
+cruxclimbingrecovery@gmail.com
