@@ -226,6 +226,7 @@ export default function CheckInScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const persistedUris = await Promise.all(pendingMedia.map(copyMediaToStorage));
     const mergedUris = [...mediaUris, ...persistedUris];
+    if (isRestDay) await deleteSessionsByKey(targetDate);
     await saveCheckIn({ date: targetDate, soreness, affectedFingers, painAreas, isRestDay, mediaUris: mergedUris });
     if (!isEditing) {
       cancelStreakProtection().catch(() => {});
@@ -239,27 +240,14 @@ export default function CheckInScreen() {
     if (isEditing) router.navigate('/(tabs)/calendar');
   };
 
-  const handleRestDay = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await Promise.all([
-      saveCheckIn({ date: targetDate, soreness: '0', affectedFingers: [], painAreas: [], isRestDay: true }),
-      deleteSessionsByKey(targetDate),
-    ]);
-    if (!isEditing) {
-      cancelStreakProtection().catch(() => {});
-      rescheduleReminderForTomorrow().catch(() => {});
-    }
-    setIsRestDay(true);
-    setDrs(100);
-    setMediaUris([]);
-    setPendingMedia([]);
-    setAlreadyCheckedIn(true);
-    if (isEditing) router.navigate('/(tabs)/calendar');
+  const toggleRestDay = () => {
+    Haptics.selectionAsync();
+    setIsRestDay(prev => !prev);
   };
 
   const verdict = drs !== null ? getDRSVerdict(C, drs) : null;
-  const liveScore = !locked && soreness
-    ? calculateDRS(soreness, painAreas, affectedFingers, recentSessions, false)
+  const liveScore = !locked && (soreness || isRestDay)
+    ? calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRestDay)
     : null;
   const liveVerdict = liveScore !== null ? getDRSVerdict(C, liveScore) : null;
   const displayVerdict = locked ? verdict : liveVerdict;
@@ -267,7 +255,7 @@ export default function CheckInScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, (soreness || (isEditing && alreadyCheckedIn)) && !locked && { paddingBottom: 88 }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, (isRestDay || soreness || (isEditing && alreadyCheckedIn)) && !locked && { paddingBottom: 88 }]}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -305,104 +293,100 @@ export default function CheckInScreen() {
           </Card>
         )}
 
-        {/* Rest Day Button — hidden when editing an existing non-rest check-in */}
-        {!locked && !(isEditing && alreadyCheckedIn && !isRestDay) && (
-          <Card
-            label="Rest Day"
-            accentColor={C.green}
-            bgColor={C.greenBg}
-            labelColor={C.green}
-          >
-            <TouchableOpacity style={styles.restDayBtn} onPress={handleRestDay}>
-              <View style={styles.restDayBtnLeft}>
-                <Text style={styles.restDayBtnTitle}>Log Rest Day</Text>
-                <Text style={styles.restDayBtnSub}>Skip the session and recover</Text>
-              </View>
-              <Text style={[styles.restDayBtnArrow, { color: C.green }]}>→</Text>
-            </TouchableOpacity>
-          </Card>
-        )}
-
-        {/* Rest Day Confirmed */}
-        {isRestDay && locked ? (
-          <Card
-            label="Today"
-            accentColor={C.green}
-            bgColor={C.greenBg}
-            labelColor={C.green}
-          >
+        {/* Rest Day Toggle */}
+        <Card
+          label="Rest Day"
+          accentColor={isRestDay ? C.green : undefined}
+          bgColor={isRestDay ? C.greenBg : undefined}
+          labelColor={isRestDay ? C.green : undefined}
+        >
+          {locked ? (
             <View style={styles.restDayConfirmed}>
-              <Text style={styles.restDayConfirmedTitle}>Rest Day</Text>
-              <Text style={styles.restDayConfirmedSub}>Recovery mode — your body is thanking you</Text>
-              <View style={styles.restDayDRS}>
-                <Text style={styles.restDayDRSLabel}>Status</Text>
-                <Text style={styles.restDayDRSScore}>Recovering</Text>
-              </View>
+              <Text style={[styles.restDayConfirmedTitle, { color: isRestDay ? C.green : C.dust }]}>
+                {isRestDay ? 'Rest Day' : 'Training Day'}
+              </Text>
+              <Text style={styles.restDayConfirmedSub}>
+                {isRestDay ? 'Recovery mode — your body is thanking you' : 'Session logged for this day'}
+              </Text>
             </View>
-          </Card>
-        ) : (
-          <>
-            {/* Soreness */}
-            <Card label="Overall Soreness">
-              <View style={styles.sectionInner}>
-                <View style={styles.sorenessRow}>
-                  {SORENESS_LEVELS.map((level) => {
-                    const selected = soreness === level;
-                    const color = getSorenessColor(C, level);
-                    return (
-                      <TouchableOpacity
-                        key={level}
-                        style={[styles.sorenessBtn, selected && { backgroundColor: color, borderColor: color }]}
-                        onPress={() => { if (!locked) { Haptics.selectionAsync(); setSoreness(level); if (isRestDay) setIsRestDay(false); } }}
-                      >
-                        <Text style={[styles.sorenessBtnText, selected && { color: '#fff' }]}>{level}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                {soreness && (
-                  <Text style={styles.sorenessHint}>
-                    {parseInt(soreness) <= 3 ? '→ Feeling good' :
-                     parseInt(soreness) <= 6 ? '→ Some fatigue present' :
-                     '→ High soreness — consider resting'}
-                  </Text>
-                )}
+          ) : (
+            <TouchableOpacity style={styles.restDayBtn} onPress={toggleRestDay} activeOpacity={0.7}>
+              <View style={styles.restDayBtnLeft}>
+                <Text style={[styles.restDayBtnTitle, { color: isRestDay ? C.green : C.ink }]}>
+                  {isRestDay ? 'Rest Day — ON' : 'Mark as Rest Day'}
+                </Text>
+                <Text style={styles.restDayBtnSub}>
+                  {isRestDay ? 'Tap to remove rest day' : 'No session today — still log how you feel below'}
+                </Text>
               </View>
-            </Card>
-
-            {/* Finger Condition */}
-            <Card label="Finger Condition">
-              <View style={styles.sectionInner}>
-                <Text style={styles.sectionHint}>Tap any fingers that feel sore or tweaked</Text>
-                <View style={styles.fingerTable}>
-                  {FINGER_ZONES.map((finger) => (
-                    <View key={finger.id} style={styles.fingerRow}>
-                      <Text style={styles.fingerLabel}>{finger.label}</Text>
-                      <View style={styles.fingerSides}>
-                        {SIDES.map((side) => {
-                          const id = `${side}_${finger.id}`;
-                          const selected = affectedFingers.includes(id);
-                          return (
-                            <TouchableOpacity
-                              key={side}
-                              style={[styles.sideChip, selected && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
-                              onPress={() => toggleFinger(id)}
-                            >
-                              <Text style={[styles.sideChipText, selected && { color: C.red }]}>{side}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  ))}
-                </View>
+              <View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: isRestDay ? C.green : C.borderLight, padding: 3, justifyContent: 'center' }}>
+                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: C.surface, transform: [{ translateX: isRestDay ? 18 : 0 }] }} />
               </View>
-            </Card>
+            </TouchableOpacity>
+          )}
+        </Card>
 
-            {/* Pain Areas */}
-            <Card label="Pain or Strain">
+        {/* Soreness */}
+        <Card label="Overall Soreness">
+          <View style={styles.sectionInner}>
+            <View style={styles.sorenessRow}>
+              {SORENESS_LEVELS.map((level) => {
+                const selected = soreness === level;
+                const color = getSorenessColor(C, level);
+                return (
+                  <TouchableOpacity
+                    key={level}
+                    style={[styles.sorenessBtn, selected && { backgroundColor: color, borderColor: color }]}
+                    onPress={() => { if (!locked) { Haptics.selectionAsync(); setSoreness(level); } }}
+                  >
+                    <Text style={[styles.sorenessBtnText, selected && { color: '#fff' }]}>{level}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {soreness && (
+              <Text style={styles.sorenessHint}>
+                {parseInt(soreness) <= 3 ? '→ Feeling good' :
+                 parseInt(soreness) <= 6 ? '→ Some fatigue present' :
+                 '→ High soreness — consider resting'}
+              </Text>
+            )}
+          </View>
+        </Card>
+
+        {/* Finger Condition */}
+        <Card label="Finger Condition">
+          <View style={styles.sectionInner}>
+            {!locked && <Text style={styles.sectionHint}>Tap any fingers that feel sore or tweaked</Text>}
+            <View style={styles.fingerTable}>
+              {FINGER_ZONES.map((finger) => (
+                <View key={finger.id} style={styles.fingerRow}>
+                  <Text style={styles.fingerLabel}>{finger.label}</Text>
+                  <View style={styles.fingerSides}>
+                    {SIDES.map((side) => {
+                      const id = `${side}_${finger.id}`;
+                      const selected = affectedFingers.includes(id);
+                      return (
+                        <TouchableOpacity
+                          key={side}
+                          style={[styles.sideChip, selected && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
+                          onPress={() => toggleFinger(id)}
+                        >
+                          <Text style={[styles.sideChipText, selected && { color: C.red }]}>{side}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </Card>
+
+        {/* Pain Areas */}
+        <Card label="Pain or Strain">
               <View style={styles.sectionInner}>
-                <Text style={styles.sectionHint}>Select all areas that feel off today</Text>
+                {!locked && <Text style={styles.sectionHint}>Select all areas that feel off today</Text>}
                 <View style={styles.chipRow}>
                   {PAIN_AREAS.map((area) => {
                     const selected = painAreas.includes(area.id);
@@ -508,13 +492,10 @@ export default function CheckInScreen() {
             </TouchableOpacity>
           )}
 
-          </>
-        )}
-
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {(soreness || (isEditing && alreadyCheckedIn)) && !locked && (
+      {(isRestDay || soreness || (isEditing && alreadyCheckedIn)) && !locked && (
         <View style={styles.stickyFooter}>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
             <Text style={styles.saveBtnText}>{isEditing ? 'Save Changes →' : 'Save Check-in →'}</Text>
