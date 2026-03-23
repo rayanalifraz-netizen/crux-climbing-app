@@ -985,7 +985,7 @@ export default function ProfileScreen() {
           <View style={styles.shareBtnRow}>
             <TouchableOpacity style={[styles.shareBtn, { flex: 1 }]} onPress={handleShareReport}>
               <Ionicons name="document-text-outline" size={15} color={C.sand} />
-              <Text style={styles.shareBtnText}>Provider Report</Text>
+              <Text style={styles.shareBtnText}>Physician Report</Text>
             </TouchableOpacity>
             {todayCheckIn && streak && (
               <TouchableOpacity style={[styles.shareBtn, { flex: 1 }]} onPress={() => setShowShareCard(true)}>
