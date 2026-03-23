@@ -267,7 +267,7 @@ export default function CheckInScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, soreness && !locked && { paddingBottom: 88 }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, (soreness || (isEditing && alreadyCheckedIn)) && !locked && { paddingBottom: 88 }]}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -305,8 +305,8 @@ export default function CheckInScreen() {
           </Card>
         )}
 
-        {/* Rest Day Button */}
-        {!locked && (
+        {/* Rest Day Button — hidden when editing an existing non-rest check-in */}
+        {!locked && !(isEditing && alreadyCheckedIn && !isRestDay) && (
           <Card
             label="Rest Day"
             accentColor={C.green}
@@ -514,10 +514,10 @@ export default function CheckInScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {soreness && !locked && (
+      {(soreness || (isEditing && alreadyCheckedIn)) && !locked && (
         <View style={styles.stickyFooter}>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Text style={styles.saveBtnText}>Save Check-in →</Text>
+            <Text style={styles.saveBtnText}>{isEditing ? 'Save Changes →' : 'Save Check-in →'}</Text>
           </TouchableOpacity>
         </View>
       )}
