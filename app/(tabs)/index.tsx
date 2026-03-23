@@ -311,8 +311,8 @@ function computeRecovery(sessions, checkIns) {
   return { days, earliestDate, isReady, factors, res: lastSession.res };
 }
 
-function computeProjectReadiness({ chiData, sessions, checkIns, progressCount, progressMax, projectGrade }) {
-  if (!chiData || !projectGrade) return null;
+function computeProjectReadiness({ chiData, sessions, checkIns, progressCount, progressMax, projectGrade, maxGrade }) {
+  if (!chiData || !projectGrade || !maxGrade) return null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -321,7 +321,6 @@ function computeProjectReadiness({ chiData, sessions, checkIns, progressCount, p
   // ── Health gate (always primary) ──────────────────────────────────────
   let healthDays = chi >= 80 ? 0 : chi >= 65 ? 1 : chi >= 45 ? 3 : 5;
 
-  // Active finger/joint issues from recent check-ins
   for (let i = 0; i <= 1; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
@@ -335,11 +334,9 @@ function computeProjectReadiness({ chiData, sessions, checkIns, progressCount, p
     break;
   }
 
-  // Low injury score → enforce more rest
   if (injury < 40) healthDays = Math.max(healthDays, 6);
   else if (injury < 60) healthDays = Math.max(healthDays, 3);
 
-  // Recent hard session → ensure at least 1 day
   const sortedDates = Object.keys(sessions).sort().reverse();
   if (sortedDates.length > 0) {
     const lastDate = sortedDates[0];
@@ -352,22 +349,29 @@ function computeProjectReadiness({ chiData, sessions, checkIns, progressCount, p
 
   healthDays = Math.min(healthDays, 14);
 
-  // ── Progress gate ──────────────────────────────────────────────────────
-  const rate = progressMax > 0 ? progressCount / progressMax : 0;
-  let progressDays = 0;
-  let progressReason = '';
+  // ── Progress gate — based on grade gap + completion rate ───────────────
+  // Real-world bouldering progression timelines (grade gap → base days at 0% sends):
+  // 1 grade: ~30 days (1 month of focused work)
+  // 2 grades: ~90 days (3 months)
+  // 3 grades: ~180 days (6 months)
+  // 4 grades: ~270 days (9 months)
+  // 5+ grades: ~365 days (1 year+)
+  const gradeGap = Math.max(0, V_GRADES.indexOf(projectGrade) - V_GRADES.indexOf(maxGrade));
+  const BASE_DAYS_BY_GAP = [7, 30, 90, 180, 270, 365];
+  const baseDays = BASE_DAYS_BY_GAP[Math.min(gradeGap, BASE_DAYS_BY_GAP.length - 1)];
 
-  if (rate >= 1.0) {
-    progressDays = 0; progressReason = 'Project sends complete';
-  } else if (rate >= 0.8) {
-    progressDays = 2; progressReason = `${progressMax - progressCount} more send${progressMax - progressCount !== 1 ? 's' : ''} to unlock`;
-  } else if (rate >= 0.6) {
-    progressDays = 5; progressReason = 'Keep building confidence at this grade';
-  } else if (rate >= 0.3) {
-    progressDays = 10; progressReason = 'Build more base at your project grade first';
-  } else {
-    progressDays = 18; progressReason = 'Focus on volume at your project grade';
-  }
+  // Scale down as sends accumulate — at 100% sends remaining days = 0
+  const rate = progressMax > 0 ? Math.min(progressCount / progressMax, 1) : 0;
+  const progressDays = Math.round(baseDays * (1 - rate));
+
+  const remaining = progressMax - progressCount;
+  let progressReason = '';
+  if (rate >= 1.0) progressReason = 'Project sends complete';
+  else if (gradeGap === 0) progressReason = `${remaining} more send${remaining !== 1 ? 's' : ''} to unlock`;
+  else if (rate >= 0.7) progressReason = `Almost there — ${remaining} more send${remaining !== 1 ? 's' : ''} at this grade`;
+  else if (rate >= 0.3) progressReason = `Keep logging ${projectGrade} sends — building the base`;
+  else if (gradeGap >= 3) progressReason = `${projectGrade} is ${gradeGap} grades above your max — consistent training needed`;
+  else progressReason = `Build volume at ${projectGrade} before a serious attempt`;
 
   // ── Combine — health always wins ───────────────────────────────────────
   const totalDays = Math.max(healthDays, progressDays);
@@ -388,7 +392,7 @@ function computeProjectReadiness({ chiData, sessions, checkIns, progressCount, p
   const recommendedDate = new Date(today);
   recommendedDate.setDate(recommendedDate.getDate() + totalDays);
 
-  return { totalDays, healthDays, progressDays, primaryFactor, recommendedDate, reason, progressRate: rate };
+  return { totalDays, healthDays, progressDays, primaryFactor, recommendedDate, reason, progressRate: rate, gradeGap, baseDays };
 }
 
 function computeCheckInStreak(checkIns: Record<string, any>): { current: number; last7: boolean[] } {
@@ -614,6 +618,7 @@ export default function ProfileScreen() {
       progressCount: count,
       progressMax: target,
       projectGrade: prof.projectGrade,
+      maxGrade: prof.maxGrade,
     }));
 
     if (goalReached && prof.projectGrade && prof.maxGrade) {
