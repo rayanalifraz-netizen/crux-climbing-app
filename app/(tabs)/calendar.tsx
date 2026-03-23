@@ -3,8 +3,9 @@ import { editStore } from '../../lib/editStore';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
-import { deleteGoalDate, getCheckIns, getGoalDate, getSessions, saveGoalDate } from '../../storage';
+import { deleteGoalDate, getCheckIns, getGoalDate, getInjuryAlerts, getProfile, getSessions, saveGoalDate } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
+import { computeCHI, computeProjectReadiness } from '../../lib/scoring';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -107,16 +108,37 @@ export default function CalendarScreen() {
   const [viewerIndex, setViewerIndex] = useState(0);
   const [showViewer, setShowViewer] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
+  const [projectReadiness, setProjectReadiness] = useState(null);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
-    const [sessionData, checkInData, savedGoal] = await Promise.all([
-      getSessions(), getCheckIns(), getGoalDate(),
+    const [sessionData, checkInData, savedGoal, profile, injuryAlerts] = await Promise.all([
+      getSessions(), getCheckIns(), getGoalDate(), getProfile(), getInjuryAlerts(),
     ]);
     setSessions(sessionData);
     setCheckIns(checkInData);
     if (savedGoal) setGoalDate(savedGoal);
+
+    if (profile?.projectGrade && profile?.maxGrade) {
+      const chiData = computeCHI(sessionData, checkInData, injuryAlerts);
+      let progressCount = 0;
+      Object.values(sessionData).forEach((sess: any) => {
+        if (sess.gradeCounts?.[profile.projectGrade])
+          progressCount += sess.gradeCounts[profile.projectGrade];
+      });
+      setProjectReadiness(computeProjectReadiness({
+        chiData,
+        sessions: sessionData,
+        checkIns: checkInData,
+        progressCount,
+        progressMax: profile.sendsToUnlock ?? 10,
+        projectGrade: profile.projectGrade,
+        maxGrade: profile.maxGrade,
+      }));
+    } else {
+      setProjectReadiness(null);
+    }
   };
 
   const handleSaveGoalDate = async (dateStr) => {
@@ -208,6 +230,63 @@ export default function CalendarScreen() {
             <Text style={styles.setGoalBtnText}>+ Set Project Goal Date</Text>
           </TouchableOpacity>
         )}
+
+        {/* Project Send Window */}
+        {projectReadiness && (() => {
+          const pr = projectReadiness;
+          const isReady = pr.primaryFactor === 'ready';
+          const accentColor = isReady ? C.green : pr.primaryFactor === 'health' ? C.red : C.amber;
+          const bgColor = isReady ? C.greenBg : pr.primaryFactor === 'health' ? C.redBg : C.amberBg;
+          const dateStr = pr.recommendedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          const healthBarW = `${Math.max(0, Math.min(100, 100 - pr.healthDays * 12))}%`;
+          const progressBarW = `${Math.round(pr.progressRate * 100)}%`;
+          return (
+            <Card label="Project Send Window" accentColor={accentColor} bgColor={bgColor} labelColor={accentColor}>
+              <View style={{ paddingHorizontal: 20, paddingBottom: 16, paddingTop: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: isReady ? 20 : 17, fontWeight: '800', color: accentColor, lineHeight: 22 }}>
+                      {isReady ? 'Ready to send!' : dateStr}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: accentColor + 'bb', marginTop: 3, lineHeight: 17 }}>
+                      {pr.reason}
+                    </Text>
+                  </View>
+                  {!isReady && (
+                    <View style={{ alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: 12, borderWidth: 1.5, borderColor: accentColor + '60', marginLeft: 12 }}>
+                      <Text style={{ fontSize: 20, fontWeight: '900', color: accentColor, lineHeight: 24 }}>{pr.totalDays}</Text>
+                      <Text style={{ fontSize: 9, fontWeight: '700', color: accentColor, letterSpacing: 0.5 }}>DAYS</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={{ marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Recovery readiness</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red }}>
+                      {pr.healthDays === 0 ? 'Clear' : `${pr.healthDays}d needed`}
+                    </Text>
+                  </View>
+                  <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ height: 5, width: healthBarW, backgroundColor: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red, borderRadius: 3 }} />
+                  </View>
+                </View>
+
+                <View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Project sends</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red }}>
+                      {Math.round(pr.progressRate * 100)}%
+                    </Text>
+                  </View>
+                  <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ height: 5, width: progressBarW, backgroundColor: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red, borderRadius: 3 }} />
+                  </View>
+                </View>
+              </View>
+            </Card>
+          );
+        })()}
 
         {/* Goal Date Picker Modal */}
         <Modal visible={showGoalModal} animationType="slide" transparent>
