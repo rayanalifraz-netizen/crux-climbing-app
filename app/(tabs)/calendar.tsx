@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { editStore } from '../../lib/editStore';
-import { useCallback, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { deleteGoalDate, getCheckIns, getGoalDate, getInjuryAlerts, getProfile, getSessions, saveGoalDate } from '../../storage';
@@ -109,6 +110,21 @@ export default function CalendarScreen() {
   const [showViewer, setShowViewer] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
   const [projectReadiness, setProjectReadiness] = useState(null);
+  const [showProjectedProgress, setShowProjectedProgress] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem('showProjectedProgress').then(v => {
+      if (v !== null) setShowProjectedProgress(v === 'true');
+    }).catch(() => {});
+  }, []);
+
+  const toggleProjectedProgress = () => {
+    setShowProjectedProgress(prev => {
+      const next = !prev;
+      AsyncStorage.setItem('showProjectedProgress', String(next)).catch(() => {});
+      return next;
+    });
+  };
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
@@ -236,58 +252,77 @@ export default function CalendarScreen() {
           const pr = projectReadiness;
           const isReady = pr.primaryFactor === 'ready';
           const accentColor = isReady ? C.green : pr.primaryFactor === 'health' ? C.red : C.amber;
-          const bgColor = isReady ? C.greenBg : pr.primaryFactor === 'health' ? C.redBg : C.amberBg;
+          const bgColor = showProjectedProgress ? (isReady ? C.greenBg : pr.primaryFactor === 'health' ? C.redBg : C.amberBg) : C.surface;
           const dateStr = pr.recommendedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
           const healthBarW = `${Math.max(0, Math.min(100, 100 - pr.healthDays * 12))}%`;
           const progressBarW = `${Math.round(pr.progressRate * 100)}%`;
           return (
-            <Card label="Projected Progress" accentColor={accentColor} bgColor={bgColor} labelColor={accentColor}>
-              <View style={{ paddingHorizontal: 20, paddingBottom: 16, paddingTop: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: isReady ? 20 : 17, fontWeight: '800', color: accentColor, lineHeight: 22 }}>
-                      {isReady ? 'Ready to send!' : dateStr}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: accentColor + 'bb', marginTop: 3, lineHeight: 17 }}>
-                      {pr.reason}
-                    </Text>
-                  </View>
-                  {!isReady && (
-                    <View style={{ alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: 12, borderWidth: 1.5, borderColor: accentColor + '60', marginLeft: 12 }}>
-                      <Text style={{ fontSize: 20, fontWeight: '900', color: accentColor, lineHeight: 24 }}>{pr.totalDays}</Text>
-                      <Text style={{ fontSize: 9, fontWeight: '700', color: accentColor, letterSpacing: 0.5 }}>DAYS</Text>
-                    </View>
-                  )}
-                </View>
-
-                <View style={{ marginBottom: 8 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Recovery readiness</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red }}>
-                      {pr.healthDays === 0 ? 'Clear' : `${pr.healthDays}d needed`}
-                    </Text>
-                  </View>
-                  <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ height: 5, width: healthBarW, backgroundColor: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red, borderRadius: 3 }} />
-                  </View>
-                </View>
-
-                <View style={{ marginBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Project sends</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red }}>
-                      {Math.round(pr.progressRate * 100)}%
-                    </Text>
-                  </View>
-                  <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ height: 5, width: progressBarW, backgroundColor: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red, borderRadius: 3 }} />
-                  </View>
-                </View>
-
-                <Text style={{ fontSize: 10, color: C.dust, fontStyle: 'italic', lineHeight: 15 }}>
-                  Estimated suggestion based on your logged data. Individual results vary — listen to your body.
+            <Card accentColor={showProjectedProgress ? accentColor : undefined} bgColor={bgColor}>
+              {/* Header row with toggle */}
+              <TouchableOpacity
+                onPress={toggleProjectedProgress}
+                activeOpacity={0.7}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: showProjectedProgress ? 2 : 16 }}
+              >
+                <Text style={{ fontSize: 10, fontWeight: '700', color: showProjectedProgress ? accentColor : C.dust, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Projected Progress
                 </Text>
-              </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '600', color: C.dust }}>{showProjectedProgress ? 'On' : 'Off'}</Text>
+                  <View style={{ width: 36, height: 22, borderRadius: 11, backgroundColor: showProjectedProgress ? accentColor : C.borderLight, padding: 2, justifyContent: 'center' }}>
+                    <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: C.surface, transform: [{ translateX: showProjectedProgress ? 14 : 0 }] }} />
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {showProjectedProgress && (
+                <View style={{ paddingHorizontal: 20, paddingBottom: 16, paddingTop: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: isReady ? 20 : 17, fontWeight: '800', color: accentColor, lineHeight: 22 }}>
+                        {isReady ? 'Ready to send!' : dateStr}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: accentColor + 'bb', marginTop: 3, lineHeight: 17 }}>
+                        {pr.reason}
+                      </Text>
+                    </View>
+                    {!isReady && (
+                      <View style={{ alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: 12, borderWidth: 1.5, borderColor: accentColor + '60', marginLeft: 12 }}>
+                        <Text style={{ fontSize: 20, fontWeight: '900', color: accentColor, lineHeight: 24 }}>{pr.totalDays}</Text>
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: accentColor, letterSpacing: 0.5 }}>DAYS</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={{ marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Recovery readiness</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red }}>
+                        {pr.healthDays === 0 ? 'Clear' : `${pr.healthDays}d needed`}
+                      </Text>
+                    </View>
+                    <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ height: 5, width: healthBarW, backgroundColor: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red, borderRadius: 3 }} />
+                    </View>
+                  </View>
+
+                  <View style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Project sends</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red }}>
+                        {Math.round(pr.progressRate * 100)}%
+                      </Text>
+                    </View>
+                    <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ height: 5, width: progressBarW, backgroundColor: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red, borderRadius: 3 }} />
+                    </View>
+                  </View>
+
+                  <Text style={{ fontSize: 10, color: C.dust, fontStyle: 'italic', lineHeight: 15 }}>
+                    Estimated suggestion based on your logged data. Individual results vary — listen to your body.
+                  </Text>
+                </View>
+              )}
             </Card>
           );
         })()}
