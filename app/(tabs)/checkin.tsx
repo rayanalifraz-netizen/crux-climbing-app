@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { cancelStreakProtection, scheduleStreakProtection } from '../../notifications';
-import { copyMediaToStorage, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
+import { copyMediaToStorage, deleteSessionsByKey, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
 function Card({ label, labelColor, accentColor, bgColor, children, style }: {
@@ -238,7 +238,10 @@ export default function CheckInScreen() {
 
   const handleRestDay = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await saveCheckIn({ date: targetDate, soreness: '0', affectedFingers: [], painAreas: [], isRestDay: true });
+    await Promise.all([
+      saveCheckIn({ date: targetDate, soreness: '0', affectedFingers: [], painAreas: [], isRestDay: true }),
+      deleteSessionsByKey(targetDate),
+    ]);
     if (!isEditing) cancelStreakProtection().catch(() => {});
     setIsRestDay(true);
     setDrs(100);

@@ -80,8 +80,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="onboarding" options={{ href: null }} />
-      <Tabs.Screen name="gradeupdate" options={{ href: null }} />
     </Tabs>
   );
 }
