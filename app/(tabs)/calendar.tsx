@@ -231,7 +231,7 @@ export default function CalendarScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Project Send Window */}
+        {/* Projected Progress */}
         {projectReadiness && (() => {
           const pr = projectReadiness;
           const isReady = pr.primaryFactor === 'ready';
@@ -241,7 +241,7 @@ export default function CalendarScreen() {
           const healthBarW = `${Math.max(0, Math.min(100, 100 - pr.healthDays * 12))}%`;
           const progressBarW = `${Math.round(pr.progressRate * 100)}%`;
           return (
-            <Card label="Project Send Window" accentColor={accentColor} bgColor={bgColor} labelColor={accentColor}>
+            <Card label="Projected Progress" accentColor={accentColor} bgColor={bgColor} labelColor={accentColor}>
               <View style={{ paddingHorizontal: 20, paddingBottom: 16, paddingTop: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <View style={{ flex: 1 }}>
@@ -272,7 +272,7 @@ export default function CalendarScreen() {
                   </View>
                 </View>
 
-                <View>
+                <View style={{ marginBottom: 12 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Project sends</Text>
                     <Text style={{ fontSize: 11, fontWeight: '700', color: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red }}>
@@ -283,6 +283,10 @@ export default function CalendarScreen() {
                     <View style={{ height: 5, width: progressBarW, backgroundColor: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red, borderRadius: 3 }} />
                   </View>
                 </View>
+
+                <Text style={{ fontSize: 10, color: C.dust, fontStyle: 'italic', lineHeight: 15 }}>
+                  Estimated suggestion based on your logged data. Individual results vary — listen to your body.
+                </Text>
               </View>
             </Card>
           );
