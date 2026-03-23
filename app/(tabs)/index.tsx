@@ -19,9 +19,9 @@ const GAUGE_SW = 16;
 const GAUGE_SIZE = (GAUGE_R + GAUGE_SW + 6) * 2;
 
 
-function Card({ label, labelColor, accentColor, bgColor, children, style, collapsible, collapsed, onToggle }: {
+function Card({ label, labelColor, accentColor, bgColor, children, style, collapsible, collapsed, onToggle, onInfoPress }: {
   label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
-  collapsible?: boolean; collapsed?: boolean; onToggle?: () => void;
+  collapsible?: boolean; collapsed?: boolean; onToggle?: () => void; onInfoPress?: () => void;
 }) {
   const { C } = useTheme();
   const hasAccent = !!accentColor;
@@ -52,7 +52,18 @@ function Card({ label, labelColor, accentColor, bgColor, children, style, collap
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: hasAccent ? 24 : 20, paddingTop: 16, paddingBottom: collapsed ? 16 : 2 }}
         >
           <Text style={labelStyle}>{label}</Text>
-          <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={labelColor || C.dust} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {onInfoPress && (
+              <TouchableOpacity
+                onPress={(e) => { e.stopPropagation(); onInfoPress(); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: (labelColor || C.dust) + '60', justifyContent: 'center', alignItems: 'center' }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: labelColor || C.dust }}>?</Text>
+              </TouchableOpacity>
+            )}
+            <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={labelColor || C.dust} />
+          </View>
         </TouchableOpacity>
       ) : (
         <Text style={{ ...labelStyle, paddingHorizontal: hasAccent ? 24 : 20, paddingTop: 18, paddingBottom: 2 }}>{label}</Text>
@@ -64,9 +75,10 @@ function Card({ label, labelColor, accentColor, bgColor, children, style, collap
 
 
 
-function CHICard({ data, collapsed, onToggle }: { data: any; collapsed?: boolean; onToggle?: () => void }) {
+function CHICard({ data, collapsed, onToggle, hasCheckInToday }: { data: any; collapsed?: boolean; onToggle?: () => void; hasCheckInToday?: boolean }) {
   const { C } = useTheme();
   const { chi, readiness, load, injury } = data;
+  const [showInfo, setShowInfo] = useState(false);
 
   const chiColor = chi >= 80 ? C.green : chi >= 65 ? C.terra : chi >= 45 ? C.amber : C.red;
   const chiLabel = chi >= 80 ? 'Peak' : chi >= 65 ? 'Good' : chi >= 45 ? 'Stressed' : 'Recovery Mode';
@@ -90,10 +102,52 @@ function CHICard({ data, collapsed, onToggle }: { data: any; collapsed?: boolean
       shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12,
       elevation: 3, padding: 20,
     }}>
+      {/* Info modal */}
+      <Modal visible={showInfo} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.ink, paddingHorizontal: 16, paddingVertical: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 }}>About CHI</Text>
+              <TouchableOpacity onPress={() => setShowInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: C.ink }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 24, paddingBottom: 48, gap: 16 }}>
+              <Text style={{ fontSize: 13, color: C.ink, fontWeight: '700', marginBottom: -8 }}>Climber Health Index (CHI)</Text>
+              <Text style={{ fontSize: 13, color: C.sand, lineHeight: 20 }}>
+                A composite 0–100 score that estimates how ready your body is to train. Higher is better.
+              </Text>
+              {[
+                { label: 'Readiness  ·  35%', desc: 'Based on soreness level, pain areas, and affected fingers from your most recent check-in.' },
+                { label: 'Load Balance  ·  35%', desc: 'Based on session frequency and intensity (RES) over the last 7 days. High consecutive hard sessions lower this score.' },
+                { label: 'Injury Status  ·  30%', desc: 'Based on active injury alerts, recent pain reports, and how finger/shoulder-intensive your recent sessions were.' },
+              ].map(item => (
+                <View key={item.label} style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: C.ink }}>{item.label}</Text>
+                  <Text style={{ fontSize: 12, color: C.sand, lineHeight: 18 }}>{item.desc}</Text>
+                </View>
+              ))}
+              <View style={{ borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 14 }}>
+                <Text style={{ fontSize: 11, color: C.dust, fontStyle: 'italic', lineHeight: 16 }}>
+                  CHI is an estimate based on your logged data only. It is not a medical assessment.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Title row */}
       <TouchableOpacity onPress={onToggle} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed ? 0 : 8 }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: C.ink, letterSpacing: 0.2 }}>Climber Health Index</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation(); setShowInfo(true); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.borderLight, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '800', color: C.dust }}>?</Text>
+          </TouchableOpacity>
           <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.terra, justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="fitness" size={18} color="#fff" />
           </View>
@@ -153,6 +207,16 @@ function CHICard({ data, collapsed, onToggle }: { data: any; collapsed?: boolean
         <Text style={{ fontSize: 10, color: C.dust, marginTop: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 15 }}>
           For informational purposes only. Not a substitute for professional medical advice. Always consult a doctor or physio for injuries.
         </Text>
+
+        {/* Check-in shortcut */}
+        {!hasCheckInToday && (
+          <TouchableOpacity
+            onPress={() => router.navigate('/(tabs)/checkin')}
+            style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 12, alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '600', color: C.terra, letterSpacing: 0.3 }}>Log today's check-in →</Text>
+          </TouchableOpacity>
+        )}
       </>)}
     </View>
   );
@@ -377,6 +441,7 @@ export default function ProfileScreen() {
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ enabled: false, hour: 8, minute: 0 });
   const [currentUser, setCurrentUser] = useState<{ email?: string | null } | null>(null);
   const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>({});
+  const [showRecoveryInfo, setShowRecoveryInfo] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('collapsedCards').then(v => {
@@ -727,7 +792,7 @@ export default function ProfileScreen() {
             )}
 
             {/* CHI */}
-            {(totalSessions > 0 || totalCheckIns > 0) && chiData && <CHICard data={chiData} collapsed={!!collapsedCards.chi} onToggle={() => toggleCard('chi')} />}
+            {(totalSessions > 0 || totalCheckIns > 0) && chiData && <CHICard data={chiData} collapsed={!!collapsedCards.chi} onToggle={() => toggleCard('chi')} hasCheckInToday={!!todayCheckIn} />}
 
             {/* Streak */}
             {streak !== null && (
@@ -819,7 +884,16 @@ export default function ProfileScreen() {
                   ? { color: C.red, bg: C.redBg, border: C.redBorder }
                   : { color: C.amber, bg: C.amberBg, border: C.amberBorder };
               return (
-                <Card label="Recovery" accentColor={rc.color} bgColor={rc.bg} labelColor={rc.color} collapsible collapsed={!!collapsedCards.recovery} onToggle={() => toggleCard('recovery')}>
+                <Card
+                  label="Recovery"
+                  accentColor={rc.color}
+                  bgColor={rc.bg}
+                  labelColor={rc.color}
+                  collapsible
+                  collapsed={!!collapsedCards.recovery}
+                  onToggle={() => toggleCard('recovery')}
+                  onInfoPress={() => setShowRecoveryInfo(true)}
+                >
                   <View style={styles.recoveryInner}>
                     <View style={styles.recoveryTopRow}>
                       <View style={{ flex: 1 }}>
@@ -857,6 +931,14 @@ export default function ProfileScreen() {
                       For informational purposes only. Not a substitute for professional medical advice. Always consult a doctor or physio for injuries.
                     </Text>
                   </View>
+                  {recovery.isReady && (
+                    <TouchableOpacity
+                      onPress={() => router.navigate('/(tabs)/session')}
+                      style={{ borderTopWidth: 1, borderTopColor: rc.border + '40', paddingHorizontal: 24, paddingVertical: 10 }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: rc.color, letterSpacing: 0.3 }}>Log today's session →</Text>
+                    </TouchableOpacity>
+                  )}
                 </Card>
               );
             })()}
@@ -998,6 +1080,45 @@ export default function ProfileScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      {/* Recovery info modal */}
+      <Modal visible={showRecoveryInfo} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(26,21,16,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.ink, paddingHorizontal: 16, paddingVertical: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: C.surface, letterSpacing: 0.5 }}>About Recovery</Text>
+              <TouchableOpacity onPress={() => setShowRecoveryInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: C.ink }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 24, paddingBottom: 48, gap: 16 }}>
+              <Text style={{ fontSize: 13, color: C.ink, fontWeight: '700', marginBottom: -8 }}>RES — Relative Effort Score</Text>
+              <Text style={{ fontSize: 13, color: C.sand, lineHeight: 20 }}>
+                A 0–100 score for each session estimating how hard it was relative to your max grade. Hold type multipliers (crimps, pockets) increase the score.
+              </Text>
+              <Text style={{ fontSize: 13, color: C.ink, fontWeight: '700', marginBottom: -8 }}>Recovery Window</Text>
+              <Text style={{ fontSize: 13, color: C.sand, lineHeight: 20 }}>
+                Estimates how many rest days your body needs based on your last session's RES, soreness from your check-in, finger load, and consecutive hard sessions.
+              </Text>
+              {[
+                { label: 'Light session  (RES ≤ 40)', desc: 'Typically 0 rest days needed.' },
+                { label: 'Moderate session  (RES 41–70)', desc: 'Usually 1 day. More if soreness is high or fingers are affected.' },
+                { label: 'Hard session  (RES > 70)', desc: 'At least 1 day. Up to 3 days if compounded by high soreness or consecutive hard sessions.' },
+              ].map(item => (
+                <View key={item.label} style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: C.ink }}>{item.label}</Text>
+                  <Text style={{ fontSize: 12, color: C.sand, lineHeight: 18 }}>{item.desc}</Text>
+                </View>
+              ))}
+              <View style={{ borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 14 }}>
+                <Text style={{ fontSize: 11, color: C.dust, fontStyle: 'italic', lineHeight: 16 }}>
+                  Recovery estimates are based on your logged data only. Listen to your body and consult a professional for injuries.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {todayCheckIn && streak && (
         <ShareCardModal
