@@ -298,6 +298,86 @@ function computeRecovery(sessions, checkIns) {
   return { days, earliestDate, isReady, factors, res: lastSession.res };
 }
 
+function computeProjectReadiness({ chiData, sessions, checkIns, progressCount, progressMax, projectGrade }) {
+  if (!chiData || !projectGrade) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const { chi, injury } = chiData;
+
+  // ── Health gate (always primary) ──────────────────────────────────────
+  let healthDays = chi >= 80 ? 0 : chi >= 65 ? 1 : chi >= 45 ? 3 : 5;
+
+  // Active finger/joint issues from recent check-ins
+  for (let i = 0; i <= 1; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ci = checkIns[d.toISOString().split('T')[0]];
+    if (!ci || ci.isRestDay) continue;
+    const fingers = ci.affectedFingers?.length || 0;
+    const pain = ci.painAreas?.length || 0;
+    if (fingers >= 2) healthDays += 2;
+    else if (fingers >= 1) healthDays += 1;
+    if (pain >= 2) healthDays += 1;
+    break;
+  }
+
+  // Low injury score → enforce more rest
+  if (injury < 40) healthDays = Math.max(healthDays, 6);
+  else if (injury < 60) healthDays = Math.max(healthDays, 3);
+
+  // Recent hard session → ensure at least 1 day
+  const sortedDates = Object.keys(sessions).sort().reverse();
+  if (sortedDates.length > 0) {
+    const lastDate = sortedDates[0];
+    const lastD = new Date(lastDate + 'T00:00:00');
+    const daysSince = Math.round((today.getTime() - lastD.getTime()) / (1000 * 60 * 60 * 24));
+    const lastRES = sessions[lastDate].res;
+    if (daysSince <= 2 && lastRES >= 85) healthDays = Math.max(healthDays, 2);
+    else if (daysSince <= 1 && lastRES >= 70) healthDays = Math.max(healthDays, 1);
+  }
+
+  healthDays = Math.min(healthDays, 14);
+
+  // ── Progress gate ──────────────────────────────────────────────────────
+  const rate = progressMax > 0 ? progressCount / progressMax : 0;
+  let progressDays = 0;
+  let progressReason = '';
+
+  if (rate >= 1.0) {
+    progressDays = 0; progressReason = 'Project sends complete';
+  } else if (rate >= 0.8) {
+    progressDays = 2; progressReason = `${progressMax - progressCount} more send${progressMax - progressCount !== 1 ? 's' : ''} to unlock`;
+  } else if (rate >= 0.6) {
+    progressDays = 5; progressReason = 'Keep building confidence at this grade';
+  } else if (rate >= 0.3) {
+    progressDays = 10; progressReason = 'Build more base at your project grade first';
+  } else {
+    progressDays = 18; progressReason = 'Focus on volume at your project grade';
+  }
+
+  // ── Combine — health always wins ───────────────────────────────────────
+  const totalDays = Math.max(healthDays, progressDays);
+  const primaryFactor: 'health' | 'progress' | 'ready' =
+    totalDays === 0 ? 'ready' :
+    healthDays >= progressDays ? 'health' : 'progress';
+
+  let reason = '';
+  if (primaryFactor === 'ready') reason = 'Health and progress look good — go send it!';
+  else if (primaryFactor === 'health') {
+    if (injury < 50) reason = 'Let your body heal before a max effort';
+    else if (chi < 45) reason = 'Prioritize recovery before projecting';
+    else reason = 'A few more recovery days before a project attempt';
+  } else {
+    reason = progressReason;
+  }
+
+  const recommendedDate = new Date(today);
+  recommendedDate.setDate(recommendedDate.getDate() + totalDays);
+
+  return { totalDays, healthDays, progressDays, primaryFactor, recommendedDate, reason, progressRate: rate };
+}
+
 function computeCheckInStreak(checkIns: Record<string, any>): { current: number; last7: boolean[] } {
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -460,6 +540,7 @@ export default function ProfileScreen() {
   const [showShareCard, setShowShareCard] = useState(false);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ enabled: false, hour: 8, minute: 0 });
   const [currentUser, setCurrentUser] = useState<{ email?: string | null } | null>(null);
+  const [projectReadiness, setProjectReadiness] = useState(null);
 
   const loadData = useCallback(async () => {
     const [prof, sessions, checkIns, alerts, alertPrefs] = await Promise.all([
@@ -496,6 +577,15 @@ export default function ProfileScreen() {
     const goalReached = count >= target;
     setProgressCount(count);
     setShowCongrats(goalReached);
+    const chiResult = computeCHI(sessions, checkIns, alerts);
+    setProjectReadiness(computeProjectReadiness({
+      chiData: chiResult,
+      sessions,
+      checkIns,
+      progressCount: count,
+      progressMax: target,
+      projectGrade: prof.projectGrade,
+    }));
 
     if (goalReached && prof.projectGrade && prof.maxGrade) {
       const currentMaxIndex = V_GRADES.indexOf(prof.maxGrade);
@@ -879,6 +969,66 @@ export default function ProfileScreen() {
                 <Text style={styles.sendsTargetText}>Target: {progressMax} sends · change →</Text>
               </TouchableOpacity>
             </Card>
+
+            {/* Project Send Window */}
+            {totalSessions > 0 && projectReadiness && (() => {
+              const pr = projectReadiness;
+              const isReady = pr.primaryFactor === 'ready';
+              const accentColor = isReady ? C.green : pr.primaryFactor === 'health' ? C.red : C.amber;
+              const bgColor = isReady ? C.greenBg : pr.primaryFactor === 'health' ? C.redBg : C.amberBg;
+              const dateStr = pr.recommendedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+              const healthBarW = `${Math.max(0, Math.min(100, 100 - pr.healthDays * 12))}%`;
+              const progressBarW = `${Math.round(pr.progressRate * 100)}%`;
+              return (
+                <Card label="Project Send Window" accentColor={accentColor} bgColor={bgColor} labelColor={accentColor}>
+                  <View style={{ paddingHorizontal: 20, paddingBottom: 16, paddingTop: 8 }}>
+                    {/* Main date / ready */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: isReady ? 20 : 17, fontWeight: '800', color: accentColor, lineHeight: 22 }}>
+                          {isReady ? 'Ready to send!' : dateStr}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: accentColor + 'bb', marginTop: 3, lineHeight: 17 }}>
+                          {pr.reason}
+                        </Text>
+                      </View>
+                      {!isReady && (
+                        <View style={{ alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: 12, borderWidth: 1.5, borderColor: accentColor + '60', marginLeft: 12 }}>
+                          <Text style={{ fontSize: 20, fontWeight: '900', color: accentColor, lineHeight: 24 }}>{pr.totalDays}</Text>
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: accentColor, letterSpacing: 0.5 }}>DAYS</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Health bar */}
+                    <View style={{ marginBottom: 8 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Recovery readiness</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red }}>
+                          {pr.healthDays === 0 ? 'Clear' : `${pr.healthDays}d needed`}
+                        </Text>
+                      </View>
+                      <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                        <View style={{ height: 5, width: healthBarW, backgroundColor: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red, borderRadius: 3 }} />
+                      </View>
+                    </View>
+
+                    {/* Progress bar */}
+                    <View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Project sends</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red }}>
+                          {Math.round(pr.progressRate * 100)}%
+                        </Text>
+                      </View>
+                      <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                        <View style={{ height: 5, width: progressBarW, backgroundColor: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red, borderRadius: 3 }} />
+                      </View>
+                    </View>
+                  </View>
+                </Card>
+              );
+            })()}
 
             {/* Recovery */}
             {totalSessions > 0 && recovery && (() => {
