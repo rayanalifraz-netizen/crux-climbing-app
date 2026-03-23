@@ -57,6 +57,10 @@ export const configureNotifications = () => {
 
 export const scheduleDailyReminder = async (hour: number, minute: number): Promise<void> => {
   await Notifications.cancelScheduledNotificationAsync('daily-reminder').catch(() => {});
+  const now = new Date();
+  const fireAt = new Date(now);
+  fireAt.setHours(hour, minute, 0, 0);
+  if (fireAt <= now) fireAt.setDate(fireAt.getDate() + 1); // already passed today — schedule for tomorrow
   await Notifications.scheduleNotificationAsync({
     identifier: 'daily-reminder',
     content: {
@@ -65,9 +69,30 @@ export const scheduleDailyReminder = async (hour: number, minute: number): Promi
       sound: true,
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: fireAt,
+    },
+  });
+};
+
+// Call this after a check-in is saved so the reminder fires tomorrow, not again today
+export const rescheduleReminderForTomorrow = async (): Promise<void> => {
+  const settings = await getReminderSettings();
+  if (!settings.enabled) return;
+  await Notifications.cancelScheduledNotificationAsync('daily-reminder').catch(() => {});
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(settings.hour, settings.minute, 0, 0);
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'daily-reminder',
+    content: {
+      title: 'Morning Check-in',
+      body: 'How is your body feeling today? A quick check-in keeps your recovery on track.',
+      sound: true,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: tomorrow,
     },
   });
 };

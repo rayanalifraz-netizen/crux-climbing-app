@@ -5,7 +5,7 @@ import { editStore } from '../../lib/editStore';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
-import { cancelStreakProtection, scheduleStreakProtection } from '../../notifications';
+import { cancelStreakProtection, rescheduleReminderForTomorrow, scheduleStreakProtection } from '../../notifications';
 import { copyMediaToStorage, deleteSessionsByKey, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -227,7 +227,10 @@ export default function CheckInScreen() {
     const persistedUris = await Promise.all(pendingMedia.map(copyMediaToStorage));
     const mergedUris = [...mediaUris, ...persistedUris];
     await saveCheckIn({ date: targetDate, soreness, affectedFingers, painAreas, isRestDay, mediaUris: mergedUris });
-    if (!isEditing) cancelStreakProtection().catch(() => {});
+    if (!isEditing) {
+      cancelStreakProtection().catch(() => {});
+      rescheduleReminderForTomorrow().catch(() => {});
+    }
     setMediaUris(mergedUris);
     setPendingMedia([]);
     const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRestDay);
@@ -242,7 +245,10 @@ export default function CheckInScreen() {
       saveCheckIn({ date: targetDate, soreness: '0', affectedFingers: [], painAreas: [], isRestDay: true }),
       deleteSessionsByKey(targetDate),
     ]);
-    if (!isEditing) cancelStreakProtection().catch(() => {});
+    if (!isEditing) {
+      cancelStreakProtection().catch(() => {});
+      rescheduleReminderForTomorrow().catch(() => {});
+    }
     setIsRestDay(true);
     setDrs(100);
     setMediaUris([]);
