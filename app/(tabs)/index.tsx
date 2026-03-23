@@ -971,7 +971,7 @@ export default function ProfileScreen() {
             </Card>
 
             {/* Project Send Window */}
-            {totalSessions > 0 && projectReadiness && (() => {
+            {projectReadiness && (() => {
               const pr = projectReadiness;
               const isReady = pr.primaryFactor === 'ready';
               const accentColor = isReady ? C.green : pr.primaryFactor === 'health' ? C.red : C.amber;
