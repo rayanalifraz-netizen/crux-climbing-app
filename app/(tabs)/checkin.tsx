@@ -353,7 +353,7 @@ export default function CheckInScreen() {
                       <TouchableOpacity
                         key={level}
                         style={[styles.sorenessBtn, selected && { backgroundColor: color, borderColor: color }]}
-                        onPress={() => { if (!locked) { Haptics.selectionAsync(); setSoreness(level); } }}
+                        onPress={() => { if (!locked) { Haptics.selectionAsync(); setSoreness(level); if (isRestDay) setIsRestDay(false); } }}
                       >
                         <Text style={[styles.sorenessBtnText, selected && { color: '#fff' }]}>{level}</Text>
                       </TouchableOpacity>
