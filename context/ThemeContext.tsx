@@ -73,6 +73,7 @@ export const GRADE_COLORS: Record<string, string> = {
   'V7':'#F4845F','V8':'#F4845F',
   'V9':'#E63946','V10':'#E63946',
   'V11':'#2B2D42','V12':'#2B2D42',
+  'V13+':'#C9A84C',
 };
 export const GRADE_BG_COLORS: Record<string, string> = {
   'VB':'#FDF8E1','V0':'#FDF8E1',
@@ -82,6 +83,7 @@ export const GRADE_BG_COLORS: Record<string, string> = {
   'V7':'#FEF2EC','V8':'#FEF2EC',
   'V9':'#FEECEE','V10':'#FEECEE',
   'V11':'#EEEEF5','V12':'#EEEEF5',
+  'V13+':'#FDF8E8',
 };
 export function gradeColor(grade: string): string {
   return GRADE_COLORS[grade] || '#8A837A';
@@ -95,6 +97,7 @@ export const V_TO_FONT: Record<string, string> = {
   V3: '6a', V4: '6b', V5: '6c', V6: '7a',
   V7: '7a+',V8: '7b', V9: '7c', V10: '8a',
   V11: '8a+',V12: '8b',
+  'V13+': '8b+',
 };
 
 export const toDisplayGrade = (vGrade: string, system: GradeSystem): string => {
