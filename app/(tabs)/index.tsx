@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Modal, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LayoutAnimation, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
+
+if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 import Svg, { Circle } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
 import { applyReminderSettings, getReminderSettings, saveReminderSettings, type ReminderSettings, scheduleStreakProtection } from '../../notifications';
@@ -16,11 +19,16 @@ const GAUGE_SIZE = (GAUGE_R + GAUGE_SW + 6) * 2;
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 
-function Card({ label, labelColor, accentColor, bgColor, children, style }: {
+function Card({ label, labelColor, accentColor, bgColor, children, style, collapsible, collapsed, onToggle }: {
   label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+  collapsible?: boolean; collapsed?: boolean; onToggle?: () => void;
 }) {
   const { C } = useTheme();
   const hasAccent = !!accentColor;
+  const labelStyle = {
+    fontSize: 10, fontWeight: '700' as const, color: labelColor || C.dust,
+    letterSpacing: 1, textTransform: 'uppercase' as const,
+  };
   return (
     <View style={[{
       backgroundColor: bgColor || C.surface,
@@ -37,19 +45,19 @@ function Card({ label, labelColor, accentColor, bgColor, children, style }: {
       {hasAccent && (
         <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
       )}
-      {label && (
-        <Text style={{
-          fontSize: 10,
-          fontWeight: '700',
-          color: labelColor || C.dust,
-          letterSpacing: 1,
-          textTransform: 'uppercase',
-          paddingHorizontal: hasAccent ? 24 : 20,
-          paddingTop: 18,
-          paddingBottom: 2,
-        }}>{label}</Text>
-      )}
-      {children}
+      {label && (collapsible ? (
+        <TouchableOpacity
+          onPress={onToggle}
+          activeOpacity={0.7}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: hasAccent ? 24 : 20, paddingTop: 16, paddingBottom: collapsed ? 16 : 2 }}
+        >
+          <Text style={labelStyle}>{label}</Text>
+          <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={labelColor || C.dust} />
+        </TouchableOpacity>
+      ) : (
+        <Text style={{ ...labelStyle, paddingHorizontal: hasAccent ? 24 : 20, paddingTop: 18, paddingBottom: 2 }}>{label}</Text>
+      ))}
+      {!collapsed && children}
     </View>
   );
 }
@@ -153,7 +161,7 @@ function computeCHI(sessions, checkIns, injuryAlerts) {
   return { chi, readiness: Math.round(readiness), load: Math.round(load), injury: Math.round(injury) };
 }
 
-function CHICard({ data }) {
+function CHICard({ data, collapsed, onToggle }: { data: any; collapsed?: boolean; onToggle?: () => void }) {
   const { C } = useTheme();
   const { chi, readiness, load, injury } = data;
 
@@ -180,64 +188,69 @@ function CHICard({ data }) {
       elevation: 3, padding: 20,
     }}>
       {/* Title row */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+      <TouchableOpacity onPress={onToggle} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed ? 0 : 8 }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: C.ink, letterSpacing: 0.2 }}>Climber Health Index</Text>
-        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.terra, justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="fitness" size={18} color="#fff" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.terra, justifyContent: 'center', alignItems: 'center' }}>
+            <Ionicons name="fitness" size={18} color="#fff" />
+          </View>
+          <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={C.dust} />
         </View>
-      </View>
+      </TouchableOpacity>
 
-      {/* Gauge */}
-      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <Svg width={GAUGE_SIZE} height={GAUGE_SIZE}>
-          <Circle cx={cx} cy={cy} r={GAUGE_R} fill="none"
-            stroke={C.borderLight} strokeWidth={GAUGE_SW}
-            strokeDasharray={`${arcLength} ${circumference - arcLength}`}
-            strokeLinecap="round"
-            transform={`rotate(135 ${cx} ${cy})`}
-          />
-          <Circle cx={cx} cy={cy} r={GAUGE_R} fill="none"
-            stroke={chiColor} strokeWidth={GAUGE_SW}
-            strokeDasharray={`${filled} ${circumference - filled}`}
-            strokeLinecap="round"
-            transform={`rotate(135 ${cx} ${cy})`}
-          />
-        </Svg>
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 58, fontWeight: '900', color: C.ink, letterSpacing: -2, lineHeight: 62 }}>{chi}</Text>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: chiColor, marginTop: 2 }}>{chiLabel}</Text>
+      {!collapsed && (<>
+        {/* Gauge */}
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <Svg width={GAUGE_SIZE} height={GAUGE_SIZE}>
+            <Circle cx={cx} cy={cy} r={GAUGE_R} fill="none"
+              stroke={C.borderLight} strokeWidth={GAUGE_SW}
+              strokeDasharray={`${arcLength} ${circumference - arcLength}`}
+              strokeLinecap="round"
+              transform={`rotate(135 ${cx} ${cy})`}
+            />
+            <Circle cx={cx} cy={cy} r={GAUGE_R} fill="none"
+              stroke={chiColor} strokeWidth={GAUGE_SW}
+              strokeDasharray={`${filled} ${circumference - filled}`}
+              strokeLinecap="round"
+              transform={`rotate(135 ${cx} ${cy})`}
+            />
+          </Svg>
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 58, fontWeight: '900', color: C.ink, letterSpacing: -2, lineHeight: 62 }}>{chi}</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: chiColor, marginTop: 2 }}>{chiLabel}</Text>
+          </View>
         </View>
-      </View>
 
-      {/* Description */}
-      <Text style={{ textAlign: 'center', color: C.sand, fontSize: 13, lineHeight: 18, marginTop: -12, marginBottom: 20 }}>
-        {chiDesc}
-      </Text>
+        {/* Description */}
+        <Text style={{ textAlign: 'center', color: C.sand, fontSize: 13, lineHeight: 18, marginTop: -12, marginBottom: 20 }}>
+          {chiDesc}
+        </Text>
 
-      {/* Sub-component bars */}
-      <View style={{ gap: 10 }}>
-        {[
-          { label: 'Readiness', value: readiness },
-          { label: 'Load Balance', value: load },
-          { label: 'Injury Status', value: injury },
-        ].map(item => {
-          const barColor = item.value >= 80 ? C.green : item.value >= 55 ? C.amber : C.red;
-          return (
-            <View key={item.label}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>{item.label}</Text>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: barColor }}>{item.value}</Text>
+        {/* Sub-component bars */}
+        <View style={{ gap: 10 }}>
+          {[
+            { label: 'Readiness', value: readiness },
+            { label: 'Load Balance', value: load },
+            { label: 'Injury Status', value: injury },
+          ].map(item => {
+            const barColor = item.value >= 80 ? C.green : item.value >= 55 ? C.amber : C.red;
+            return (
+              <View key={item.label}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>{item.label}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: barColor }}>{item.value}</Text>
+                </View>
+                <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ height: 5, width: `${item.value}%`, backgroundColor: barColor, borderRadius: 3 }} />
+                </View>
               </View>
-              <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
-                <View style={{ height: 5, width: `${item.value}%`, backgroundColor: barColor, borderRadius: 3 }} />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-      <Text style={{ fontSize: 10, color: C.dust, marginTop: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 15 }}>
-        For informational purposes only. Not a substitute for professional medical advice. Always consult a doctor or physio for injuries.
-      </Text>
+            );
+          })}
+        </View>
+        <Text style={{ fontSize: 10, color: C.dust, marginTop: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 15 }}>
+          For informational purposes only. Not a substitute for professional medical advice. Always consult a doctor or physio for injuries.
+        </Text>
+      </>)}
     </View>
   );
 }
@@ -541,6 +554,22 @@ export default function ProfileScreen() {
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ enabled: false, hour: 8, minute: 0 });
   const [currentUser, setCurrentUser] = useState<{ email?: string | null } | null>(null);
   const [projectReadiness, setProjectReadiness] = useState(null);
+  const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    AsyncStorage.getItem('collapsedCards').then(v => {
+      if (v) setCollapsedCards(JSON.parse(v));
+    }).catch(() => {});
+  }, []);
+
+  const toggleCard = useCallback((key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCollapsedCards(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      AsyncStorage.setItem('collapsedCards', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
 
   const loadData = useCallback(async () => {
     const [prof, sessions, checkIns, alerts, alertPrefs] = await Promise.all([
@@ -886,11 +915,11 @@ export default function ProfileScreen() {
             )}
 
             {/* CHI */}
-            {(totalSessions > 0 || totalCheckIns > 0) && chiData && <CHICard data={chiData} />}
+            {(totalSessions > 0 || totalCheckIns > 0) && chiData && <CHICard data={chiData} collapsed={!!collapsedCards.chi} onToggle={() => toggleCard('chi')} />}
 
             {/* Streak */}
             {streak !== null && (
-              <Card label="Check-in Streak" style={{ marginTop: 8 }}>
+              <Card label="Check-in Streak" style={{ marginTop: 8 }} collapsible collapsed={!!collapsedCards.streak} onToggle={() => toggleCard('streak')}>
                 <View style={styles.streakInner}>
                   <View style={styles.streakLeft}>
                     <View style={styles.streakNumRow}>
@@ -923,7 +952,7 @@ export default function ProfileScreen() {
             )}
 
             {/* Grade Hero */}
-            <Card label="Current Status" style={{ marginTop: 8 }}>
+            <Card label="Current Status" style={{ marginTop: 8 }} collapsible collapsed={!!collapsedCards.status} onToggle={() => toggleCard('status')}>
               <View style={styles.gradeHeroInner}>
                 <View style={styles.gradeHeroCol}>
                   <Text style={styles.gradeEyebrow}>LEVEL</Text>
@@ -944,7 +973,7 @@ export default function ProfileScreen() {
             </Card>
 
             {/* Progress */}
-            <Card label="Project Progress" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra}>
+            <Card label="Project Progress" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra} collapsible collapsed={!!collapsedCards.progress} onToggle={() => toggleCard('progress')}>
               <View style={styles.progressInner}>
                 <View style={styles.progressTopRow}>
                   <View>
@@ -980,7 +1009,7 @@ export default function ProfileScreen() {
               const healthBarW = `${Math.max(0, Math.min(100, 100 - pr.healthDays * 12))}%`;
               const progressBarW = `${Math.round(pr.progressRate * 100)}%`;
               return (
-                <Card label="Project Send Window" accentColor={accentColor} bgColor={bgColor} labelColor={accentColor}>
+                <Card label="Project Send Window" accentColor={accentColor} bgColor={bgColor} labelColor={accentColor} collapsible collapsed={!!collapsedCards.sendWindow} onToggle={() => toggleCard('sendWindow')}>
                   <View style={{ paddingHorizontal: 20, paddingBottom: 16, paddingTop: 8 }}>
                     {/* Main date / ready */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -1038,7 +1067,7 @@ export default function ProfileScreen() {
                   ? { color: C.red, bg: C.redBg, border: C.redBorder }
                   : { color: C.amber, bg: C.amberBg, border: C.amberBorder };
               return (
-                <Card label="Recovery" accentColor={rc.color} bgColor={rc.bg} labelColor={rc.color}>
+                <Card label="Recovery" accentColor={rc.color} bgColor={rc.bg} labelColor={rc.color} collapsible collapsed={!!collapsedCards.recovery} onToggle={() => toggleCard('recovery')}>
                   <View style={styles.recoveryInner}>
                     <View style={styles.recoveryTopRow}>
                       <View style={{ flex: 1 }}>
@@ -1082,7 +1111,7 @@ export default function ProfileScreen() {
 
             {/* Weekly */}
             {totalSessions > 0 && weeklySummary && (
-              <Card label="This Week">
+              <Card label="This Week" collapsible collapsed={!!collapsedCards.thisWeek} onToggle={() => toggleCard('thisWeek')}>
                 <View style={styles.weeklyInner}>
                   {[
                     { val: weeklySummary.sessionCount, label: 'sessions', color: C.ink },
@@ -1103,7 +1132,7 @@ export default function ProfileScreen() {
             )}
 
             {/* Stats */}
-            <Card label="All Time">
+            <Card label="All Time" collapsible collapsed={!!collapsedCards.allTime} onToggle={() => toggleCard('allTime')}>
               <View style={styles.statsInner}>
                 {[
                   { label: 'Sessions', val: totalSessions },
@@ -1123,7 +1152,7 @@ export default function ProfileScreen() {
 
         {/* Reminders */}
         {profile && (
-          <Card label="Reminders">
+          <Card label="Reminders" collapsible collapsed={!!collapsedCards.reminders} onToggle={() => toggleCard('reminders')}>
             <View style={styles.reminderInner}>
               <TouchableOpacity style={styles.reminderToggleRow} onPress={handleReminderToggle}>
                 <View style={{ flex: 1 }}>
