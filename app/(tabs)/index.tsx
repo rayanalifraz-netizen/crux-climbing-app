@@ -441,7 +441,7 @@ function TrendChart({ sessions, checkIns, days }: { sessions: Record<string, any
       return {
         drs,
         res: sess?.res ?? null,
-        label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        label: d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2),
         isToday: i === days - 1,
       };
     });
