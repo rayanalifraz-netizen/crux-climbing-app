@@ -465,7 +465,7 @@ function TrendChart({ sessions, checkIns, days }: { sessions: Record<string, any
   const barColor = (drs: number) => drs >= 70 ? C.green : drs >= 40 ? C.amber : C.red;
   const resColor = (res: number) => res >= 75 ? C.red : res >= 50 ? C.amber : C.green;
 
-  const labelStep = days <= 14 ? 2 : 7;
+  const labelStep = days <= 14 ? 1 : 4;
 
   return (
     <Svg width={CHART_W} height={TOTAL_H}>
