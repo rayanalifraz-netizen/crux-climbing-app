@@ -507,7 +507,7 @@ function TrendChart({ sessions, checkIns, days }: { sessions: Record<string, any
         return (
           <SvgText key={'x' + i} x={barX(i) + barW / 2} y={BAR_TOP + BAR_H + 14}
             fontSize={8} fill={pt.isToday ? C.terra : C.dust} fontWeight={pt.isToday ? '800' : '400'} textAnchor="middle">
-            {pt.isToday ? 'Today' : pt.label}
+            {pt.isToday ? 'Td' : pt.label}
           </SvgText>
         );
       })}
