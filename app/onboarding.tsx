@@ -21,7 +21,7 @@ const FEATURE_SLIDES = [
     tag: 'Session Tracking',
     title: 'Know the Real Cost of Every Session',
     body: 'Log grades and hold types after each climb. Your Relative Effort Score (RES) cuts through guesswork — so you stop repeating the sessions that broke you.',
-    stat: '73% of climbing injuries come from doing too much, too soon.',
+    stat: 'Overuse — not a single bad fall — is the leading cause of climbing injury. It builds up across sessions, invisibly.',
     statIcon: 'alert-circle-outline' as const,
   },
   {
@@ -31,7 +31,7 @@ const FEATURE_SLIDES = [
     tag: 'Daily Check-In',
     title: 'Catch Problems Before They Become Injuries',
     body: 'A 30-second morning check-in tracks soreness, pain areas, and finger condition. Your Daily Readiness Score tells you exactly when to push and when to hold back.',
-    stat: 'Climbers who track body signals recover 2× faster.',
+    stat: 'Most climbers only notice something is wrong once it\'s already an injury. Daily tracking catches the warning signs first.',
     statIcon: 'flash-outline' as const,
   },
   {
@@ -41,7 +41,7 @@ const FEATURE_SLIDES = [
     tag: 'Climber Health Index',
     title: 'One Score. Total Clarity.',
     body: 'CHI combines your readiness, training load, and injury signals into a single number. No more second-guessing — you always know if today is a send day or a rest day.',
-    stat: 'Consistent check-ins improve performance plateaus in 4–6 weeks.',
+    stat: 'The climbers who improve fastest aren\'t the ones who train hardest — they\'re the ones who train consistently without getting hurt.',
     statIcon: 'ribbon-outline' as const,
   },
 ];
@@ -142,9 +142,9 @@ export default function OnboardingScreen() {
             </View>
             <View style={s.welcomeHook}>
               <View style={s.hookCard}>
-                <Text style={s.hookStat}>1 in 2</Text>
+                <Text style={s.hookStat}>Most climbing injuries are preventable.</Text>
                 <Text style={s.hookDesc}>
-                  boulderers get injured every year — almost always from poor load management.{'\n\n'}
+                  They don't happen in a single session — they build up over weeks of ignoring what your body is already telling you.{'\n\n'}
                   Crux is the daily habit that keeps you climbing.
                 </Text>
               </View>
@@ -179,7 +179,7 @@ export default function OnboardingScreen() {
               </View>
               <Text style={s.featureTitle}>Build the Habit</Text>
               <Text style={s.featureBody}>
-                A daily check-in takes 30 seconds. Climbers with reminders log 4× more consistently — and catch injuries before they happen.
+                A daily check-in takes 30 seconds. The hardest part is remembering to do it — a reminder makes it automatic so the habit actually sticks.
               </Text>
             </View>
 
@@ -337,7 +337,7 @@ const s = StyleSheet.create({
   welcomeTag: { fontSize: 14, color: '#8A837A', fontWeight: '600', letterSpacing: 0.5, textAlign: 'center' },
   welcomeHook: { paddingHorizontal: 28, paddingBottom: 28 },
   hookCard: { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3 },
-  hookStat: { fontSize: 48, fontWeight: '900', color: '#C8622A', letterSpacing: -2, marginBottom: 10 },
+  hookStat: { fontSize: 22, fontWeight: '900', color: '#C8622A', letterSpacing: -0.3, marginBottom: 10, lineHeight: 28 },
   hookDesc: { fontSize: 14, color: '#8A837A', lineHeight: 22 },
 
   // Feature slides
