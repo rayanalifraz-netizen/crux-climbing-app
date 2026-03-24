@@ -504,6 +504,7 @@ function TrendChart({ sessions, checkIns, days }: { sessions: Record<string, any
       {/* ── X-axis day labels ── */}
       {data.map((pt, i) => {
         if (i % labelStep !== 0 && !pt.isToday) return null;
+        if (!pt.isToday && days - 1 - i < 3) return null; // skip labels crowding "Today"
         return (
           <SvgText key={'x' + i} x={barX(i) + barW / 2} y={BAR_TOP + BAR_H + 14}
             fontSize={8} fill={pt.isToday ? C.terra : C.dust} fontWeight={pt.isToday ? '800' : '400'} textAnchor="middle">
