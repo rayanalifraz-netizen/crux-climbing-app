@@ -418,10 +418,6 @@ function SendsModal({ visible, current, onClose, onSave }) {
 }
 
 const CHART_W = Dimensions.get('window').width - 64;
-const CHART_H = 150;
-const PAD = { l: 28, r: 8, t: 10, b: 22 };
-const DATA_W = CHART_W - PAD.l - PAD.r;
-const DATA_H = CHART_H - PAD.t - PAD.b;
 
 function TrendChart({ sessions, checkIns, days }: { sessions: Record<string, any>; checkIns: Record<string, any>; days: number }) {
   const { C } = useTheme();
@@ -436,84 +432,99 @@ function TrendChart({ sessions, checkIns, days }: { sessions: Record<string, any
       const sess = sessions[ds];
       let drs: number | null = null;
       if (ci) {
-        if (ci.isRestDay) {
-          drs = 100;
-        } else {
-          const s = parseInt(ci.soreness || '0');
-          const p = ci.painAreas?.length || 0;
-          const f = ci.affectedFingers?.length || 0;
-          drs = Math.max(0, Math.min(100, 100 - s * 5 - p * 10 - f * 5));
-        }
+        drs = ci.isRestDay ? 100 : Math.max(0, Math.min(100,
+          100 - parseInt(ci.soreness || '0') * 5
+              - (ci.painAreas?.length || 0) * 10
+              - (ci.affectedFingers?.length || 0) * 5
+        ));
       }
-      return { ds, drs, res: sess?.res ?? null, label: d.toLocaleDateString('en-US', { weekday: 'short' }), dayNum: d.getDate() };
+      return {
+        drs,
+        res: sess?.res ?? null,
+        label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        isToday: i === days - 1,
+      };
     });
   }, [sessions, checkIns, days]);
 
-  const xFor = (i: number) => PAD.l + (i / (days - 1)) * DATA_W;
-  const yFor = (v: number) => PAD.t + (1 - v / 100) * DATA_H;
+  // Layout constants
+  const PAD_L = 42;   // space for zone labels
+  const PAD_R = 8;
+  const BAR_TOP = 8;
+  const BAR_H = 90;   // max bar height
+  const X_LABEL_H = 20;
+  const SEP_Y = BAR_TOP + BAR_H + X_LABEL_H + 6;
+  const SESS_Y = SEP_Y + 14;
+  const SESS_H = 20;
+  const TOTAL_H = SESS_Y + SESS_H + 10;
 
-  // Build DRS path — break on missing days
-  let drsPath = '';
-  let pen = false;
-  data.forEach((pt, i) => {
-    if (pt.drs !== null) {
-      drsPath += `${pen ? 'L' : 'M'} ${xFor(i).toFixed(1)} ${yFor(pt.drs).toFixed(1)} `;
-      pen = true;
-    } else { pen = false; }
-  });
+  const dataW = CHART_W - PAD_L - PAD_R;
+  const slotW = dataW / days;
+  const barW = Math.max(slotW - (days <= 14 ? 3 : 1.5), 4);
+  const barX = (i: number) => PAD_L + i * slotW + (slotW - barW) / 2;
+  const barColor = (drs: number) => drs >= 70 ? C.green : drs >= 40 ? C.amber : C.red;
+  const resColor = (res: number) => res >= 75 ? C.red : res >= 50 ? C.amber : C.green;
 
   const labelStep = days <= 14 ? 2 : 7;
 
   return (
-    <Svg width={CHART_W} height={CHART_H}>
-      <Defs>
-        <LinearGradient id="greenZone" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={C.green} stopOpacity={0.12} />
-          <Stop offset="1" stopColor={C.green} stopOpacity={0.04} />
-        </LinearGradient>
-        <LinearGradient id="redZone" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={C.red} stopOpacity={0.04} />
-          <Stop offset="1" stopColor={C.red} stopOpacity={0.12} />
-        </LinearGradient>
-      </Defs>
+    <Svg width={CHART_W} height={TOTAL_H}>
 
-      {/* Zone bands */}
-      <Rect x={PAD.l} y={PAD.t} width={DATA_W} height={DATA_H * 0.3} fill="url(#greenZone)" />
-      <Rect x={PAD.l} y={PAD.t + DATA_H * 0.6} width={DATA_W} height={DATA_H * 0.4} fill="url(#redZone)" />
+      {/* ── Zone labels on left ── */}
+      <SvgText x={PAD_L - 4} y={BAR_TOP + 8} fontSize={8} fontWeight="700" fill={C.green} textAnchor="end">Good</SvgText>
+      <SvgText x={PAD_L - 4} y={BAR_TOP + BAR_H * 0.42} fontSize={8} fontWeight="700" fill={C.amber} textAnchor="end">OK</SvgText>
+      <SvgText x={PAD_L - 4} y={BAR_TOP + BAR_H * 0.78} fontSize={8} fontWeight="700" fill={C.red} textAnchor="end">Low</SvgText>
 
-      {/* Grid lines */}
-      {[100, 70, 40, 0].map(v => (
-        <Line key={v} x1={PAD.l} y1={yFor(v)} x2={PAD.l + DATA_W} y2={yFor(v)}
-          stroke={C.borderLight} strokeWidth={1} />
-      ))}
+      {/* ── Threshold guide lines ── */}
+      <Line x1={PAD_L} y1={BAR_TOP + BAR_H * 0.3} x2={PAD_L + dataW} y2={BAR_TOP + BAR_H * 0.3}
+        stroke={C.green} strokeWidth={0.75} strokeDasharray="3,3" opacity={0.5} />
+      <Line x1={PAD_L} y1={BAR_TOP + BAR_H * 0.6} x2={PAD_L + dataW} y2={BAR_TOP + BAR_H * 0.6}
+        stroke={C.amber} strokeWidth={0.75} strokeDasharray="3,3" opacity={0.5} />
 
-      {/* Session RES dots */}
-      {data.map((pt, i) => pt.res !== null && (
-        <Circle key={'r' + i} cx={xFor(i)} cy={yFor(pt.res)} r={4}
-          fill={C.blueBg} stroke={C.blue} strokeWidth={1.5} />
-      ))}
-
-      {/* DRS line */}
-      {drsPath ? <Path d={drsPath} stroke={C.terra} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
-
-      {/* DRS dots */}
-      {data.map((pt, i) => pt.drs !== null && (
-        <Circle key={'d' + i} cx={xFor(i)} cy={yFor(pt.drs)} r={3.5}
-          fill={C.terra} stroke={C.surface} strokeWidth={1.5} />
-      ))}
-
-      {/* Y labels */}
-      {[100, 70, 40].map(v => (
-        <SvgText key={'y' + v} x={PAD.l - 4} y={yFor(v) + 3} fontSize={8} fill={C.dust} textAnchor="end">{v}</SvgText>
-      ))}
-
-      {/* X labels */}
+      {/* ── Bars ── */}
       {data.map((pt, i) => {
-        if (i % labelStep !== 0 && i !== days - 1) return null;
+        const x = barX(i);
+        const bh = pt.drs !== null ? (pt.drs / 100) * BAR_H : 0;
+        const by = BAR_TOP + BAR_H - bh;
+        const color = pt.drs !== null ? barColor(pt.drs) : C.borderLight;
+        const isEmpty = pt.drs === null;
         return (
-          <SvgText key={'x' + i} x={xFor(i)} y={CHART_H - 4} fontSize={8} fill={C.dust} textAnchor="middle">
-            {pt.label}
+          <Rect
+            key={i}
+            x={x} y={isEmpty ? BAR_TOP : by}
+            width={barW} height={isEmpty ? BAR_H : bh}
+            rx={days <= 14 ? 3 : 2}
+            fill={isEmpty ? 'transparent' : color + 'cc'}
+            stroke={isEmpty ? C.borderLight : color}
+            strokeWidth={isEmpty ? 1 : 0}
+          />
+        );
+      })}
+
+      {/* ── X-axis day labels ── */}
+      {data.map((pt, i) => {
+        if (i % labelStep !== 0 && !pt.isToday) return null;
+        return (
+          <SvgText key={'x' + i} x={barX(i) + barW / 2} y={BAR_TOP + BAR_H + 14}
+            fontSize={8} fill={pt.isToday ? C.terra : C.dust} fontWeight={pt.isToday ? '800' : '400'} textAnchor="middle">
+            {pt.isToday ? 'Today' : pt.label}
           </SvgText>
+        );
+      })}
+
+      {/* ── Session row separator + label ── */}
+      <Line x1={PAD_L} y1={SEP_Y} x2={PAD_L + dataW} y2={SEP_Y} stroke={C.borderLight} strokeWidth={1} />
+      <SvgText x={PAD_L - 4} y={SESS_Y + SESS_H / 2 + 4} fontSize={8} fontWeight="700" fill={C.dust} textAnchor="end">Climb</SvgText>
+
+      {/* ── Session dots ── */}
+      {data.map((pt, i) => {
+        if (pt.res === null) return null;
+        const cx = barX(i) + barW / 2;
+        const cy = SESS_Y + SESS_H / 2;
+        const color = resColor(pt.res);
+        return (
+          <Circle key={'s' + i} cx={cx} cy={cy} r={days <= 14 ? 5 : 3.5}
+            fill={color + 'aa'} stroke={color} strokeWidth={1.5} />
         );
       })}
     </Svg>
@@ -909,14 +920,7 @@ export default function ProfileScreen() {
               <Card label="Trends" style={{ marginTop: 8 }} collapsible collapsed={!!collapsedCards.trends} onToggle={() => toggleCard('trends')}>
                 <View style={styles.trendInner}>
                   <View style={styles.trendTopRow}>
-                    <View style={styles.trendLegend}>
-                      {[{ color: C.terra, label: 'Readiness' }, { color: C.blue, label: 'Session RES' }].map(({ color, label }) => (
-                        <View key={label} style={styles.trendLegendItem}>
-                          <View style={[styles.trendLegendDot, { backgroundColor: color }]} />
-                          <Text style={styles.trendLegendText}>{label}</Text>
-                        </View>
-                      ))}
-                    </View>
+                    <Text style={styles.trendSubtitle}>How your body felt each day · climbing sessions below</Text>
                     <View style={styles.trendWindowBtns}>
                       {[14, 30].map(d => (
                         <TouchableOpacity key={d} style={[styles.trendWindowBtn, trendDays === d && styles.trendWindowBtnActive]} onPress={() => setTrendDays(d)}>
@@ -1354,11 +1358,8 @@ function makeStyles(C) {
     shareBtnText: { fontSize: 12, fontWeight: '600', color: C.sand, letterSpacing: 0.3 },
 
     trendInner: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 10 },
-    trendTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-    trendLegend: { flexDirection: 'row', gap: 14 },
-    trendLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    trendLegendDot: { width: 8, height: 8, borderRadius: 4 },
-    trendLegendText: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 0.3 },
+    trendTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 },
+    trendSubtitle: { flex: 1, fontSize: 11, color: C.dust, lineHeight: 15 },
     trendWindowBtns: { flexDirection: 'row', gap: 5 },
     trendWindowBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: C.surfaceAlt },
     trendWindowBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
