@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { editStore } from '../../lib/editStore';
 import { useCallback, useMemo, useState } from 'react';
-import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { cancelStreakProtection, rescheduleReminderForTomorrow, scheduleStreakProtection } from '../../notifications';
 import { copyMediaToStorage, deleteSessionsByKey, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
@@ -146,6 +146,7 @@ export default function CheckInScreen() {
   const [recentSessions, setRecentSessions] = useState([]);
   const [injuryAlerts, setInjuryAlerts] = useState([]);
   const [alertSettings, setAlertSettings] = useState({ injuryOverload: true });
+  const [notes, setNotes] = useState('');
   const [mediaUris, setMediaUris] = useState<string[]>([]);
   const [pendingMedia, setPendingMedia] = useState<string[]>([]);
   const [showShareCard, setShowShareCard] = useState(false);
@@ -179,6 +180,7 @@ export default function CheckInScreen() {
       setPainAreas(ci.painAreas || []);
       setIsRestDay(ci.isRestDay || false);
       setMediaUris(ci.mediaUris || []);
+      setNotes(ci.notes || '');
       setDrs(calculateDRS(ci.soreness, ci.painAreas, ci.affectedFingers, last7, ci.isRestDay));
     } else {
       setAlreadyCheckedIn(false);
@@ -188,6 +190,7 @@ export default function CheckInScreen() {
       setIsRestDay(false);
       setMediaUris([]);
       setPendingMedia([]);
+      setNotes('');
       setDrs(null);
     }
   };
@@ -227,7 +230,7 @@ export default function CheckInScreen() {
     const persistedUris = await Promise.all(pendingMedia.map(copyMediaToStorage));
     const mergedUris = [...mediaUris, ...persistedUris];
     if (isRestDay) await deleteSessionsByKey(targetDate);
-    await saveCheckIn({ date: targetDate, soreness, affectedFingers, painAreas, isRestDay, mediaUris: mergedUris });
+    await saveCheckIn({ date: targetDate, soreness, affectedFingers, painAreas, isRestDay, mediaUris: mergedUris, notes: notes.trim() || undefined });
     if (!isEditing) {
       cancelStreakProtection().catch(() => {});
       rescheduleReminderForTomorrow().catch(() => {});
@@ -406,6 +409,30 @@ export default function CheckInScreen() {
               </View>
             </Card>
 
+            {/* Notes */}
+            <Card label="Notes · optional" accentColor={C.dust} bgColor={C.surface} labelColor={C.dust}>
+              <View style={styles.sectionInner}>
+                {locked ? (
+                  notes ? (
+                    <Text style={styles.notesText}>{notes}</Text>
+                  ) : (
+                    <Text style={styles.notesPlaceholder}>No notes logged</Text>
+                  )
+                ) : (
+                  <TextInput
+                    style={styles.notesInput}
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="How did you feel? Any tweaks, tightness, or wins..."
+                    placeholderTextColor={C.dust}
+                    multiline
+                    numberOfLines={3}
+                    maxLength={500}
+                  />
+                )}
+              </View>
+            </Card>
+
             {/* Photos */}
             <Card label="Photos · optional" accentColor={C.dust} bgColor={C.surface} labelColor={C.dust}>
               <View style={styles.sectionInner}>
@@ -578,6 +605,10 @@ function makeStyles(C) {
 
     shareCardBtn: { marginHorizontal: 16, marginBottom: 14, borderWidth: 1, borderColor: C.borderLight, borderRadius: 12, padding: 14, alignItems: 'center' },
     shareCardBtnText: { fontSize: 12, fontWeight: '700', color: C.sand, letterSpacing: 0.3 },
+
+    notesInput: { color: C.ink, fontSize: 13, lineHeight: 20, minHeight: 72, textAlignVertical: 'top', paddingTop: 2 },
+    notesText: { color: C.inkLight, fontSize: 13, lineHeight: 20 },
+    notesPlaceholder: { color: C.dust, fontSize: 12, fontStyle: 'italic' },
 
     mediaThumbnailWrap: { position: 'relative' },
     mediaThumbnail: { width: 88, height: 88, borderRadius: 10, backgroundColor: C.borderLight },

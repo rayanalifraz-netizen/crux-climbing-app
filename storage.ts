@@ -19,6 +19,16 @@ export type CheckIn = {
   painAreas: string[];
   isRestDay?: boolean;
   mediaUris?: string[];
+  notes?: string;
+};
+
+export type InjuryEntry = {
+  id: string;
+  partId: string;
+  partName: string;
+  note: string;
+  date: string;
+  resolved: boolean;
 };
 
 export type UserProfile = {
@@ -348,4 +358,27 @@ export const getInjuryAlerts = async (windowDays = 14): Promise<BodyAlert[]> => 
     console.error('Error computing injury alerts', e);
     return [];
   }
+};
+
+// ─── Injury Log ───────────────────────────────────────────────────────────────
+
+export const getInjuryLog = async (): Promise<InjuryEntry[]> => {
+  try {
+    const data = await AsyncStorage.getItem('injuryLog');
+    return data ? JSON.parse(data) : [];
+  } catch { return []; }
+};
+
+export const saveInjuryLog = async (log: InjuryEntry[]): Promise<void> => {
+  await AsyncStorage.setItem('injuryLog', JSON.stringify(log));
+};
+
+export const addInjuryEntry = async (entry: InjuryEntry): Promise<void> => {
+  const log = await getInjuryLog();
+  await saveInjuryLog([...log, entry]);
+};
+
+export const resolveInjuryEntry = async (id: string): Promise<void> => {
+  const log = await getInjuryLog();
+  await saveInjuryLog(log.map(e => e.id === id ? { ...e, resolved: true } : e));
 };

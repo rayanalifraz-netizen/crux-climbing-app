@@ -1,8 +1,9 @@
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
-import { getAlertSettings, getCheckIns, getSessions } from '../../storage';
+import { Dimensions, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
+import { InjuryEntry, addInjuryEntry, getAlertSettings, getCheckIns, getInjuryLog, getSessions, resolveInjuryEntry } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -98,10 +99,11 @@ function Card({ label, labelColor, accentColor, bgColor, children, style }: {
   );
 }
 
-function BodyDiagram({ loads }) {
+function BodyDiagram({ loads, injuries, onPartPress }: { loads: any; injuries: InjuryEntry[]; onPartPress: (part: typeof BODY_PARTS[0]) => void }) {
   const { C } = useTheme();
   const W = DIAGRAM_WIDTH;
   const H = DIAGRAM_HEIGHT;
+  const activePartIds = new Set(injuries.filter(i => !i.resolved).map(i => i.partId));
   const cx = W / 2;
 
   // Body proportions
@@ -194,35 +196,27 @@ function BodyDiagram({ loads }) {
         const px = part.x * W;
         const py = part.y * H;
         const r = part.radius * W;
+        const isInjured = activePartIds.has(part.id);
 
         return (
-          <Circle
-            key={part.id}
-            cx={px}
-            cy={py}
-            r={r}
-            fill={color + '55'}
-            stroke={color}
-            strokeWidth={2}
-          />
-        );
-      })}
-
-      {/* ── Load numbers on hotspots ── */}
-      {BODY_PARTS.map((part) => {
-        const load = loads[part.id] || 0;
-        const thresholds = THRESHOLDS[part.id];
-        const color = getColor(C, load, thresholds);
-        const px = part.x * W;
-        const py = part.y * H;
-
-        return (
-          <Circle
-            key={part.id + '_num'}
-            cx={px}
-            cy={py}
-            r={0}
-          />
+          <G key={part.id} onPress={() => onPartPress(part)}>
+            <Circle
+              cx={px}
+              cy={py}
+              r={r}
+              fill={isInjured ? C.red + '33' : color + '55'}
+              stroke={isInjured ? C.red : color}
+              strokeWidth={isInjured ? 2.5 : 2}
+            />
+            {isInjured && (
+              <>
+                <Line x1={px - r * 0.4} y1={py - r * 0.4} x2={px + r * 0.4} y2={py + r * 0.4}
+                  stroke={C.red} strokeWidth={2} strokeLinecap="round" />
+                <Line x1={px + r * 0.4} y1={py - r * 0.4} x2={px - r * 0.4} y2={py + r * 0.4}
+                  stroke={C.red} strokeWidth={2} strokeLinecap="round" />
+              </>
+            )}
+          </G>
         );
       })}
     </Svg>
@@ -236,8 +230,17 @@ export default function HeatmapScreen() {
   const [window, setWindow] = useState(14);
   const [lastUpdated, setLastUpdated] = useState('');
   const [alertSettings, setAlertSettings] = useState({ bodyHighLoad: true });
+  const [injuryLog, setInjuryLog] = useState<InjuryEntry[]>([]);
+  const [selectedPart, setSelectedPart] = useState<typeof BODY_PARTS[0] | null>(null);
+  const [injuryNote, setInjuryNote] = useState('');
+  const [showInjuryModal, setShowInjuryModal] = useState(false);
 
-  useFocusEffect(useCallback(() => { computeLoads(); }, [window]));
+  useFocusEffect(useCallback(() => { loadAll(); }, [window]));
+
+  const loadAll = async () => {
+    const [log] = await Promise.all([getInjuryLog(), computeLoads()]);
+    setInjuryLog(log as InjuryEntry[]);
+  };
 
   const computeLoads = async () => {
     const [sessions, checkIns, alertPrefs] = await Promise.all([getSessions(), getCheckIns(), getAlertSettings()]);
@@ -287,6 +290,37 @@ export default function HeatmapScreen() {
     setLoads(counts);
     setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
   };
+
+  const handlePartPress = (part: typeof BODY_PARTS[0]) => {
+    Haptics.selectionAsync();
+    setSelectedPart(part);
+    setInjuryNote('');
+    setShowInjuryModal(true);
+  };
+
+  const handleLogInjury = async () => {
+    if (!selectedPart) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const entry: InjuryEntry = {
+      id: Date.now().toString(),
+      partId: selectedPart.id,
+      partName: selectedPart.label,
+      note: injuryNote.trim(),
+      date: new Date().toISOString().split('T')[0],
+      resolved: false,
+    };
+    await addInjuryEntry(entry);
+    setInjuryLog(prev => [...prev, entry]);
+    setShowInjuryModal(false);
+  };
+
+  const handleResolve = async (id: string) => {
+    Haptics.selectionAsync();
+    await resolveInjuryEntry(id);
+    setInjuryLog(prev => prev.map(e => e.id === id ? { ...e, resolved: true } : e));
+  };
+
+  const activeInjuries = injuryLog.filter(e => !e.resolved);
 
   const totalLoad = Object.values(loads).reduce((a, b) => a + b, 0);
   const highParts = BODY_PARTS.filter(p => {
@@ -342,11 +376,11 @@ export default function HeatmapScreen() {
 
         {/* Body Diagram */}
         <Card
-          label="Front View"
+          label="Front View — tap a zone to log an injury"
           style={{ marginHorizontal: 16 }}
         >
           <View style={styles.diagramInner}>
-            <BodyDiagram loads={loads} />
+            <BodyDiagram loads={loads} injuries={injuryLog} onPartPress={handlePartPress} />
           </View>
         </Card>
 
@@ -423,8 +457,61 @@ export default function HeatmapScreen() {
           </View>
         </Card>
 
+        {/* Active Injuries */}
+        {activeInjuries.length > 0 && (
+          <Card label="Active Injuries" accentColor={C.red} bgColor={C.redBg} labelColor={C.red} style={{ marginHorizontal: 16 }}>
+            <View style={styles.injuryListInner}>
+              {activeInjuries.map((entry, i) => (
+                <View key={entry.id}>
+                  {i > 0 && <View style={styles.injuryDivider} />}
+                  <View style={styles.injuryRow}>
+                    <View style={styles.injuryInfo}>
+                      <Text style={styles.injuryPart}>{entry.partName}</Text>
+                      <Text style={styles.injuryDate}>{entry.date}</Text>
+                      {entry.note ? <Text style={styles.injuryNote}>{entry.note}</Text> : null}
+                    </View>
+                    <TouchableOpacity style={styles.resolveBtn} onPress={() => handleResolve(entry.id)}>
+                      <Text style={styles.resolveBtnText}>Resolved</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Card>
+        )}
+
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      {/* Injury Log Modal */}
+      <Modal visible={showInjuryModal} transparent animationType="slide" onRequestClose={() => setShowInjuryModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Log Injury</Text>
+            <Text style={styles.modalPart}>{selectedPart?.label}</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={injuryNote}
+              onChangeText={setInjuryNote}
+              placeholder="Describe what happened (optional)..."
+              placeholderTextColor={C.dust}
+              multiline
+              numberOfLines={3}
+              maxLength={300}
+              autoFocus
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowInjuryModal(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={handleLogInjury}>
+                <Text style={styles.modalConfirmText}>Log Injury</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -474,5 +561,27 @@ function makeStyles(C) {
     summaryBig: { fontSize: 32, fontWeight: '800', color: C.ink, letterSpacing: -1, lineHeight: 36 },
     summarySmall: { fontSize: 9, fontWeight: '600', color: C.dust, marginTop: 2 },
     summaryDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 8 },
+
+    injuryListInner: { padding: 16, paddingTop: 14 },
+    injuryDivider: { height: 1, backgroundColor: C.redBorder + '55', marginVertical: 8 },
+    injuryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    injuryInfo: { flex: 1 },
+    injuryPart: { fontSize: 13, fontWeight: '800', color: C.red },
+    injuryDate: { fontSize: 10, fontWeight: '600', color: C.red + 'aa', marginTop: 1, letterSpacing: 0.5 },
+    injuryNote: { fontSize: 12, color: C.inkLight, marginTop: 4, lineHeight: 17 },
+    resolveBtn: { borderWidth: 1, borderColor: C.redBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+    resolveBtnText: { fontSize: 10, fontWeight: '800', color: C.red, letterSpacing: 0.5 },
+
+    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+    modalSheet: { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 14 },
+    modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 8 },
+    modalTitle: { fontSize: 22, fontWeight: '800', color: C.ink, letterSpacing: -0.5 },
+    modalPart: { fontSize: 13, fontWeight: '700', color: C.dust, marginTop: -8 },
+    modalInput: { backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.borderLight, borderRadius: 12, padding: 14, color: C.ink, fontSize: 13, lineHeight: 20, minHeight: 80, textAlignVertical: 'top' },
+    modalBtns: { flexDirection: 'row', gap: 10 },
+    modalCancel: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center' },
+    modalCancelText: { fontSize: 13, fontWeight: '700', color: C.sand },
+    modalConfirm: { flex: 2, padding: 14, borderRadius: 12, backgroundColor: C.red, alignItems: 'center' },
+    modalConfirmText: { fontSize: 13, fontWeight: '800', color: '#fff' },
   });
 }
