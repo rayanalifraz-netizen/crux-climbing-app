@@ -317,7 +317,8 @@ export default function HeatmapScreen() {
   const handleResolve = async (id: string) => {
     Haptics.selectionAsync();
     await resolveInjuryEntry(id);
-    setInjuryLog(prev => prev.map(e => e.id === id ? { ...e, resolved: true } : e));
+    const today = new Date().toISOString().split('T')[0];
+    setInjuryLog(prev => prev.map(e => e.id === id ? { ...e, resolved: true, resolvedDate: today } : e));
   };
 
   const activeInjuries = injuryLog.filter(e => !e.resolved);

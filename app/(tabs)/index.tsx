@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, LayoutAnimation, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
 import { applyReminderSettings, getReminderSettings, saveReminderSettings, scheduleInsightNotifications, scheduleStreakProtection, type ReminderSettings } from '../../notifications';
 import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
@@ -593,13 +593,13 @@ export default function ProfileScreen() {
     setInjuryAlerts(alerts);
     setAlertSettings(alertPrefs);
     setRecovery(computeRecovery(sessions, checkIns));
-    setChiData(computeCHI(sessions, checkIns, alerts));
+    const chi = computeCHI(sessions, checkIns, alerts);
+    setChiData(chi);
     setStreak(computeCheckInStreak(checkIns));
     const todayStr = new Date().toISOString().split('T')[0];
     setTodayCheckIn(checkIns[todayStr] || null);
     setReminderSettings(await getReminderSettings());
     if (!checkIns[todayStr]) scheduleStreakProtection().catch(() => {});
-    const chi = computeCHI(sessions, checkIns, alerts);
     scheduleInsightNotifications(chi, sessions, checkIns).catch(() => {});
     setCurrentUser(await getCurrentUser());
 
