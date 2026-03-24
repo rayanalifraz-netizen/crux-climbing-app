@@ -408,24 +408,34 @@ export default function HeatmapScreen() {
               const bgColor = getBgColor(C, load, thresholds);
               const borderColor = getBorderColor(C, load, thresholds);
               const pct = Math.min(load / thresholds[1], 1);
+              const activeInjury = activeInjuries.find(e => e.partId === part.id);
 
               return (
                 <View key={part.id}>
                   {i > 0 && <View style={styles.breakdownDivider} />}
                   <View style={styles.breakdownRow}>
-                    <View style={[styles.breakdownDot, { backgroundColor: color }]} />
+                    <View style={[styles.breakdownDot, { backgroundColor: activeInjury ? C.red : color }]} />
                     <Text style={styles.breakdownLabel}>{part.label}</Text>
                     <View style={styles.breakdownBarWrap}>
                       <View style={styles.breakdownTrack}>
-                        <View style={[styles.breakdownFill, { width: `${pct * 100}%`, backgroundColor: color }]} />
+                        <View style={[styles.breakdownFill, { width: `${pct * 100}%`, backgroundColor: activeInjury ? C.red : color }]} />
                       </View>
                     </View>
-                    <View style={[styles.breakdownBadge, { borderColor, backgroundColor: bgColor }]}>
-                      <Text style={[styles.breakdownBadgeText, { color }]}>
-                        {getLabel(load, thresholds)}
+                    <View style={[styles.breakdownBadge, { borderColor: activeInjury ? C.redBorder : borderColor, backgroundColor: activeInjury ? C.redBg : bgColor }]}>
+                      <Text style={[styles.breakdownBadgeText, { color: activeInjury ? C.red : color }]}>
+                        {activeInjury ? 'Injured' : getLabel(load, thresholds)}
                       </Text>
                     </View>
                   </View>
+                  {activeInjury && (
+                    <View style={styles.breakdownInjuryRow}>
+                      <Text style={styles.breakdownInjuryDate}>Since {activeInjury.date}</Text>
+                      {activeInjury.note ? <Text style={styles.breakdownInjuryNote} numberOfLines={1}>{activeInjury.note}</Text> : null}
+                      <TouchableOpacity style={styles.breakdownHealBtn} onPress={() => handleResolve(activeInjury.id)}>
+                        <Text style={styles.breakdownHealBtnText}>Mark Healed</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -471,8 +481,29 @@ export default function HeatmapScreen() {
                       {entry.note ? <Text style={styles.injuryNote}>{entry.note}</Text> : null}
                     </View>
                     <TouchableOpacity style={styles.resolveBtn} onPress={() => handleResolve(entry.id)}>
-                      <Text style={styles.resolveBtnText}>Resolved</Text>
+                      <Text style={styles.resolveBtnText}>Mark Healed</Text>
                     </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Card>
+        )}
+
+        {/* Injury History */}
+        {injuryLog.filter(e => e.resolved).length > 0 && (
+          <Card label="Injury History" style={{ marginHorizontal: 16 }}>
+            <View style={styles.injuryListInner}>
+              {[...injuryLog].filter(e => e.resolved).reverse().map((entry, i) => (
+                <View key={entry.id}>
+                  {i > 0 && <View style={{ height: 1, backgroundColor: C.borderLight, marginVertical: 8 }} />}
+                  <View style={styles.historyRow}>
+                    <View style={[styles.historyDot, { backgroundColor: C.green }]} />
+                    <View style={styles.injuryInfo}>
+                      <Text style={styles.historyPart}>{entry.partName}</Text>
+                      <Text style={styles.historyDate}>Logged {entry.date} · Healed</Text>
+                      {entry.note ? <Text style={styles.injuryNote}>{entry.note}</Text> : null}
+                    </View>
                   </View>
                 </View>
               ))}
@@ -562,6 +593,12 @@ function makeStyles(C) {
     summarySmall: { fontSize: 9, fontWeight: '600', color: C.dust, marginTop: 2 },
     summaryDivider: { width: 1, backgroundColor: C.borderLight, marginHorizontal: 8 },
 
+    breakdownInjuryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 18, paddingBottom: 8, flexWrap: 'wrap' },
+    breakdownInjuryDate: { fontSize: 10, fontWeight: '600', color: C.red + 'aa', letterSpacing: 0.3 },
+    breakdownInjuryNote: { flex: 1, fontSize: 10, color: C.dust, fontStyle: 'italic' },
+    breakdownHealBtn: { borderWidth: 1, borderColor: C.greenBorder, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: C.greenBg },
+    breakdownHealBtnText: { fontSize: 9, fontWeight: '800', color: C.green, letterSpacing: 0.5 },
+
     injuryListInner: { padding: 16, paddingTop: 14 },
     injuryDivider: { height: 1, backgroundColor: C.redBorder + '55', marginVertical: 8 },
     injuryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -571,6 +608,11 @@ function makeStyles(C) {
     injuryNote: { fontSize: 12, color: C.inkLight, marginTop: 4, lineHeight: 17 },
     resolveBtn: { borderWidth: 1, borderColor: C.redBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
     resolveBtnText: { fontSize: 10, fontWeight: '800', color: C.red, letterSpacing: 0.5 },
+
+    historyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
+    historyDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
+    historyPart: { fontSize: 13, fontWeight: '700', color: C.inkLight },
+    historyDate: { fontSize: 10, fontWeight: '600', color: C.green, marginTop: 1, letterSpacing: 0.3 },
 
     modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
     modalSheet: { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 14 },
