@@ -3,7 +3,7 @@ import { editStore } from '../../lib/editStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
 import { deleteGoalDate, getCheckIns, getGoalDate, getInjuryAlerts, getProfile, getSessions, saveGoalDate } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
@@ -17,8 +17,8 @@ const GDW = GCHART_W - GP.l - GP.r;
 const GDH = GCHART_H - GP.t - GP.b;
 const MAX_IDX = V_GRADES.length - 1;
 
-function GradeProgressChart({ sessions, maxGrade, projectGrade, gradeSystem, limit }: {
-  sessions: Record<string, any>; maxGrade?: string; projectGrade?: string; gradeSystem: string; limit: number;
+function GradeProgressChart({ sessions, gradeSystem, limit }: {
+  sessions: Record<string, any>; gradeSystem: string; limit: number;
 }) {
   const { C } = useTheme();
 
@@ -31,13 +31,10 @@ function GradeProgressChart({ sessions, maxGrade, projectGrade, gradeSystem, lim
       const grades = Object.keys(s.gradeCounts).filter(g => V_GRADES.includes(g));
       const maxG = grades.reduce((best, g) =>
         V_GRADES.indexOf(g) > V_GRADES.indexOf(best) ? g : best, grades[0]);
-      const idx = V_GRADES.indexOf(maxG);
       const d = new Date(date + 'T00:00:00');
       return {
         grade: maxG,
-        idx,
-        date,
-        label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        idx: V_GRADES.indexOf(maxG),
         month: d.toLocaleDateString('en-US', { month: 'short' }),
       };
     });
@@ -45,101 +42,54 @@ function GradeProgressChart({ sessions, maxGrade, projectGrade, gradeSystem, lim
 
   if (points.length < 2) return (
     <View style={{ padding: 24, alignItems: 'center' }}>
-      <Text style={{ color: C.dust, fontSize: 12 }}>Log at least 2 sessions to see grade progress</Text>
+      <Text style={{ color: C.dust, fontSize: 12 }}>Log at least 2 sessions to see progress</Text>
     </View>
   );
 
   const n = points.length;
-  const xFor = (i: number) => GP.l + (n === 1 ? GDW / 2 : (i / (n - 1)) * GDW);
+  const xFor = (i: number) => GP.l + (i / (n - 1)) * GDW;
   const yFor = (idx: number) => GP.t + (1 - idx / MAX_IDX) * GDH;
 
-  // Main line path
-  let path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(p.idx).toFixed(1)}`).join(' ');
+  const linePath = points.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(p.idx).toFixed(1)}`
+  ).join(' ');
 
-  // 3-point moving average trend line
-  const avgPoints = points.map((_, i) => {
-    const from = Math.max(0, i - 1);
-    const to = Math.min(n - 1, i + 1);
-    const avg = points.slice(from, to + 1).reduce((s, p) => s + p.idx, 0) / (to - from + 1);
-    return { x: xFor(i), y: yFor(avg) };
-  });
-  let trendPath = avgPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const labelStep = n <= 10 ? 1 : Math.ceil(n / 6);
 
-  const maxGradeIdx = maxGrade ? V_GRADES.indexOf(maxGrade) : -1;
-  const projGradeIdx = projectGrade ? V_GRADES.indexOf(projectGrade) : -1;
-
-  // Y labels: show grades at even indices
+  // Y axis: show a grade label every 2 steps
   const yLabels = V_GRADES.map((g, i) => ({ g, i })).filter(({ i }) => i % 2 === 0 || i === MAX_IDX);
-
-  // X labels: show month on first of each month or every N points
-  const labelStep = n <= 10 ? 1 : n <= 20 ? 2 : Math.ceil(n / 8);
 
   return (
     <Svg width={GCHART_W} height={GCHART_H}>
-      <Defs>
-        <LinearGradient id="trendGrad" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor={C.terra} stopOpacity={0.4} />
-          <Stop offset="1" stopColor={C.terra} stopOpacity={1} />
-        </LinearGradient>
-      </Defs>
-
-      {/* Background band for project grade */}
-      {projGradeIdx >= 0 && (
-        <Rect x={GP.l} y={yFor(projGradeIdx) - 1} width={GDW} height={2}
-          fill={C.goal} opacity={0.25} />
-      )}
-      {projGradeIdx >= 0 && (
-        <SvgText x={GP.l + GDW + 4} y={yFor(projGradeIdx) + 4} fontSize={7} fill={C.goal} fontWeight="700">
-          Goal
-        </SvgText>
-      )}
-
-      {/* Max grade reference line */}
-      {maxGradeIdx >= 0 && (
-        <Line x1={GP.l} y1={yFor(maxGradeIdx)} x2={GP.l + GDW} y2={yFor(maxGradeIdx)}
-          stroke={C.green} strokeWidth={1} strokeDasharray="4,3" opacity={0.5} />
-      )}
-
-      {/* Grid lines at each grade label */}
+      {/* Light horizontal grid lines */}
       {yLabels.map(({ i }) => (
         <Line key={i} x1={GP.l} y1={yFor(i)} x2={GP.l + GDW} y2={yFor(i)}
           stroke={C.borderLight} strokeWidth={0.75} />
       ))}
 
-      {/* Trend (moving avg) line */}
-      <Path d={trendPath} stroke="url(#trendGrad)" strokeWidth={2} fill="none"
-        strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+      {/* Single clean line */}
+      <Path d={linePath} stroke={C.terra} strokeWidth={2.5} fill="none"
+        strokeLinecap="round" strokeLinejoin="round" />
 
-      {/* Main session line */}
-      <Path d={path} stroke={C.dust} strokeWidth={1} fill="none"
-        strokeLinecap="round" strokeLinejoin="round" opacity={0.35} strokeDasharray="2,2" />
+      {/* Dots */}
+      {points.map((p, i) => (
+        <Circle key={i} cx={xFor(i)} cy={yFor(p.idx)} r={n > 20 ? 3 : 4}
+          fill={C.terra} stroke={C.surface} strokeWidth={1.5} />
+      ))}
 
-      {/* Session dots */}
-      {points.map((p, i) => {
-        const cx = xFor(i);
-        const cy = yFor(p.idx);
-        const col = gradeColor(p.grade);
-        return (
-          <Circle key={i} cx={cx} cy={cy} r={n > 25 ? 3 : 4.5}
-            fill={col} stroke={C.surface} strokeWidth={1.5} />
-        );
-      })}
-
-      {/* Y axis grade labels */}
+      {/* Y grade labels */}
       {yLabels.map(({ g, i }) => (
         <SvgText key={g} x={GP.l - 4} y={yFor(i) + 3} fontSize={8} fill={C.dust} textAnchor="end">
-          {gradeSystem === 'font' ? (g === 'VB' ? '3' : g === 'V0' ? '4' : g) : g}
+          {toDisplayGrade(g, gradeSystem)}
         </SvgText>
       ))}
 
-      {/* X axis date labels */}
+      {/* X month labels */}
       {points.map((p, i) => {
         if (i % labelStep !== 0 && i !== n - 1) return null;
         return (
           <SvgText key={i} x={xFor(i)} y={GCHART_H - 4} fontSize={8}
-            fill={i === n - 1 ? C.terra : C.dust} textAnchor="middle">
-            {p.month}
-          </SvgText>
+            fill={C.dust} textAnchor="middle">{p.month}</SvgText>
         );
       })}
     </Svg>
@@ -621,29 +571,9 @@ export default function CalendarScreen() {
               </View>
               <GradeProgressChart
                 sessions={sessions}
-                maxGrade={profile?.maxGrade}
-                projectGrade={profile?.projectGrade}
                 gradeSystem={gradeSystem}
                 limit={progressLimit}
               />
-              <View style={styles.progressLegend}>
-                <View style={styles.progressLegendItem}>
-                  <View style={[styles.progressLegendLine, { backgroundColor: C.terra }]} />
-                  <Text style={styles.progressLegendText}>Trend</Text>
-                </View>
-                {profile?.maxGrade && (
-                  <View style={styles.progressLegendItem}>
-                    <View style={[styles.progressLegendDash, { borderColor: C.green }]} />
-                    <Text style={styles.progressLegendText}>Your max ({toDisplayGrade(profile.maxGrade, gradeSystem)})</Text>
-                  </View>
-                )}
-                {profile?.projectGrade && (
-                  <View style={styles.progressLegendItem}>
-                    <View style={[styles.progressLegendDash, { borderColor: C.goal }]} />
-                    <Text style={styles.progressLegendText}>Project ({toDisplayGrade(profile.projectGrade, gradeSystem)})</Text>
-                  </View>
-                )}
-              </View>
             </View>
           </Card>
         )}
@@ -975,11 +905,6 @@ function makeStyles(C) {
     progressBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
     progressBtnText: { fontSize: 10, fontWeight: '800', color: C.dust },
     progressBtnTextActive: { color: C.terra },
-    progressLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 },
-    progressLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    progressLegendLine: { width: 16, height: 2, borderRadius: 1 },
-    progressLegendDash: { width: 16, height: 0, borderWidth: 1, borderStyle: 'dashed' },
-    progressLegendText: { fontSize: 10, fontWeight: '600', color: C.dust },
 
     emptyState: { marginHorizontal: 16, padding: 32, alignItems: 'center', gap: 6 },
     emptyTitle: { color: C.sand, fontSize: 14, fontWeight: '800' },
