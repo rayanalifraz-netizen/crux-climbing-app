@@ -501,7 +501,7 @@ export default function HeatmapScreen() {
                     <View style={[styles.historyDot, { backgroundColor: C.green }]} />
                     <View style={styles.injuryInfo}>
                       <Text style={styles.historyPart}>{entry.partName}</Text>
-                      <Text style={styles.historyDate}>Logged {entry.date} · Healed</Text>
+                      <Text style={styles.historyDate}>Logged {entry.date}{entry.resolvedDate ? ` · Healed ${entry.resolvedDate}` : ' · Healed'}</Text>
                       {entry.note ? <Text style={styles.injuryNote}>{entry.note}</Text> : null}
                     </View>
                   </View>

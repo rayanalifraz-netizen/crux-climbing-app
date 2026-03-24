@@ -29,6 +29,7 @@ export type InjuryEntry = {
   note: string;
   date: string;
   resolved: boolean;
+  resolvedDate?: string;
 };
 
 export type UserProfile = {
@@ -380,5 +381,6 @@ export const addInjuryEntry = async (entry: InjuryEntry): Promise<void> => {
 
 export const resolveInjuryEntry = async (id: string): Promise<void> => {
   const log = await getInjuryLog();
-  await saveInjuryLog(log.map(e => e.id === id ? { ...e, resolved: true } : e));
+  const today = new Date().toISOString().split('T')[0];
+  await saveInjuryLog(log.map(e => e.id === id ? { ...e, resolved: true, resolvedDate: today } : e));
 };
