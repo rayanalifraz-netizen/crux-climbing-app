@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { editStore } from '../../lib/editStore';
 import { useCallback, useMemo, useState } from 'react';
-import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { cancelStreakProtection, rescheduleReminderForTomorrow, scheduleStreakProtection } from '../../notifications';
 import { copyMediaToStorage, deleteSessionsByKey, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
@@ -151,6 +151,7 @@ export default function CheckInScreen() {
   const [pendingMedia, setPendingMedia] = useState<string[]>([]);
   const [showShareCard, setShowShareCard] = useState(false);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] }>({ current: 0, last7: Array(7).fill(false) });
+  const [celebrationStreak, setCelebrationStreak] = useState<number | null>(null);
 
   useFocusEffect(useCallback(() => {
     const editDate = editStore.checkinDate;
@@ -240,6 +241,18 @@ export default function CheckInScreen() {
     const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRestDay);
     setDrs(score);
     setAlreadyCheckedIn(true);
+
+    // Streak milestone celebration
+    if (!isEditing) {
+      const updatedCheckIns = await getCheckIns();
+      const newStreak = computeStreak(updatedCheckIns);
+      setStreak(newStreak);
+      const MILESTONES = [3, 7, 14, 30, 50, 100];
+      if (MILESTONES.includes(newStreak.current)) {
+        setCelebrationStreak(newStreak.current);
+      }
+    }
+
     if (isEditing) router.navigate('/(tabs)/calendar');
   };
 
@@ -540,6 +553,28 @@ export default function CheckInScreen() {
           streak={streak}
         />
       )}
+
+      {/* Streak milestone celebration */}
+      <Modal visible={celebrationStreak !== null} transparent animationType="fade" onRequestClose={() => setCelebrationStreak(null)}>
+        <View style={styles.celebOverlay}>
+          <View style={styles.celebCard}>
+            <Text style={styles.celebEmoji}>🔥</Text>
+            <Text style={styles.celebNum}>{celebrationStreak}</Text>
+            <Text style={styles.celebUnit}>day streak</Text>
+            <Text style={styles.celebMsg}>
+              {celebrationStreak === 3 ? "3 days in. You're building a habit." :
+               celebrationStreak === 7 ? 'One full week of consistency. Keep it going.' :
+               celebrationStreak === 14 ? 'Two weeks strong. Your body is tracking.' :
+               celebrationStreak === 30 ? '30 days. You\'re a different climber now.' :
+               celebrationStreak === 50 ? '50 days of check-ins. That\'s real dedication.' :
+               '100 days. Absolutely legendary.'}
+            </Text>
+            <TouchableOpacity style={styles.celebBtn} onPress={() => setCelebrationStreak(null)}>
+              <Text style={styles.celebBtnText}>Keep Going →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -616,6 +651,15 @@ function makeStyles(C) {
     mediaRemoveText: { color: '#fff', fontSize: 10, fontWeight: '800' },
     mediaAddBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 10, borderStyle: 'dashed', padding: 12, alignItems: 'center' },
     mediaAddText: { color: C.dust, fontSize: 12, fontWeight: '700' },
+
+    celebOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+    celebCard: { backgroundColor: C.surface, borderRadius: 28, padding: 32, alignItems: 'center', width: '100%', gap: 8 },
+    celebEmoji: { fontSize: 52, marginBottom: 4 },
+    celebNum: { fontSize: 72, fontWeight: '900', color: C.terra, letterSpacing: -3, lineHeight: 76 },
+    celebUnit: { fontSize: 16, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+    celebMsg: { fontSize: 15, color: C.inkLight, textAlign: 'center', lineHeight: 22, marginBottom: 12 },
+    celebBtn: { backgroundColor: C.ink, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 14, marginTop: 4 },
+    celebBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
 
     stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 16, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
     saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 12, alignItems: 'center' },

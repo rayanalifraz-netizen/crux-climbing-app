@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutAnimation, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
+import { Dimensions, LayoutAnimation, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
 import { applyReminderSettings, getReminderSettings, saveReminderSettings, scheduleInsightNotifications, scheduleStreakProtection, type ReminderSettings } from '../../notifications';
 import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
@@ -417,6 +417,109 @@ function SendsModal({ visible, current, onClose, onSave }) {
   );
 }
 
+const CHART_W = Dimensions.get('window').width - 64;
+const CHART_H = 150;
+const PAD = { l: 28, r: 8, t: 10, b: 22 };
+const DATA_W = CHART_W - PAD.l - PAD.r;
+const DATA_H = CHART_H - PAD.t - PAD.b;
+
+function TrendChart({ sessions, checkIns, days }: { sessions: Record<string, any>; checkIns: Record<string, any>; days: number }) {
+  const { C } = useTheme();
+
+  const data = useMemo(() => {
+    const today = new Date();
+    return Array.from({ length: days }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (days - 1 - i));
+      const ds = d.toISOString().split('T')[0];
+      const ci = checkIns[ds];
+      const sess = sessions[ds];
+      let drs: number | null = null;
+      if (ci) {
+        if (ci.isRestDay) {
+          drs = 100;
+        } else {
+          const s = parseInt(ci.soreness || '0');
+          const p = ci.painAreas?.length || 0;
+          const f = ci.affectedFingers?.length || 0;
+          drs = Math.max(0, Math.min(100, 100 - s * 5 - p * 10 - f * 5));
+        }
+      }
+      return { ds, drs, res: sess?.res ?? null, label: d.toLocaleDateString('en-US', { weekday: 'short' }), dayNum: d.getDate() };
+    });
+  }, [sessions, checkIns, days]);
+
+  const xFor = (i: number) => PAD.l + (i / (days - 1)) * DATA_W;
+  const yFor = (v: number) => PAD.t + (1 - v / 100) * DATA_H;
+
+  // Build DRS path — break on missing days
+  let drsPath = '';
+  let pen = false;
+  data.forEach((pt, i) => {
+    if (pt.drs !== null) {
+      drsPath += `${pen ? 'L' : 'M'} ${xFor(i).toFixed(1)} ${yFor(pt.drs).toFixed(1)} `;
+      pen = true;
+    } else { pen = false; }
+  });
+
+  const labelStep = days <= 14 ? 2 : 7;
+
+  return (
+    <Svg width={CHART_W} height={CHART_H}>
+      <Defs>
+        <LinearGradient id="greenZone" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={C.green} stopOpacity={0.12} />
+          <Stop offset="1" stopColor={C.green} stopOpacity={0.04} />
+        </LinearGradient>
+        <LinearGradient id="redZone" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={C.red} stopOpacity={0.04} />
+          <Stop offset="1" stopColor={C.red} stopOpacity={0.12} />
+        </LinearGradient>
+      </Defs>
+
+      {/* Zone bands */}
+      <Rect x={PAD.l} y={PAD.t} width={DATA_W} height={DATA_H * 0.3} fill="url(#greenZone)" />
+      <Rect x={PAD.l} y={PAD.t + DATA_H * 0.6} width={DATA_W} height={DATA_H * 0.4} fill="url(#redZone)" />
+
+      {/* Grid lines */}
+      {[100, 70, 40, 0].map(v => (
+        <Line key={v} x1={PAD.l} y1={yFor(v)} x2={PAD.l + DATA_W} y2={yFor(v)}
+          stroke={C.borderLight} strokeWidth={1} />
+      ))}
+
+      {/* Session RES dots */}
+      {data.map((pt, i) => pt.res !== null && (
+        <Circle key={'r' + i} cx={xFor(i)} cy={yFor(pt.res)} r={4}
+          fill={C.blueBg} stroke={C.blue} strokeWidth={1.5} />
+      ))}
+
+      {/* DRS line */}
+      {drsPath ? <Path d={drsPath} stroke={C.terra} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
+
+      {/* DRS dots */}
+      {data.map((pt, i) => pt.drs !== null && (
+        <Circle key={'d' + i} cx={xFor(i)} cy={yFor(pt.drs)} r={3.5}
+          fill={C.terra} stroke={C.surface} strokeWidth={1.5} />
+      ))}
+
+      {/* Y labels */}
+      {[100, 70, 40].map(v => (
+        <SvgText key={'y' + v} x={PAD.l - 4} y={yFor(v) + 3} fontSize={8} fill={C.dust} textAnchor="end">{v}</SvgText>
+      ))}
+
+      {/* X labels */}
+      {data.map((pt, i) => {
+        if (i % labelStep !== 0 && i !== days - 1) return null;
+        return (
+          <SvgText key={'x' + i} x={xFor(i)} y={CHART_H - 4} fontSize={8} fill={C.dust} textAnchor="middle">
+            {pt.label}
+          </SvgText>
+        );
+      })}
+    </Svg>
+  );
+}
+
 export default function ProfileScreen() {
   const { C, isDark, gradeSystem } = useTheme();
   const styles = useMemo(() => makeStyles(C), [C]);
@@ -442,6 +545,9 @@ export default function ProfileScreen() {
   const [currentUser, setCurrentUser] = useState<{ email?: string | null } | null>(null);
   const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>({});
   const [showRecoveryInfo, setShowRecoveryInfo] = useState(false);
+  const [trendDays, setTrendDays] = useState(14);
+  const [allSessions, setAllSessions] = useState<Record<string, any>>({});
+  const [allCheckIns, setAllCheckIns] = useState<Record<string, any>>({});
 
   useEffect(() => {
     AsyncStorage.getItem('collapsedCards').then(v => {
@@ -464,6 +570,8 @@ export default function ProfileScreen() {
     ]);
     if (!prof) { setProfile(null); return; }
     setProfile(prof);
+    setAllSessions(sessions);
+    setAllCheckIns(checkIns);
     setProgressMax(prof.sendsToUnlock ?? 10);
     const allSess = Object.values(sessions);
     setTotalSessions(allSess.length);
@@ -795,6 +903,32 @@ export default function ProfileScreen() {
 
             {/* CHI */}
             {(totalSessions > 0 || totalCheckIns > 0) && chiData && <CHICard data={chiData} collapsed={!!collapsedCards.chi} onToggle={() => toggleCard('chi')} hasCheckInToday={!!todayCheckIn} />}
+
+            {/* Trend Chart */}
+            {(totalCheckIns >= 3 || totalSessions >= 3) && (
+              <Card label="Trends" style={{ marginTop: 8 }} collapsible collapsed={!!collapsedCards.trends} onToggle={() => toggleCard('trends')}>
+                <View style={styles.trendInner}>
+                  <View style={styles.trendTopRow}>
+                    <View style={styles.trendLegend}>
+                      {[{ color: C.terra, label: 'Readiness' }, { color: C.blue, label: 'Session RES' }].map(({ color, label }) => (
+                        <View key={label} style={styles.trendLegendItem}>
+                          <View style={[styles.trendLegendDot, { backgroundColor: color }]} />
+                          <Text style={styles.trendLegendText}>{label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.trendWindowBtns}>
+                      {[14, 30].map(d => (
+                        <TouchableOpacity key={d} style={[styles.trendWindowBtn, trendDays === d && styles.trendWindowBtnActive]} onPress={() => setTrendDays(d)}>
+                          <Text style={[styles.trendWindowBtnText, trendDays === d && styles.trendWindowBtnTextActive]}>{d}d</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  <TrendChart sessions={allSessions} checkIns={allCheckIns} days={trendDays} />
+                </View>
+              </Card>
+            )}
 
             {/* Streak */}
             {streak !== null && (
@@ -1218,6 +1352,18 @@ function makeStyles(C) {
     shareBtnRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 4 },
     shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, borderWidth: 1, borderColor: C.borderLight, borderRadius: 14 },
     shareBtnText: { fontSize: 12, fontWeight: '600', color: C.sand, letterSpacing: 0.3 },
+
+    trendInner: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 10 },
+    trendTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    trendLegend: { flexDirection: 'row', gap: 14 },
+    trendLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    trendLegendDot: { width: 8, height: 8, borderRadius: 4 },
+    trendLegendText: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 0.3 },
+    trendWindowBtns: { flexDirection: 'row', gap: 5 },
+    trendWindowBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: C.surfaceAlt },
+    trendWindowBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
+    trendWindowBtnText: { fontSize: 10, fontWeight: '800', color: C.dust },
+    trendWindowBtnTextActive: { color: C.terra },
 
     streakInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
     streakLeft: { flex: 1 },
