@@ -170,3 +170,125 @@ export const applyReminderSettings = async (settings: ReminderSettings): Promise
     await cancelDailyReminder();
   }
 };
+
+// ─── Smart insight notifications ──────────────────────────────────────────────
+// Computes data-driven insights and schedules them as local notifications.
+// Call this each time the app loads with fresh CHI + session + check-in data.
+// Fires at 2pm today (if still in future) or 2pm tomorrow.
+
+const INSIGHT_PREFIX = 'insight-';
+const MAX_INSIGHTS = 3;
+
+export const cancelInsightNotifications = async (): Promise<void> => {
+  await Promise.all(
+    Array.from({ length: MAX_INSIGHTS }, (_, i) =>
+      Notifications.cancelScheduledNotificationAsync(`${INSIGHT_PREFIX}${i}`).catch(() => {})
+    )
+  );
+};
+
+export const scheduleInsightNotifications = async (
+  chiData: { chi: number; readiness: number; load: number; injury: number } | null,
+  sessions: Record<string, any>,
+  checkIns: Record<string, any>,
+): Promise<void> => {
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+
+  await cancelInsightNotifications();
+
+  if (!chiData) return;
+
+  const insights: { title: string; body: string }[] = [];
+  const today = new Date().toISOString().split('T')[0];
+  const todayCheckIn = checkIns[today];
+
+  // 1. Critical CHI — body needs full rest
+  if (chiData.chi < 45) {
+    insights.push({
+      title: 'Recovery Mode',
+      body: `Your Climber Health Index is ${chiData.chi}/100 — your body needs a full rest day before your next session.`,
+    });
+  }
+  // 2. Moderately low CHI — take it easy
+  else if (chiData.chi < 65 && !todayCheckIn?.isRestDay) {
+    insights.push({
+      title: 'Take It Easy Today',
+      body: `CHI is at ${chiData.chi} — your load or recovery is off. Consider a lighter session or rest day.`,
+    });
+  }
+
+  // 3. No rest day after 4+ sessions in 7 days
+  const now = new Date();
+  let sessionCount = 0;
+  let restCount = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    if (sessions[ds]) sessionCount++;
+    if (checkIns[ds]?.isRestDay) restCount++;
+  }
+  if (sessionCount >= 4 && restCount === 0 && insights.length < MAX_INSIGHTS) {
+    insights.push({
+      title: 'Rest Day Overdue',
+      body: `You've logged ${sessionCount} sessions this week with no rest days. Your body needs a break — schedule one soon.`,
+    });
+  }
+
+  // 4. High soreness for 2+ consecutive days
+  let highSorenessStreak = 0;
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const ci = checkIns[d.toISOString().split('T')[0]];
+    if (ci && !ci.isRestDay && parseInt(ci.soreness || '0') >= 7) highSorenessStreak++;
+    else break;
+  }
+  if (highSorenessStreak >= 2 && insights.length < MAX_INSIGHTS) {
+    insights.push({
+      title: 'Soreness Alert',
+      body: `Your soreness has been high for ${highSorenessStreak} days in a row. Take a rest day before this becomes an injury.`,
+    });
+  }
+
+  // 5. Finger overload — crimps/pockets heavy week
+  let fingerSessions = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const sess = sessions[d.toISOString().split('T')[0]];
+    if (sess?.holdTypes?.some((h: string) => h === 'crimps' || h === 'pockets')) fingerSessions++;
+  }
+  if (fingerSessions >= 3 && insights.length < MAX_INSIGHTS) {
+    insights.push({
+      title: 'Finger Load Warning',
+      body: `You've done ${fingerSessions} crimp or pocket sessions this week. Go easy on the fingers — or go sloper day.`,
+    });
+  }
+
+  // 6. Great shape — project send window open
+  if (chiData.chi >= 80 && chiData.injury >= 75 && insights.length < MAX_INSIGHTS) {
+    insights.push({
+      title: 'Green Light',
+      body: `CHI is ${chiData.chi}/100 and your body is recovered. If you have a project — today could be the day.`,
+    });
+  }
+
+  if (insights.length === 0) return;
+
+  // Schedule at 2pm today or 2pm tomorrow if already past
+  const fireBase = new Date(now);
+  fireBase.setHours(14, 0, 0, 0);
+  if (fireBase <= now) fireBase.setDate(fireBase.getDate() + 1);
+
+  for (let i = 0; i < insights.length; i++) {
+    const fireAt = new Date(fireBase);
+    fireAt.setMinutes(i * 3); // stagger by 3 minutes so they don't stack
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${INSIGHT_PREFIX}${i}`,
+      content: { title: insights[i].title, body: insights[i].body, sound: true },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt },
+    });
+  }
+};

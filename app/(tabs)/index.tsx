@@ -7,7 +7,7 @@ import { LayoutAnimation, Modal, Platform, SafeAreaView, ScrollView, Share, Styl
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 import Svg, { Circle } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
-import { applyReminderSettings, getReminderSettings, saveReminderSettings, type ReminderSettings, scheduleStreakProtection } from '../../notifications';
+import { applyReminderSettings, getReminderSettings, saveReminderSettings, scheduleInsightNotifications, scheduleStreakProtection, type ReminderSettings } from '../../notifications';
 import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
 import { gradeColor, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 import { getCurrentUser, signOut } from '../../lib/supabase';
@@ -480,6 +480,8 @@ export default function ProfileScreen() {
     setTodayCheckIn(checkIns[todayStr] || null);
     setReminderSettings(await getReminderSettings());
     if (!checkIns[todayStr]) scheduleStreakProtection().catch(() => {});
+    const chi = computeCHI(sessions, checkIns, alerts);
+    scheduleInsightNotifications(chi, sessions, checkIns).catch(() => {});
     setCurrentUser(await getCurrentUser());
 
     let count = 0;
