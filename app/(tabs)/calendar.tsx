@@ -2,11 +2,149 @@ import { router, useFocusEffect } from 'expo-router';
 import { editStore } from '../../lib/editStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
 import { deleteGoalDate, getCheckIns, getGoalDate, getInjuryAlerts, getProfile, getSessions, saveGoalDate } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
-import { computeCHI, computeProjectReadiness } from '../../lib/scoring';
+import { V_GRADES, computeCHI, computeProjectReadiness } from '../../lib/scoring';
+
+const SCREEN_W = Dimensions.get('window').width;
+const GCHART_W = SCREEN_W - 64;
+const GCHART_H = 200;
+const GP = { l: 40, r: 8, t: 10, b: 24 };
+const GDW = GCHART_W - GP.l - GP.r;
+const GDH = GCHART_H - GP.t - GP.b;
+const MAX_IDX = V_GRADES.length - 1;
+
+function GradeProgressChart({ sessions, maxGrade, projectGrade, gradeSystem, limit }: {
+  sessions: Record<string, any>; maxGrade?: string; projectGrade?: string; gradeSystem: string; limit: number;
+}) {
+  const { C } = useTheme();
+
+  const points = useMemo(() => {
+    const sorted = Object.entries(sessions)
+      .filter(([, s]) => s.gradeCounts && Object.keys(s.gradeCounts).length > 0)
+      .sort(([a], [b]) => a.localeCompare(b));
+    const slice = limit === 0 ? sorted : sorted.slice(-limit);
+    return slice.map(([date, s]) => {
+      const grades = Object.keys(s.gradeCounts).filter(g => V_GRADES.includes(g));
+      const maxG = grades.reduce((best, g) =>
+        V_GRADES.indexOf(g) > V_GRADES.indexOf(best) ? g : best, grades[0]);
+      const idx = V_GRADES.indexOf(maxG);
+      const d = new Date(date + 'T00:00:00');
+      return {
+        grade: maxG,
+        idx,
+        date,
+        label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        month: d.toLocaleDateString('en-US', { month: 'short' }),
+      };
+    });
+  }, [sessions, limit]);
+
+  if (points.length < 2) return (
+    <View style={{ padding: 24, alignItems: 'center' }}>
+      <Text style={{ color: C.dust, fontSize: 12 }}>Log at least 2 sessions to see grade progress</Text>
+    </View>
+  );
+
+  const n = points.length;
+  const xFor = (i: number) => GP.l + (n === 1 ? GDW / 2 : (i / (n - 1)) * GDW);
+  const yFor = (idx: number) => GP.t + (1 - idx / MAX_IDX) * GDH;
+
+  // Main line path
+  let path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(p.idx).toFixed(1)}`).join(' ');
+
+  // 3-point moving average trend line
+  const avgPoints = points.map((_, i) => {
+    const from = Math.max(0, i - 1);
+    const to = Math.min(n - 1, i + 1);
+    const avg = points.slice(from, to + 1).reduce((s, p) => s + p.idx, 0) / (to - from + 1);
+    return { x: xFor(i), y: yFor(avg) };
+  });
+  let trendPath = avgPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+
+  const maxGradeIdx = maxGrade ? V_GRADES.indexOf(maxGrade) : -1;
+  const projGradeIdx = projectGrade ? V_GRADES.indexOf(projectGrade) : -1;
+
+  // Y labels: show grades at even indices
+  const yLabels = V_GRADES.map((g, i) => ({ g, i })).filter(({ i }) => i % 2 === 0 || i === MAX_IDX);
+
+  // X labels: show month on first of each month or every N points
+  const labelStep = n <= 10 ? 1 : n <= 20 ? 2 : Math.ceil(n / 8);
+
+  return (
+    <Svg width={GCHART_W} height={GCHART_H}>
+      <Defs>
+        <LinearGradient id="trendGrad" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor={C.terra} stopOpacity={0.4} />
+          <Stop offset="1" stopColor={C.terra} stopOpacity={1} />
+        </LinearGradient>
+      </Defs>
+
+      {/* Background band for project grade */}
+      {projGradeIdx >= 0 && (
+        <Rect x={GP.l} y={yFor(projGradeIdx) - 1} width={GDW} height={2}
+          fill={C.goal} opacity={0.25} />
+      )}
+      {projGradeIdx >= 0 && (
+        <SvgText x={GP.l + GDW + 4} y={yFor(projGradeIdx) + 4} fontSize={7} fill={C.goal} fontWeight="700">
+          Goal
+        </SvgText>
+      )}
+
+      {/* Max grade reference line */}
+      {maxGradeIdx >= 0 && (
+        <Line x1={GP.l} y1={yFor(maxGradeIdx)} x2={GP.l + GDW} y2={yFor(maxGradeIdx)}
+          stroke={C.green} strokeWidth={1} strokeDasharray="4,3" opacity={0.5} />
+      )}
+
+      {/* Grid lines at each grade label */}
+      {yLabels.map(({ i }) => (
+        <Line key={i} x1={GP.l} y1={yFor(i)} x2={GP.l + GDW} y2={yFor(i)}
+          stroke={C.borderLight} strokeWidth={0.75} />
+      ))}
+
+      {/* Trend (moving avg) line */}
+      <Path d={trendPath} stroke="url(#trendGrad)" strokeWidth={2} fill="none"
+        strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+
+      {/* Main session line */}
+      <Path d={path} stroke={C.dust} strokeWidth={1} fill="none"
+        strokeLinecap="round" strokeLinejoin="round" opacity={0.35} strokeDasharray="2,2" />
+
+      {/* Session dots */}
+      {points.map((p, i) => {
+        const cx = xFor(i);
+        const cy = yFor(p.idx);
+        const col = gradeColor(p.grade);
+        return (
+          <Circle key={i} cx={cx} cy={cy} r={n > 25 ? 3 : 4.5}
+            fill={col} stroke={C.surface} strokeWidth={1.5} />
+        );
+      })}
+
+      {/* Y axis grade labels */}
+      {yLabels.map(({ g, i }) => (
+        <SvgText key={g} x={GP.l - 4} y={yFor(i) + 3} fontSize={8} fill={C.dust} textAnchor="end">
+          {gradeSystem === 'font' ? (g === 'VB' ? '3' : g === 'V0' ? '4' : g) : g}
+        </SvgText>
+      ))}
+
+      {/* X axis date labels */}
+      {points.map((p, i) => {
+        if (i % labelStep !== 0 && i !== n - 1) return null;
+        return (
+          <SvgText key={i} x={xFor(i)} y={GCHART_H - 4} fontSize={8}
+            fill={i === n - 1 ? C.terra : C.dust} textAnchor="middle">
+            {p.month}
+          </SvgText>
+        );
+      })}
+    </Svg>
+  );
+}
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -111,6 +249,8 @@ export default function CalendarScreen() {
   const [showShareCard, setShowShareCard] = useState(false);
   const [projectReadiness, setProjectReadiness] = useState(null);
   const [showProjectedProgress, setShowProjectedProgress] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
+  const [progressLimit, setProgressLimit] = useState(30);
 
   useEffect(() => {
     AsyncStorage.getItem('showProjectedProgress').then(v => {
@@ -134,6 +274,7 @@ export default function CalendarScreen() {
     ]);
     setSessions(sessionData);
     setCheckIns(checkInData);
+    setProfile(profile);
     if (savedGoal) setGoalDate(savedGoal);
 
     if (profile?.projectGrade && profile?.maxGrade) {
@@ -458,6 +599,55 @@ export default function CalendarScreen() {
           </View>
         </Card>
 
+        {/* Grade Progress Chart */}
+        {Object.keys(sessions).filter(d => sessions[d].gradeCounts && Object.keys(sessions[d].gradeCounts).length > 0).length >= 2 && (
+          <Card label="Grade Progress">
+            <View style={styles.progressInner}>
+              <View style={styles.progressTopRow}>
+                <Text style={styles.progressSubtitle}>Max grade climbed each session</Text>
+                <View style={styles.progressBtns}>
+                  {[{ label: '30', val: 30 }, { label: 'All', val: 0 }].map(opt => (
+                    <TouchableOpacity
+                      key={opt.val}
+                      style={[styles.progressBtn, progressLimit === opt.val && styles.progressBtnActive]}
+                      onPress={() => setProgressLimit(opt.val)}
+                    >
+                      <Text style={[styles.progressBtnText, progressLimit === opt.val && styles.progressBtnTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <GradeProgressChart
+                sessions={sessions}
+                maxGrade={profile?.maxGrade}
+                projectGrade={profile?.projectGrade}
+                gradeSystem={gradeSystem}
+                limit={progressLimit}
+              />
+              <View style={styles.progressLegend}>
+                <View style={styles.progressLegendItem}>
+                  <View style={[styles.progressLegendLine, { backgroundColor: C.terra }]} />
+                  <Text style={styles.progressLegendText}>Trend</Text>
+                </View>
+                {profile?.maxGrade && (
+                  <View style={styles.progressLegendItem}>
+                    <View style={[styles.progressLegendDash, { borderColor: C.green }]} />
+                    <Text style={styles.progressLegendText}>Your max ({toDisplayGrade(profile.maxGrade, gradeSystem)})</Text>
+                  </View>
+                )}
+                {profile?.projectGrade && (
+                  <View style={styles.progressLegendItem}>
+                    <View style={[styles.progressLegendDash, { borderColor: C.goal }]} />
+                    <Text style={styles.progressLegendText}>Project ({toDisplayGrade(profile.projectGrade, gradeSystem)})</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </Card>
+        )}
+
         {/* Empty / Hint */}
         {!selectedDate && totalSessions === 0 && Object.keys(checkIns).length === 0 && (
           <View style={styles.emptyState}>
@@ -776,6 +966,20 @@ function makeStyles(C) {
     legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     legendDot: { width: 5, height: 5, borderRadius: 1 },
     legendText: { color: C.dust, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+
+    progressInner: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 10 },
+    progressTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    progressSubtitle: { flex: 1, fontSize: 11, color: C.dust },
+    progressBtns: { flexDirection: 'row', gap: 5 },
+    progressBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3, backgroundColor: C.surfaceAlt },
+    progressBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
+    progressBtnText: { fontSize: 10, fontWeight: '800', color: C.dust },
+    progressBtnTextActive: { color: C.terra },
+    progressLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 },
+    progressLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    progressLegendLine: { width: 16, height: 2, borderRadius: 1 },
+    progressLegendDash: { width: 16, height: 0, borderWidth: 1, borderStyle: 'dashed' },
+    progressLegendText: { fontSize: 10, fontWeight: '600', color: C.dust },
 
     emptyState: { marginHorizontal: 16, padding: 32, alignItems: 'center', gap: 6 },
     emptyTitle: { color: C.sand, fontSize: 14, fontWeight: '800' },
