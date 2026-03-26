@@ -606,8 +606,7 @@ export default function ProfileScreen() {
     let count = 0;
     if (prof.projectGrade) {
       Object.values(sessions).forEach(sess => {
-        if (sess.gradeCounts?.[prof.projectGrade])
-          count += sess.gradeCounts[prof.projectGrade];
+        count += sess.gradeData?.[prof.projectGrade]?.sends ?? 0;
       });
     }
     const target = prof.sendsToUnlock ?? 10;

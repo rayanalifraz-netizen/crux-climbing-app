@@ -59,8 +59,8 @@ function fmt(dateStr: string) {
 
 function SessionCard({ session, date }: { session: Session; date: string }) {
   const color = resColor(session.res);
-  const totalAttempts = Object.values(session.gradeCounts || {}).reduce((a, b) => a + b, 0);
-  const grades = Object.entries(session.gradeCounts || {}).filter(([, c]) => c > 0);
+  const totalAttempts = Object.values(session.gradeData || {}).reduce((a, e) => a + e.attempts, 0);
+  const grades = Object.entries(session.gradeData || {}).filter(([, e]) => e.attempts > 0);
 
   return (
     <View style={sc.card}>
@@ -92,10 +92,11 @@ function SessionCard({ session, date }: { session: Session; date: string }) {
         <View style={sc.block}>
           <Text style={sc.blockLabel}>Grades</Text>
           <View style={sc.chipRow}>
-            {grades.map(([grade, count]) => (
+            {grades.map(([grade, entry]) => (
               <View key={grade} style={[sc.gradeChip, { borderColor: gradeColor(grade) + '50', backgroundColor: gradeColor(grade) + '15' }]}>
                 <Text style={[sc.gradeChipText, { color: gradeColor(grade) }]}>{grade}</Text>
-                <Text style={[sc.gradeChipCount, { color: gradeColor(grade) + 'aa' }]}>×{count}</Text>
+                <Text style={[sc.gradeChipCount, { color: gradeColor(grade) + 'aa' }]}>×{entry.attempts}</Text>
+                {entry.sends > 0 && <Text style={[sc.gradeChipCount, { color: gradeColor(grade) }]}>✓{entry.sends}</Text>}
               </View>
             ))}
           </View>

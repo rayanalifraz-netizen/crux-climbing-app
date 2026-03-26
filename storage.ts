@@ -2,9 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { signOut as supabaseSignOut, syncCheckIn, syncProfile, syncSession } from './lib/supabase';
 
+export type GradeEntry = {
+  attempts: number;
+  sends: number;
+};
+
 export type Session = {
   date: string;
-  gradeCounts: Record<string, number>;
+  gradeData: Record<string, GradeEntry>;
+  gradeCounts?: Record<string, number>; // legacy — present on old sessions only
   holdTypes: string[];
   movementTypes: string[];
   res: number;
@@ -134,9 +140,24 @@ export const saveSession = async (session: Session): Promise<void> => {
   syncSession(session.date, session).catch(() => {});
 };
 
+function normaliseSession(sess: any): Session {
+  if (sess.gradeData) return sess as Session;
+  const gradeData: Record<string, GradeEntry> = {};
+  Object.entries(sess.gradeCounts || {}).forEach(([grade, count]) => {
+    gradeData[grade] = { attempts: count as number, sends: 0 };
+  });
+  return { ...sess, gradeData };
+}
+
 export const getSessions = async (): Promise<Record<string, Session>> => {
   const data = await get('sessions');
-  return data ? JSON.parse(data) : {};
+  if (!data) return {};
+  const raw = JSON.parse(data);
+  const result: Record<string, Session> = {};
+  Object.entries(raw).forEach(([date, sess]) => {
+    result[date] = normaliseSession(sess);
+  });
+  return result;
 };
 
 export const deleteSessionsByKey = async (dateKey: string): Promise<void> => {

@@ -6,7 +6,7 @@ import { editStore } from '../../lib/editStore';
 import { Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { scheduleRecoveryReminder } from '../../notifications';
-import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession } from '../../storage';
+import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession, type GradeEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
@@ -68,19 +68,19 @@ const HOLD_INJURY_WEIGHT = {
   crimps: 1.3, slopers: 1.1, pinches: 1.2, pockets: 1.4, jugs: 0.8,
 };
 
-function calculateRES(gradeCounts, maxGrade, selectedHolds) {
-  const entries = Object.entries(gradeCounts).filter(([_, count]) => count > 0);
+function calculateRES(gradeData: Record<string, GradeEntry>, maxGrade: string, selectedHolds: string[]) {
+  const entries = Object.entries(gradeData).filter(([, e]) => e.attempts > 0);
   if (entries.length === 0) return 0;
   const maxIndex = V_GRADES.indexOf(maxGrade);
   if (maxIndex <= 0) return 100;
   let totalIntensity = 0, totalAttempts = 0;
-  entries.forEach(([grade, count]) => {
+  entries.forEach(([grade, e]) => {
     const gradeIndex = V_GRADES.indexOf(grade);
     const intensity = gradeIndex / maxIndex;
     const gradesAboveMax = gradeIndex - maxIndex;
     const reachMultiplier = gradesAboveMax > 2 ? 1 + (gradesAboveMax - 2) * 0.25 : 1.0;
-    totalIntensity += intensity * reachMultiplier * count;
-    totalAttempts += count;
+    totalIntensity += intensity * reachMultiplier * e.attempts;
+    totalAttempts += e.attempts;
   });
   const avgIntensity = totalIntensity / totalAttempts;
   const volumeScore = Math.min(totalAttempts / 15, 1.0);
@@ -96,7 +96,7 @@ export default function SessionScreen() {
   const styles = useMemo(() => makeStyles(C), [C]);
   const [targetDate, setTargetDate] = useState(getTodayDate());
   const [isEditing, setIsEditing] = useState(false);
-  const [gradeCounts, setGradeCounts] = useState({});
+  const [gradeData, setGradeData] = useState<Record<string, GradeEntry>>({});
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
   const [notes, setNotes] = useState('');
@@ -131,13 +131,13 @@ export default function SessionScreen() {
     setAlreadySaved(!!existing);
     setSavedSession(existing || null);
     if (existing) {
-      setGradeCounts(existing.gradeCounts || {});
+      setGradeData(existing.gradeData || {});
       setHoldTypes(existing.holdTypes || []);
       setMovementTypes(existing.movementTypes || []);
       setNotes(existing.notes || '');
       setSavedMedia(existing.mediaUris || []);
     } else {
-      setGradeCounts({});
+      setGradeData({});
       setHoldTypes([]);
       setMovementTypes([]);
       setNotes('');
@@ -147,17 +147,43 @@ export default function SessionScreen() {
     setIsRestDay(checkIn?.isRestDay || false);
   };
 
-  const incrementGrade = (grade) => {
+  const incrementAttempts = (grade: string) => {
     Haptics.selectionAsync();
-    setGradeCounts(prev => ({ ...prev, [grade]: (prev[grade] || 0) + 1 }));
+    setGradeData(prev => ({
+      ...prev,
+      [grade]: { attempts: (prev[grade]?.attempts || 0) + 1, sends: prev[grade]?.sends || 0 },
+    }));
   };
 
-  const decrementGrade = (grade) => {
+  const decrementAttempts = (grade: string) => {
     Haptics.selectionAsync();
-    setGradeCounts(prev => {
-      const current = prev[grade] || 0;
-      if (current <= 1) { const u = { ...prev }; delete u[grade]; return u; }
-      return { ...prev, [grade]: current - 1 };
+    setGradeData(prev => {
+      const entry = prev[grade] || { attempts: 0, sends: 0 };
+      const newAttempts = entry.attempts - 1;
+      if (newAttempts <= 0) {
+        const u = { ...prev };
+        delete u[grade];
+        return u;
+      }
+      return { ...prev, [grade]: { attempts: newAttempts, sends: Math.min(entry.sends, newAttempts) } };
+    });
+  };
+
+  const incrementSends = (grade: string) => {
+    Haptics.selectionAsync();
+    setGradeData(prev => {
+      const entry = prev[grade] || { attempts: 0, sends: 0 };
+      if (entry.sends >= entry.attempts) return prev;
+      return { ...prev, [grade]: { ...entry, sends: entry.sends + 1 } };
+    });
+  };
+
+  const decrementSends = (grade: string) => {
+    Haptics.selectionAsync();
+    setGradeData(prev => {
+      const entry = prev[grade] || { attempts: 0, sends: 0 };
+      if (entry.sends <= 0) return prev;
+      return { ...prev, [grade]: { ...entry, sends: entry.sends - 1 } };
     });
   };
 
@@ -194,19 +220,20 @@ export default function SessionScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const persistedUris = await Promise.all(pendingMedia.map(uri => copyMediaToStorage(uri)));
     const mergedMedia = [...savedMedia, ...persistedUris];
-    await saveSession({ date: targetDate, gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
+    await saveSession({ date: targetDate, gradeData, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
     if (!isEditing) scheduleRecoveryReminder(res).catch(() => {});
     setAlreadySaved(true);
-    setSavedSession({ gradeCounts, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
+    setSavedSession({ gradeData, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
     setSavedMedia(mergedMedia);
     setPendingMedia([]);
     if (isEditing) router.navigate('/(tabs)/calendar');
   };
 
   const locked = alreadySaved && !isEditing;
-  const hasGrades = Object.keys(gradeCounts).length > 0;
-  const totalAttempts = Object.values(gradeCounts).reduce((a, b) => a + b, 0);
-  const res = maxGrade ? calculateRES(gradeCounts, maxGrade, holdTypes) : 0;
+  const hasGrades = Object.keys(gradeData).length > 0;
+  const totalAttempts = Object.values(gradeData).reduce((a, e) => a + e.attempts, 0);
+  const totalSends = Object.values(gradeData).reduce((a, e) => a + e.sends, 0);
+  const res = maxGrade ? calculateRES(gradeData, maxGrade, holdTypes) : 0;
 
   const getResColor = (val) => val <= 40 ? C.terra : val <= 70 ? C.amber : C.red;
   const getResBg = (val) => val <= 40 ? C.terraBg : val <= 70 ? C.amberBg : C.redBg;
@@ -258,19 +285,20 @@ export default function SessionScreen() {
             <View style={styles.savedInner}>
               <View style={styles.savedTopRow}>
                 <Text style={styles.savedAttempts}>
-                  {Object.values(savedSession.gradeCounts || {}).reduce((a, b) => a + b, 0)} attempts logged
+                  {Object.values(savedSession.gradeData || {}).reduce((a, e) => a + e.attempts, 0)} attempts · {Object.values(savedSession.gradeData || {}).reduce((a, e) => a + e.sends, 0)} sends
                 </Text>
                 <View style={[styles.resBox, { borderColor: getResBorder(savedSession.res) }]}>
                   <Text style={[styles.resBoxNum, { color: getResColor(savedSession.res) }]}>{savedSession.res}</Text>
                   <Text style={[styles.resBoxLabel, { color: getResColor(savedSession.res) }]}>RES</Text>
                 </View>
               </View>
-              {savedSession.gradeCounts && Object.keys(savedSession.gradeCounts).length > 0 && (
+              {savedSession.gradeData && Object.keys(savedSession.gradeData).length > 0 && (
                 <View style={styles.savedGrades}>
-                  {Object.entries(savedSession.gradeCounts).map(([grade, count]) => (
+                  {Object.entries(savedSession.gradeData).filter(([, e]) => e.attempts > 0).map(([grade, entry]) => (
                     <View key={grade} style={[styles.savedGradeChip, { backgroundColor: gradeColorBg(grade), borderColor: gradeColor(grade) + '40' }]}>
                       <Text style={[styles.savedGradeText, { color: gradeColor(grade) }]}>{grade}</Text>
-                      <Text style={styles.savedGradeCount}>×{count}</Text>
+                      <Text style={styles.savedGradeCount}>×{entry.attempts}</Text>
+                      {entry.sends > 0 && <Text style={[styles.savedGradeCount, { color: gradeColor(grade) }]}>✓{entry.sends}</Text>}
                     </View>
                   ))}
                 </View>
@@ -303,33 +331,57 @@ export default function SessionScreen() {
             )}
 
             {/* Grades */}
-            <Card label={hasGrades ? `Grades Climbed · ${totalAttempts} attempts` : 'Grades Climbed'}>
+            <Card label={hasGrades ? `Grades · ${totalAttempts} att · ${totalSends} sends` : 'Grades Climbed'}>
               <View style={styles.sectionInner}>
-                <Text style={styles.sectionHint}>Tap + to log attempts at each grade</Text>
+                <Text style={styles.sectionHint}>Log attempts, then mark sends (✓) below</Text>
                 <View style={styles.gradeGrid}>
                   {V_GRADES.map((grade) => {
-                    const count = gradeCounts[grade] || 0;
-                    const isActive = count > 0;
+                    const entry = gradeData[grade] || { attempts: 0, sends: 0 };
+                    const isActive = entry.attempts > 0;
+                    const color = gradeColor(grade);
                     return (
                       <View key={grade} style={[
                         styles.gradeCell,
-                        isActive && { borderColor: gradeColor(grade), backgroundColor: gradeColorBg(grade) }
+                        isActive && { borderColor: color, backgroundColor: gradeColorBg(grade) }
                       ]}>
-                        <Text style={[styles.gradeLabel, isActive && { color: gradeColor(grade) }]}>{toDisplayGrade(grade, gradeSystem)}</Text>
-                        <View style={styles.counter}>
+                        <Text style={[styles.gradeLabel, isActive && { color }]}>{toDisplayGrade(grade, gradeSystem)}</Text>
+                        {/* Attempts row */}
+                        <View style={styles.counterRow}>
+                          <Text style={[styles.counterLabel, isActive && { color }]}>att</Text>
                           {isActive && (
-                            <TouchableOpacity onPress={() => decrementGrade(grade)} style={styles.counterBtn}>
-                              <Text style={[styles.counterBtnText, { color: gradeColor(grade) }]}>−</Text>
+                            <TouchableOpacity onPress={() => decrementAttempts(grade)} style={styles.counterBtn}>
+                              <Text style={[styles.counterBtnText, { color }]}>−</Text>
                             </TouchableOpacity>
                           )}
-                          {isActive && <Text style={[styles.countText, { color: gradeColor(grade) }]}>{count}</Text>}
+                          {isActive && <Text style={[styles.countText, { color }]}>{entry.attempts}</Text>}
                           <TouchableOpacity
-                            onPress={() => incrementGrade(grade)}
-                            style={[styles.counterBtn, isActive && { backgroundColor: gradeColor(grade) }]}
+                            onPress={() => incrementAttempts(grade)}
+                            style={[styles.counterBtn, isActive && { backgroundColor: color }]}
                           >
                             <Text style={[styles.counterBtnText, { color: isActive ? '#fff' : C.sand }]}>+</Text>
                           </TouchableOpacity>
                         </View>
+                        {/* Sends row — only visible when there are attempts */}
+                        {isActive && (
+                          <View style={styles.counterRow}>
+                            <Text style={[styles.counterLabel, { color }]}>✓</Text>
+                            <TouchableOpacity
+                              onPress={() => decrementSends(grade)}
+                              style={[styles.counterBtn, entry.sends === 0 && { opacity: 0.3 }]}
+                              disabled={entry.sends === 0}
+                            >
+                              <Text style={[styles.counterBtnText, { color }]}>−</Text>
+                            </TouchableOpacity>
+                            <Text style={[styles.countText, { color }]}>{entry.sends}</Text>
+                            <TouchableOpacity
+                              onPress={() => incrementSends(grade)}
+                              style={[styles.counterBtn, { backgroundColor: color }, entry.sends >= entry.attempts && { opacity: 0.3 }]}
+                              disabled={entry.sends >= entry.attempts}
+                            >
+                              <Text style={[styles.counterBtnText, { color: '#fff' }]}>+</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
                     );
                   })}
@@ -518,9 +570,10 @@ function makeStyles(C) {
     sectionHint: { color: C.dust, fontSize: 11, marginBottom: 12 },
 
     gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    gradeCell: { width: '22%', backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
-    gradeLabel: { color: C.sand, fontSize: 13, fontWeight: '800', marginBottom: 6 },
-    counter: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    gradeCell: { width: '22%', backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight, gap: 4 },
+    gradeLabel: { color: C.sand, fontSize: 13, fontWeight: '800' },
+    counterRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    counterLabel: { color: C.dust, fontSize: 9, fontWeight: '700', width: 14, textAlign: 'center' },
     counterBtn: { width: 20, height: 20, backgroundColor: C.borderLight, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
     counterBtnText: { color: C.sand, fontSize: 13, fontWeight: '800', lineHeight: 17 },
     countText: { color: C.ink, fontSize: 12, fontWeight: '800', minWidth: 12, textAlign: 'center' },

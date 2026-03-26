@@ -24,20 +24,24 @@ function GradeProgressChart({ sessions, gradeSystem, limit }: {
 
   const points = useMemo(() => {
     const sorted = Object.entries(sessions)
-      .filter(([, s]) => s.gradeCounts && Object.keys(s.gradeCounts).length > 0)
+      .filter(([, s]) => s.gradeData && Object.keys(s.gradeData).length > 0)
       .sort(([a], [b]) => a.localeCompare(b));
     const slice = limit === 0 ? sorted : sorted.slice(-limit);
     return slice.map(([date, s]) => {
-      const grades = Object.keys(s.gradeCounts).filter(g => V_GRADES.includes(g));
-      const maxG = grades.reduce((best, g) =>
-        V_GRADES.indexOf(g) > V_GRADES.indexOf(best) ? g : best, grades[0]);
+      const allGrades = Object.keys(s.gradeData).filter(g => V_GRADES.includes(g) && s.gradeData[g].attempts > 0);
+      const sentGrades = allGrades.filter(g => s.gradeData[g].sends > 0);
+      const useGrades = sentGrades.length > 0 ? sentGrades : allGrades;
+      if (useGrades.length === 0) return null;
+      const maxG = useGrades.reduce((best, g) =>
+        V_GRADES.indexOf(g) > V_GRADES.indexOf(best) ? g : best, useGrades[0]);
       const d = new Date(date + 'T00:00:00');
       return {
         grade: maxG,
         idx: V_GRADES.indexOf(maxG),
         month: d.toLocaleDateString('en-US', { month: 'short' }),
+        isSend: sentGrades.includes(maxG),
       };
-    });
+    }).filter(Boolean);
   }, [sessions, limit]);
 
   if (points.length < 2) return (
@@ -71,10 +75,10 @@ function GradeProgressChart({ sessions, gradeSystem, limit }: {
       <Path d={linePath} stroke={C.terra} strokeWidth={2.5} fill="none"
         strokeLinecap="round" strokeLinejoin="round" />
 
-      {/* Dots */}
+      {/* Dots — filled for sends, outlined for attempts only */}
       {points.map((p, i) => (
         <Circle key={i} cx={xFor(i)} cy={yFor(p.idx)} r={n > 20 ? 3 : 4}
-          fill={C.terra} stroke={C.surface} strokeWidth={1.5} />
+          fill={p.isSend ? C.terra : 'transparent'} stroke={C.terra} strokeWidth={1.5} />
       ))}
 
       {/* Y grade labels */}
@@ -231,8 +235,7 @@ export default function CalendarScreen() {
       const chiData = computeCHI(sessionData, checkInData, injuryAlerts);
       let progressCount = 0;
       Object.values(sessionData).forEach((sess: any) => {
-        if (sess.gradeCounts?.[profile.projectGrade])
-          progressCount += sess.gradeCounts[profile.projectGrade];
+        progressCount += sess.gradeData?.[profile.projectGrade]?.sends ?? 0;
       });
       setProjectReadiness(computeProjectReadiness({
         chiData,
@@ -550,7 +553,7 @@ export default function CalendarScreen() {
         </Card>
 
         {/* Grade Progress Chart */}
-        {Object.keys(sessions).filter(d => sessions[d].gradeCounts && Object.keys(sessions[d].gradeCounts).length > 0).length >= 2 && (
+        {Object.keys(sessions).filter(d => sessions[d].gradeData && Object.keys(sessions[d].gradeData).length > 0).length >= 2 && (
           <Card label="Grade Progress">
             <View style={styles.progressInner}>
               <View style={styles.progressTopRow}>
@@ -636,7 +639,7 @@ export default function CalendarScreen() {
                         <Text style={[styles.resScoreLabel, { color: getResColor(C, selectedSession.res) }]}>RES</Text>
                       </View>
                       <Text style={styles.detailAttempts}>
-                        {Object.values(selectedSession.gradeCounts || {}).reduce((a, b) => a + b, 0)} attempts
+                        {Object.values(selectedSession.gradeData || {}).reduce((a, e) => a + e.attempts, 0)} att · {Object.values(selectedSession.gradeData || {}).reduce((a, e) => a + e.sends, 0)} sends
                       </Text>
                     </View>
                   </View>
@@ -646,10 +649,11 @@ export default function CalendarScreen() {
                   {/* Grades */}
                   <Text style={styles.detailSectionLabel}>Grades</Text>
                   <View style={styles.chipRow}>
-                    {Object.entries(selectedSession.gradeCounts || {}).map(([grade, count]) => (
+                    {Object.entries(selectedSession.gradeData || {}).filter(([, e]) => e.attempts > 0).map(([grade, entry]) => (
                       <View key={grade} style={[styles.chip, { borderColor: gradeColor(grade) + '40', backgroundColor: gradeColorBg(grade) }]}>
                         <Text style={[styles.chipGrade, { color: gradeColor(grade) }]}>{toDisplayGrade(grade, gradeSystem)}</Text>
-                        <Text style={[styles.chipCount, { color: gradeColor(grade) + 'aa' }]}>×{count}</Text>
+                        <Text style={[styles.chipCount, { color: gradeColor(grade) + 'aa' }]}>×{entry.attempts}</Text>
+                        {entry.sends > 0 && <Text style={[styles.chipCount, { color: gradeColor(grade) }]}>✓{entry.sends}</Text>}
                       </View>
                     ))}
                   </View>
