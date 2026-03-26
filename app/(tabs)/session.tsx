@@ -9,7 +9,7 @@ import { scheduleRecoveryReminder } from '../../notifications';
 import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession, type GradeEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
-const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
+const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13+'];
 function Card({ label, labelColor, accentColor, bgColor, children, style }: {
   label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
 }) {
@@ -570,7 +570,7 @@ function makeStyles(C) {
     sectionHint: { color: C.dust, fontSize: 11, marginBottom: 12 },
 
     gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    gradeCell: { width: '22%', backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight, gap: 4 },
+    gradeCell: { width: '30%', backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight, gap: 4 },
     gradeLabel: { color: C.sand, fontSize: 13, fontWeight: '800' },
     counterRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
     counterLabel: { color: C.dust, fontSize: 9, fontWeight: '700', width: 14, textAlign: 'center' },

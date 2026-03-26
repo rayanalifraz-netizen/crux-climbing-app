@@ -915,7 +915,7 @@ export default function ProfileScreen() {
             {(totalSessions > 0 || totalCheckIns > 0) && chiData && <CHICard data={chiData} collapsed={!!collapsedCards.chi} onToggle={() => toggleCard('chi')} hasCheckInToday={!!todayCheckIn} />}
 
             {/* Trend Chart */}
-            {(totalCheckIns >= 3 || totalSessions >= 3) && (
+            {(totalCheckIns >= 2 || totalSessions >= 2) && (
               <Card label="Trends" style={{ marginTop: 8 }} collapsible collapsed={!!collapsedCards.trends} onToggle={() => toggleCard('trends')}>
                 <View style={styles.trendInner}>
                   <View style={styles.trendTopRow}>
