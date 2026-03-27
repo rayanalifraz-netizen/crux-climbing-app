@@ -748,6 +748,12 @@ export default function CalendarScreen() {
                   </View>
                 </>
               )}
+              {selectedCheckIn.notes ? (
+                <>
+                  <Text style={styles.detailSectionLabel}>Notes</Text>
+                  <Text style={styles.notesText}>{selectedCheckIn.notes}</Text>
+                </>
+              ) : null}
             </View>
           </Card>
         )}
