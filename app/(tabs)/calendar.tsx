@@ -712,7 +712,15 @@ export default function CalendarScreen() {
               )}
 
               {isRestDay && !selectedSession && (
-                <Text style={styles.restMsg}>Recovery logged — no session this day.</Text>
+                <>
+                  <Text style={styles.restMsg}>Recovery logged — no session this day.</Text>
+                  {selectedCheckIn?.notes ? (
+                    <>
+                      <Text style={[styles.detailSectionLabel, { marginTop: 12 }]}>Notes</Text>
+                      <Text style={styles.notesText}>{selectedCheckIn.notes}</Text>
+                    </>
+                  ) : null}
+                </>
               )}
             </View>
           </Card>
