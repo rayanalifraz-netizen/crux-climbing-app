@@ -290,6 +290,7 @@ const PART_NAMES: Record<string, string> = {
   shoulder: 'Shoulder',
   elbow:    'Elbow',
   wrist:    'Wrist',
+  back:     'Back',
   knee:     'Knee',
   hip:      'Hip',
   ankle:    'Ankle',
@@ -301,6 +302,7 @@ const DEFAULT_THRESHOLDS: Record<string, number> = {
   shoulder: 8,
   thumb:    6,
   elbow:    4,
+  back:     6,
   knee:     8,
   ankle:    8,
   hip:      8,
@@ -312,6 +314,7 @@ const PAIN_AREA_TO_PART: Record<string, string> = {
   shoulder: 'shoulder',
   elbow:    'elbow',
   wrist:    'wrist',
+  back:     'back',
   knee:     'knee',
   hip:      'hip',
 };

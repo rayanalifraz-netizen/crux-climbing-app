@@ -736,6 +736,7 @@ export default function ProfileScreen() {
       { id: 'shoulder', label: 'Shoulder', t: [4, 8] },
       { id: 'elbow',    label: 'Elbow',    t: [2, 4] },
       { id: 'wrist',    label: 'Wrist',    t: [3, 6] },
+      { id: 'back',     label: 'Back',     t: [3, 6] },
       { id: 'hip',      label: 'Hip',      t: [3, 6] },
       { id: 'knee',     label: 'Knee',     t: [3, 6] },
       { id: 'ankle',    label: 'Ankle',    t: [3, 6] },

@@ -64,6 +64,7 @@ const PAIN_AREAS = [
   { id: 'shoulder', label: 'Shoulder' },
   { id: 'elbow', label: 'Elbow' },
   { id: 'wrist', label: 'Wrist' },
+  { id: 'back', label: 'Back' },
   { id: 'knee', label: 'Knee' },
   { id: 'hip', label: 'Hip' },
 ];
