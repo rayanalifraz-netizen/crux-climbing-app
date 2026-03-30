@@ -17,8 +17,8 @@ const BODY_PARTS = [
   { id: 'shoulder',label: 'Shoulder',x: 0.72, y: 0.24, radius: 0.06  },
   { id: 'elbow',   label: 'Elbow',   x: 0.76, y: 0.34, radius: 0.05  },
   { id: 'wrist',   label: 'Wrist',   x: 0.78, y: 0.44, radius: 0.045 },
-  { id: 'back',    label: 'Back',    x: 0.28, y: 0.32, radius: 0.055 },
-  { id: 'hip',     label: 'Hip',     x: 0.62, y: 0.55, radius: 0.055 },
+  { id: 'back',    label: 'Back',    x: 0.08, y: 0.34, radius: 0.055, lineTo: { x: 0.28, y: 0.32 } },
+  { id: 'hip',     label: 'Hip',     x: 0.61, y: 0.48, radius: 0.055 },
   { id: 'knee',    label: 'Knee',    x: 0.62, y: 0.72, radius: 0.055 },
   { id: 'ankle',   label: 'Ankle',   x: 0.62, y: 0.88, radius: 0.045 },
 ];
@@ -202,6 +202,16 @@ function BodyDiagram({ loads, injuries, onPartPress }: { loads: any; injuries: I
 
         return (
           <G key={part.id} onPress={() => onPartPress(part)}>
+            {part.lineTo && (
+              <Line
+                x1={px} y1={py}
+                x2={part.lineTo.x * W} y2={part.lineTo.y * H}
+                stroke={isInjured ? C.red : color}
+                strokeWidth={1.5}
+                strokeDasharray="4,3"
+                opacity={0.7}
+              />
+            )}
             <Circle
               cx={px}
               cy={py}
