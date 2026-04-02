@@ -247,7 +247,7 @@ export const clearAllData = async (): Promise<void> => {
   await FileSystem.deleteAsync(MEDIA_DIR, { idempotent: true }).catch(() => {});
   await AsyncStorage.multiRemove([
     'profile', 'goalDate', 'darkMode', 'alertSettings',
-    'onboardingComplete', 'sessions', 'checkins', 'reminderSettings', 'gradeSystem', 'injuryLog',
+    'onboardingComplete', 'sessions', 'checkins', 'reminderSettings', 'gradeSystem', 'injuryLog', 'bodyOverrides',
   ]);
   await supabaseSignOut().catch(() => {});
 };
@@ -391,6 +391,20 @@ export const getInjuryAlerts = async (windowDays = 14): Promise<BodyAlert[]> => 
     console.error('Error computing injury alerts', e);
     return [];
   }
+};
+
+// ─── Body Part Overrides ──────────────────────────────────────────────────────
+// partId → ISO date when user marked it as "feeling fine"
+
+export type BodyOverrides = Record<string, string>;
+
+export const getBodyOverrides = async (): Promise<BodyOverrides> => {
+  const data = await get('bodyOverrides');
+  return data ? JSON.parse(data) : {};
+};
+
+export const saveBodyOverrides = async (overrides: BodyOverrides): Promise<void> => {
+  await set('bodyOverrides', JSON.stringify(overrides));
 };
 
 // ─── Injury Log ───────────────────────────────────────────────────────────────

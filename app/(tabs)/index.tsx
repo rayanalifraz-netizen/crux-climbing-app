@@ -8,7 +8,7 @@ if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
 import { applyReminderSettings, cancelRecoveryReminder, cancelStreakProtection, getReminderSettings, saveReminderSettings, scheduleInsightNotifications, scheduleStreakProtection, type ReminderSettings } from '../../notifications';
-import { getAlertSettings, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
+import { getAlertSettings, getBodyOverrides, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
 import { gradeColor, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 import { getCurrentUser, signOut } from '../../lib/supabase';
 import { computeCHI, V_GRADES } from '../../lib/scoring';
@@ -576,8 +576,8 @@ export default function ProfileScreen() {
   }, []);
 
   const loadData = useCallback(async () => {
-    const [prof, sessions, checkIns, alerts, alertPrefs] = await Promise.all([
-      getProfile(), getSessions(), getCheckIns(), getInjuryAlerts(), getAlertSettings(),
+    const [prof, sessions, checkIns, alerts, alertPrefs, bodyOverrides] = await Promise.all([
+      getProfile(), getSessions(), getCheckIns(), getInjuryAlerts(), getAlertSettings(), getBodyOverrides(),
     ]);
     if (!prof) { setProfile(null); return; }
     setProfile(prof);
@@ -730,6 +730,8 @@ export default function ProfileScreen() {
       });
       ci.affectedFingers?.forEach(() => { bodyLoads.fingers = (bodyLoads.fingers || 0) + 1; });
     });
+    // Apply overrides — user marked these parts as feeling fine
+    Object.keys(bodyOverrides).forEach(partId => { bodyLoads[partId] = 0; });
     const BODY_PARTS_RPT = [
       { id: 'fingers',  label: 'Fingers',  t: [3, 6] },
       { id: 'thumb',    label: 'Thumb',    t: [3, 6] },

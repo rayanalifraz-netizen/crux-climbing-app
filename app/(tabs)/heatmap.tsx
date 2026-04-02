@@ -3,7 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Dimensions, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
-import { InjuryEntry, addInjuryEntry, getAlertSettings, getCheckIns, getInjuryLog, getSessions, resolveInjuryEntry } from '../../storage';
+import { BodyOverrides, InjuryEntry, addInjuryEntry, getAlertSettings, getBodyOverrides, getCheckIns, getInjuryLog, getSessions, resolveInjuryEntry, saveBodyOverrides } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -246,12 +246,14 @@ export default function HeatmapScreen() {
   const [selectedPart, setSelectedPart] = useState<typeof BODY_PARTS[0] | null>(null);
   const [injuryNote, setInjuryNote] = useState('');
   const [showInjuryModal, setShowInjuryModal] = useState(false);
+  const [overrides, setOverrides] = useState<BodyOverrides>({});
 
   useFocusEffect(useCallback(() => { loadAll(); }, [window]));
 
   const loadAll = async () => {
-    const [log] = await Promise.all([getInjuryLog(), computeLoads()]);
+    const [log, ovr] = await Promise.all([getInjuryLog(), getBodyOverrides(), computeLoads()]);
     setInjuryLog(log as InjuryEntry[]);
+    setOverrides(ovr as BodyOverrides);
   };
 
   const computeLoads = async () => {
@@ -310,6 +312,26 @@ export default function HeatmapScreen() {
     setShowInjuryModal(true);
   };
 
+  const handleMarkFine = async () => {
+    if (!selectedPart) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const today = new Date().toISOString().split('T')[0];
+    const updated = { ...overrides, [selectedPart.id]: today };
+    await saveBodyOverrides(updated);
+    setOverrides(updated);
+    setShowInjuryModal(false);
+  };
+
+  const handleRemoveOverride = async () => {
+    if (!selectedPart) return;
+    Haptics.selectionAsync();
+    const updated = { ...overrides };
+    delete updated[selectedPart.id];
+    await saveBodyOverrides(updated);
+    setOverrides(updated);
+    setShowInjuryModal(false);
+  };
+
   const handleLogInjury = async () => {
     if (!selectedPart) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -335,9 +357,13 @@ export default function HeatmapScreen() {
 
   const activeInjuries = injuryLog.filter(e => !e.resolved);
 
-  const totalLoad = Object.values(loads).reduce((a, b) => a + b, 0);
+  // Apply overrides — overridden parts show as 0 load
+  const effectiveLoads = { ...loads };
+  Object.keys(overrides).forEach(partId => { effectiveLoads[partId] = 0; });
+
+  const totalLoad = Object.values(effectiveLoads).reduce((a, b) => a + b, 0);
   const highParts = BODY_PARTS.filter(p => {
-    const load = loads[p.id] || 0;
+    const load = effectiveLoads[p.id] || 0;
     return load >= THRESHOLDS[p.id][1];
   });
 
@@ -393,7 +419,7 @@ export default function HeatmapScreen() {
           style={{ marginHorizontal: 16 }}
         >
           <View style={styles.diagramInner}>
-            <BodyDiagram loads={loads} injuries={injuryLog} onPartPress={handlePartPress} />
+            <BodyDiagram loads={effectiveLoads} injuries={injuryLog} onPartPress={handlePartPress} />
           </View>
         </Card>
 
@@ -415,7 +441,9 @@ export default function HeatmapScreen() {
         <Card label="Load Breakdown" style={{ marginHorizontal: 16 }}>
           <View style={styles.breakdownInner}>
             {BODY_PARTS.map((part, i) => {
-              const load = loads[part.id] || 0;
+              const load = effectiveLoads[part.id] || 0;
+              const rawLoad = loads[part.id] || 0;
+              const isOverridden = !!overrides[part.id];
               const thresholds = THRESHOLDS[part.id];
               const color = getColor(C, load, thresholds);
               const bgColor = getBgColor(C, load, thresholds);
@@ -436,9 +464,17 @@ export default function HeatmapScreen() {
                     </View>
                     <View style={[styles.breakdownBadge, { borderColor: activeInjury ? C.redBorder : borderColor, backgroundColor: activeInjury ? C.redBg : bgColor }]}>
                       <Text style={[styles.breakdownBadgeText, { color: activeInjury ? C.red : color }]}>
-                        {activeInjury ? 'Injured' : getLabel(load, thresholds)}
+                        {activeInjury ? 'Injured' : isOverridden ? 'Feels Fine' : getLabel(load, thresholds)}
                       </Text>
                     </View>
+                    {isOverridden && rawLoad > 0 && (
+                      <TouchableOpacity
+                        style={[styles.breakdownBadge, { borderColor: C.borderLight, backgroundColor: C.surfaceAlt, marginLeft: 4 }]}
+                        onPress={() => { setSelectedPart(BODY_PARTS.find(p => p.id === part.id) || null); setShowInjuryModal(true); }}
+                      >
+                        <Text style={[styles.breakdownBadgeText, { color: C.dust }]}>✕ Remove</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                   {activeInjury && (
                     <View style={styles.breakdownInjuryRow}>
@@ -532,8 +568,31 @@ export default function HeatmapScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Log Injury</Text>
-            <Text style={styles.modalPart}>{selectedPart?.label}</Text>
+            <Text style={styles.modalTitle}>{selectedPart?.label}</Text>
+
+            {/* Feeling fine / override section */}
+            {selectedPart && overrides[selectedPart.id] ? (
+              <>
+                <View style={[styles.modalFineTag, { backgroundColor: C.greenBg, borderColor: C.greenBorder }]}>
+                  <Text style={[styles.modalFineTagText, { color: C.green }]}>✓ Marked as feeling fine — load ignored</Text>
+                </View>
+                <TouchableOpacity style={[styles.modalFineBtn, { borderColor: C.borderLight, backgroundColor: C.surfaceAlt }]} onPress={handleRemoveOverride}>
+                  <Text style={[styles.modalFineBtnText, { color: C.sand }]}>Remove Override</Text>
+                </TouchableOpacity>
+              </>
+            ) : selectedPart && (loads[selectedPart.id] || 0) > 0 ? (
+              <>
+                <Text style={styles.modalLoadHint}>
+                  {getLabel(loads[selectedPart.id] || 0, THRESHOLDS[selectedPart.id])} load detected — tap below if it feels fine
+                </Text>
+                <TouchableOpacity style={[styles.modalFineBtn, { borderColor: C.greenBorder, backgroundColor: C.greenBg }]} onPress={handleMarkFine}>
+                  <Text style={[styles.modalFineBtnText, { color: C.green }]}>Feels Fine — Clear Load</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+
+            <View style={styles.modalDivider} />
+            <Text style={styles.modalInjuryLabel}>Log an Injury</Text>
             <TextInput
               style={styles.modalInput}
               value={injuryNote}
@@ -543,7 +602,6 @@ export default function HeatmapScreen() {
               multiline
               numberOfLines={3}
               maxLength={300}
-              autoFocus
             />
             <View style={styles.modalBtns}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setShowInjuryModal(false)}>
@@ -631,7 +689,13 @@ function makeStyles(C) {
     modalSheet: { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 14 },
     modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 8 },
     modalTitle: { fontSize: 22, fontWeight: '800', color: C.ink, letterSpacing: -0.5 },
-    modalPart: { fontSize: 13, fontWeight: '700', color: C.dust, marginTop: -8 },
+    modalLoadHint: { fontSize: 12, color: C.dust, marginTop: -6 },
+    modalFineTag: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+    modalFineTagText: { fontSize: 12, fontWeight: '700' },
+    modalFineBtn: { borderWidth: 1.5, borderRadius: 12, padding: 14, alignItems: 'center' },
+    modalFineBtnText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+    modalDivider: { height: 1, backgroundColor: C.borderLight },
+    modalInjuryLabel: { fontSize: 11, fontWeight: '800', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: -4 },
     modalInput: { backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.borderLight, borderRadius: 12, padding: 14, color: C.ink, fontSize: 13, lineHeight: 20, minHeight: 80, textAlignVertical: 'top' },
     modalBtns: { flexDirection: 'row', gap: 10 },
     modalCancel: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center' },
