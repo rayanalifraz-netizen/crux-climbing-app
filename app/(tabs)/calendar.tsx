@@ -872,7 +872,7 @@ export default function CalendarScreen() {
 function makeStyles(C) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
-    scrollContent: { paddingBottom: 60 },
+    scrollContent: { paddingBottom: 110 },
 
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 28, paddingBottom: 16 },
     greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },

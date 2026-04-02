@@ -579,7 +579,7 @@ export default function SessionScreen() {
 function makeStyles(C) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
-    scrollContent: { paddingBottom: 60 },
+    scrollContent: { paddingBottom: 110 },
 
     header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
     greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
