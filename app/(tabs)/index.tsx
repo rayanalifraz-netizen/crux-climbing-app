@@ -272,7 +272,7 @@ function computeRecovery(sessions, checkIns) {
   days = Math.min(days, 3);
 
   const earliestDate = new Date(lastD);
-  earliestDate.setDate(earliestDate.getDate() + days);
+  earliestDate.setDate(earliestDate.getDate() + days + 1);
   const isReady = today >= earliestDate;
 
   return { days, earliestDate, isReady, factors, res: lastSession.res };
