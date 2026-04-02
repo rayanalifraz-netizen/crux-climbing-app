@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
-import { deleteGoalDate, getCheckIns, getGoalDate, getInjuryAlerts, getProfile, getSessions, saveGoalDate } from '../../storage';
+import { deleteGoalDate, getCheckIns, getGoalDate, getInjuryAlerts, getProfile, getSessions, saveGoalDate, type ClimbEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 import { V_GRADES, computeCHI, computeProjectReadiness } from '../../lib/scoring';
 
@@ -639,7 +639,7 @@ export default function CalendarScreen() {
                         <Text style={[styles.resScoreLabel, { color: getResColor(C, selectedSession.res) }]}>RES</Text>
                       </View>
                       <Text style={styles.detailAttempts}>
-                        {Object.values(selectedSession.gradeData || {}).reduce((a, e) => a + e.attempts, 0)} att · {Object.values(selectedSession.gradeData || {}).reduce((a, e) => a + e.sends, 0)} sends
+                        {(selectedSession.climbs || Object.entries(selectedSession.gradeData || {}).map(([g, e]) => ({ attempts: e.attempts, sends: e.sends }))).reduce((a, e) => a + e.attempts, 0)} att · {(selectedSession.climbs || Object.entries(selectedSession.gradeData || {}).map(([g, e]) => ({ attempts: e.attempts, sends: e.sends }))).reduce((a, e) => a + e.sends, 0)} sends
                       </Text>
                     </View>
                   </View>
@@ -648,14 +648,23 @@ export default function CalendarScreen() {
 
                   {/* Grades */}
                   <Text style={styles.detailSectionLabel}>Grades</Text>
-                  <View style={styles.chipRow}>
-                    {Object.entries(selectedSession.gradeData || {}).filter(([, e]) => e.attempts > 0).map(([grade, entry]) => (
-                      <View key={grade} style={[styles.chip, { borderColor: gradeColor(grade) + '40', backgroundColor: gradeColorBg(grade) }]}>
-                        <Text style={[styles.chipGrade, { color: gradeColor(grade) }]}>{toDisplayGrade(grade, gradeSystem)}</Text>
-                        <Text style={[styles.chipCount, { color: gradeColor(grade) + 'aa' }]}>×{entry.attempts}</Text>
-                        {entry.sends > 0 && <Text style={[styles.chipCount, { color: gradeColor(grade) }]}>✓{entry.sends}</Text>}
-                      </View>
-                    ))}
+                  <View style={styles.climbEntryList}>
+                    {(selectedSession.climbs ||
+                      Object.entries(selectedSession.gradeData || {})
+                        .filter(([, e]) => e.attempts > 0)
+                        .map(([grade, e]) => ({ id: grade, grade, attempts: e.attempts, sends: e.sends }))
+                    ).map((c: ClimbEntry) => {
+                      const color = gradeColor(c.grade);
+                      let label: string;
+                      if (c.attempts === 1 && c.sends === 1) label = `${toDisplayGrade(c.grade, gradeSystem)} · Flash`;
+                      else if (c.sends >= 1) label = `${toDisplayGrade(c.grade, gradeSystem)} · ${c.attempts} att · Sent ✓`;
+                      else label = `${toDisplayGrade(c.grade, gradeSystem)} · ${c.attempts} att`;
+                      return (
+                        <View key={c.id} style={[styles.climbEntryRow, { borderLeftColor: color }]}>
+                          <Text style={[styles.climbEntryText, { color }]}>{label}</Text>
+                        </View>
+                      );
+                    })}
                   </View>
 
                   {selectedSession.holdTypes?.length > 0 && (
@@ -944,6 +953,9 @@ function makeStyles(C) {
     chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
     chipGrade: { fontSize: 12, fontWeight: '800' },
     chipCount: { fontSize: 11 },
+    climbEntryList: { gap: 7, marginBottom: 12 },
+    climbEntryRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surfaceAlt, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, borderLeftWidth: 3 },
+    climbEntryText: { fontSize: 13, fontWeight: '700' },
     notesText: { color: C.sand, fontSize: 12, lineHeight: 18, marginBottom: 8 },
     restBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
     restBadgeText: { color: C.green, fontSize: 11, fontWeight: '800' },
