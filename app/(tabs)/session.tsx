@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { editStore } from '../../lib/editStore';
 import { Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
@@ -97,6 +97,7 @@ export default function SessionScreen() {
   const [targetDate, setTargetDate] = useState(getTodayDate());
   const [isEditing, setIsEditing] = useState(false);
   const [gradeData, setGradeData] = useState<Record<string, GradeEntry>>({});
+  const hasUnsavedProgress = useRef(false);
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
   const [notes, setNotes] = useState('');
@@ -113,6 +114,8 @@ export default function SessionScreen() {
     editStore.sessionDate = null;
     const date = editDate || getTodayDate();
     const editing = !!editDate;
+    // Preserve in-progress unsaved work when switching tabs
+    if (!editDate && hasUnsavedProgress.current) return;
     setTargetDate(date);
     setIsEditing(editing);
     loadProfile();
@@ -149,6 +152,7 @@ export default function SessionScreen() {
 
   const incrementAttempts = (grade: string) => {
     Haptics.selectionAsync();
+    hasUnsavedProgress.current = true;
     setGradeData(prev => ({
       ...prev,
       [grade]: { attempts: (prev[grade]?.attempts || 0) + 1, sends: prev[grade]?.sends || 0 },
@@ -218,6 +222,7 @@ export default function SessionScreen() {
 
   const handleSave = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hasUnsavedProgress.current = false;
     const persistedUris = await Promise.all(pendingMedia.map(uri => copyMediaToStorage(uri)));
     const mergedMedia = [...savedMedia, ...persistedUris];
     await saveSession({ date: targetDate, gradeData, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
