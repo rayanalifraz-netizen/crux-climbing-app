@@ -92,13 +92,18 @@ function SessionCard({ session, date }: { session: Session; date: string }) {
         <View style={sc.block}>
           <Text style={sc.blockLabel}>Grades</Text>
           <View style={sc.chipRow}>
-            {grades.map(([grade, entry]) => (
-              <View key={grade} style={[sc.gradeChip, { borderColor: gradeColor(grade) + '50', backgroundColor: gradeColor(grade) + '15' }]}>
-                <Text style={[sc.gradeChipText, { color: gradeColor(grade) }]}>{grade}</Text>
-                <Text style={[sc.gradeChipCount, { color: gradeColor(grade) + 'aa' }]}>×{entry.attempts}</Text>
-                {entry.sends > 0 && <Text style={[sc.gradeChipCount, { color: gradeColor(grade) }]}>✓{entry.sends}</Text>}
-              </View>
-            ))}
+            {grades.map(([grade, entry]) => {
+              const color = gradeColor(grade);
+              let label: string;
+              if (entry.attempts === 1 && entry.sends === 1) label = `${grade} · Flash`;
+              else if (entry.sends >= 1) label = `${grade} · ${entry.attempts} att · Sent ✓`;
+              else label = `${grade} · ${entry.attempts} att`;
+              return (
+                <View key={grade} style={[sc.gradeChip, { borderColor: color + '50', backgroundColor: color + '15' }]}>
+                  <Text style={[sc.gradeChipText, { color }]}>{label}</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
       )}

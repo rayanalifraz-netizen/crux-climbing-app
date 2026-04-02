@@ -3,13 +3,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { editStore } from '../../lib/editStore';
-import { Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { scheduleRecoveryReminder } from '../../notifications';
 import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession, type GradeEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13+'];
+const ATTEMPT_OPTIONS = ['Flash', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
+
+function entryLabel(grade: string, entry: GradeEntry, gradeSystem: string): string {
+  const g = toDisplayGrade(grade, gradeSystem);
+  if (entry.attempts === 1 && entry.sends === 1) return `${g} · Flash`;
+  if (entry.sends >= 1) return `${g} · ${entry.attempts} att · Sent ✓`;
+  return `${g} · ${entry.attempts} att`;
+}
 function Card({ label, labelColor, accentColor, bgColor, children, style }: {
   label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
 }) {
@@ -108,6 +116,11 @@ export default function SessionScreen() {
   const [savedSession, setSavedSession] = useState(null);
   const [isRestDay, setIsRestDay] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
+  const [draftGrade, setDraftGrade] = useState('V4');
+  const [draftAttempts, setDraftAttempts] = useState('Flash');
+  const [draftSent, setDraftSent] = useState(false);
+  const [showGradePicker, setShowGradePicker] = useState(false);
+  const [showAttemptsPicker, setShowAttemptsPicker] = useState(false);
 
   useFocusEffect(useCallback(() => {
     const editDate = editStore.sessionDate;
@@ -150,44 +163,21 @@ export default function SessionScreen() {
     setIsRestDay(checkIn?.isRestDay || false);
   };
 
-  const incrementAttempts = (grade: string) => {
+  const addGradeEntry = () => {
     Haptics.selectionAsync();
     hasUnsavedProgress.current = true;
-    setGradeData(prev => ({
-      ...prev,
-      [grade]: { attempts: (prev[grade]?.attempts || 0) + 1, sends: prev[grade]?.sends || 0 },
-    }));
+    const attNum = draftAttempts === 'Flash' ? 1 : draftAttempts === '10+' ? 10 : parseInt(draftAttempts);
+    const sends = draftAttempts === 'Flash' ? 1 : draftSent ? 1 : 0;
+    setGradeData(prev => ({ ...prev, [draftGrade]: { attempts: attNum, sends } }));
   };
 
-  const decrementAttempts = (grade: string) => {
+  const removeGradeEntry = (grade: string) => {
     Haptics.selectionAsync();
+    hasUnsavedProgress.current = true;
     setGradeData(prev => {
-      const entry = prev[grade] || { attempts: 0, sends: 0 };
-      const newAttempts = entry.attempts - 1;
-      if (newAttempts <= 0) {
-        const u = { ...prev };
-        delete u[grade];
-        return u;
-      }
-      return { ...prev, [grade]: { attempts: newAttempts, sends: Math.min(entry.sends, newAttempts) } };
-    });
-  };
-
-  const incrementSends = (grade: string) => {
-    Haptics.selectionAsync();
-    setGradeData(prev => {
-      const entry = prev[grade] || { attempts: 0, sends: 0 };
-      if (entry.sends >= entry.attempts) return prev;
-      return { ...prev, [grade]: { ...entry, sends: entry.sends + 1 } };
-    });
-  };
-
-  const decrementSends = (grade: string) => {
-    Haptics.selectionAsync();
-    setGradeData(prev => {
-      const entry = prev[grade] || { attempts: 0, sends: 0 };
-      if (entry.sends <= 0) return prev;
-      return { ...prev, [grade]: { ...entry, sends: entry.sends - 1 } };
+      const u = { ...prev };
+      delete u[grade];
+      return u;
     });
   };
 
@@ -301,9 +291,9 @@ export default function SessionScreen() {
                 <View style={styles.savedGrades}>
                   {Object.entries(savedSession.gradeData).filter(([, e]) => e.attempts > 0).map(([grade, entry]) => (
                     <View key={grade} style={[styles.savedGradeChip, { backgroundColor: gradeColorBg(grade), borderColor: gradeColor(grade) + '40' }]}>
-                      <Text style={[styles.savedGradeText, { color: gradeColor(grade) }]}>{grade}</Text>
-                      <Text style={styles.savedGradeCount}>×{entry.attempts}</Text>
-                      {entry.sends > 0 && <Text style={[styles.savedGradeCount, { color: gradeColor(grade) }]}>✓{entry.sends}</Text>}
+                      <Text style={[styles.savedGradeText, { color: gradeColor(grade) }]}>
+                        {entryLabel(grade, entry, gradeSystem)}
+                      </Text>
                     </View>
                   ))}
                 </View>
@@ -338,59 +328,55 @@ export default function SessionScreen() {
             {/* Grades */}
             <Card label={hasGrades ? `Grades · ${totalAttempts} att · ${totalSends} sends` : 'Grades Climbed'}>
               <View style={styles.sectionInner}>
-                <Text style={styles.sectionHint}>Log attempts, then mark sends (✓) below</Text>
-                <View style={styles.gradeGrid}>
-                  {V_GRADES.map((grade) => {
-                    const entry = gradeData[grade] || { attempts: 0, sends: 0 };
-                    const isActive = entry.attempts > 0;
-                    const color = gradeColor(grade);
-                    return (
-                      <View key={grade} style={[
-                        styles.gradeCell,
-                        isActive && { borderColor: color, backgroundColor: gradeColorBg(grade) }
-                      ]}>
-                        <Text style={[styles.gradeLabel, isActive && { color }]}>{toDisplayGrade(grade, gradeSystem)}</Text>
-                        {/* Attempts row */}
-                        <View style={styles.counterRow}>
-                          <Text style={[styles.counterLabel, isActive && { color }]}>att</Text>
-                          {isActive && (
-                            <TouchableOpacity onPress={() => decrementAttempts(grade)} style={styles.counterBtn}>
-                              <Text style={[styles.counterBtnText, { color }]}>−</Text>
-                            </TouchableOpacity>
-                          )}
-                          {isActive && <Text style={[styles.countText, { color }]}>{entry.attempts}</Text>}
-                          <TouchableOpacity
-                            onPress={() => incrementAttempts(grade)}
-                            style={[styles.counterBtn, isActive && { backgroundColor: color }]}
-                          >
-                            <Text style={[styles.counterBtnText, { color: isActive ? '#fff' : C.sand }]}>+</Text>
+                {/* Picker row */}
+                <View style={styles.pickerRow}>
+                  <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowGradePicker(true); }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerBtnLabel}>Grade</Text>
+                      <Text style={[styles.pickerBtnValue, { color: gradeColor(draftGrade) }]}>{toDisplayGrade(draftGrade, gradeSystem)}</Text>
+                    </View>
+                    <Text style={styles.pickerBtnChevron}>▾</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowAttemptsPicker(true); }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerBtnLabel}>Attempts</Text>
+                      <Text style={styles.pickerBtnValue}>{draftAttempts}</Text>
+                    </View>
+                    <Text style={styles.pickerBtnChevron}>▾</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Sent toggle */}
+                {draftAttempts !== 'Flash' && (
+                  <TouchableOpacity style={styles.sentToggle} onPress={() => { Haptics.selectionAsync(); setDraftSent(v => !v); }}>
+                    <View style={[styles.sentCheckbox, draftSent && { backgroundColor: C.terra, borderColor: C.terra }]}>
+                      {draftSent && <Text style={styles.sentCheckmark}>✓</Text>}
+                    </View>
+                    <Text style={styles.sentLabel}>Sent it</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Add button */}
+                <TouchableOpacity style={styles.addEntryBtn} onPress={addGradeEntry}>
+                  <Text style={styles.addEntryBtnText}>+ Add</Text>
+                </TouchableOpacity>
+
+                {/* Entry list */}
+                {hasGrades && (
+                  <View style={styles.entryList}>
+                    {Object.entries(gradeData).filter(([, e]) => e.attempts > 0).map(([grade, entry]) => {
+                      const color = gradeColor(grade);
+                      return (
+                        <View key={grade} style={[styles.entryRow, { borderLeftColor: color }]}>
+                          <Text style={[styles.entryText, { color }]}>{entryLabel(grade, entry, gradeSystem)}</Text>
+                          <TouchableOpacity onPress={() => removeGradeEntry(grade)} style={styles.entryRemoveBtn}>
+                            <Text style={styles.entryRemoveText}>✕</Text>
                           </TouchableOpacity>
                         </View>
-                        {/* Sends row — only visible when there are attempts */}
-                        {isActive && (
-                          <View style={styles.counterRow}>
-                            <Text style={[styles.counterLabel, { color }]}>✓</Text>
-                            <TouchableOpacity
-                              onPress={() => decrementSends(grade)}
-                              style={[styles.counterBtn, entry.sends === 0 && { opacity: 0.3 }]}
-                              disabled={entry.sends === 0}
-                            >
-                              <Text style={[styles.counterBtnText, { color }]}>−</Text>
-                            </TouchableOpacity>
-                            <Text style={[styles.countText, { color }]}>{entry.sends}</Text>
-                            <TouchableOpacity
-                              onPress={() => incrementSends(grade)}
-                              style={[styles.counterBtn, { backgroundColor: color }, entry.sends >= entry.attempts && { opacity: 0.3 }]}
-                              disabled={entry.sends >= entry.attempts}
-                            >
-                              <Text style={[styles.counterBtnText, { color: '#fff' }]}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             </Card>
 
@@ -525,6 +511,54 @@ export default function SessionScreen() {
           date={targetDate}
         />
       )}
+
+      {/* Grade Picker Modal */}
+      <Modal visible={showGradePicker} transparent animationType="slide" onRequestClose={() => setShowGradePicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowGradePicker(false)}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerSheetHandle} />
+            <Text style={styles.pickerSheetTitle}>Select Grade</Text>
+            <ScrollView style={{ maxHeight: 340 }}>
+              {V_GRADES.map(grade => (
+                <TouchableOpacity
+                  key={grade}
+                  style={[styles.pickerOption, draftGrade === grade && styles.pickerOptionSelected]}
+                  onPress={() => { Haptics.selectionAsync(); setDraftGrade(grade); setShowGradePicker(false); }}
+                >
+                  <Text style={[styles.pickerOptionText, { color: gradeColor(grade) }, draftGrade === grade && styles.pickerOptionTextSelected]}>
+                    {toDisplayGrade(grade, gradeSystem)}
+                  </Text>
+                  {draftGrade === grade && <Text style={styles.pickerCheckmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Attempts Picker Modal */}
+      <Modal visible={showAttemptsPicker} transparent animationType="slide" onRequestClose={() => setShowAttemptsPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowAttemptsPicker(false)}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerSheetHandle} />
+            <Text style={styles.pickerSheetTitle}>Attempts</Text>
+            <ScrollView style={{ maxHeight: 340 }}>
+              {ATTEMPT_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.pickerOption, draftAttempts === opt && styles.pickerOptionSelected]}
+                  onPress={() => { Haptics.selectionAsync(); setDraftAttempts(opt); if (opt === 'Flash') setDraftSent(false); setShowAttemptsPicker(false); }}
+                >
+                  <Text style={[styles.pickerOptionText, draftAttempts === opt && styles.pickerOptionTextSelected]}>
+                    {opt === 'Flash' ? 'Flash' : opt === '1' ? '1 attempt' : `${opt} attempts`}
+                  </Text>
+                  {draftAttempts === opt && <Text style={styles.pickerCheckmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -574,14 +608,31 @@ function makeStyles(C) {
     sectionInner: { padding: 16, paddingTop: 14 },
     sectionHint: { color: C.dust, fontSize: 11, marginBottom: 12 },
 
-    gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    gradeCell: { width: '30%', backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: C.borderLight, gap: 4 },
-    gradeLabel: { color: C.sand, fontSize: 13, fontWeight: '800' },
-    counterRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    counterLabel: { color: C.dust, fontSize: 9, fontWeight: '700', width: 14, textAlign: 'center' },
-    counterBtn: { width: 20, height: 20, backgroundColor: C.borderLight, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-    counterBtnText: { color: C.sand, fontSize: 13, fontWeight: '800', lineHeight: 17 },
-    countText: { color: C.ink, fontSize: 12, fontWeight: '800', minWidth: 12, textAlign: 'center' },
+    pickerRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+    pickerBtn: { flex: 1, backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.borderLight, flexDirection: 'row', alignItems: 'center' },
+    pickerBtnLabel: { fontSize: 9, color: C.dust, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', flex: 1 },
+    pickerBtnValue: { fontSize: 15, fontWeight: '800', color: C.ink, marginRight: 4 },
+    pickerBtnChevron: { fontSize: 11, color: C.dust },
+    sentToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+    sentCheckbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: C.borderLight, justifyContent: 'center', alignItems: 'center' },
+    sentCheckmark: { color: '#fff', fontSize: 11, fontWeight: '800' },
+    sentLabel: { color: C.sand, fontSize: 13, fontWeight: '600' },
+    addEntryBtn: { backgroundColor: C.ink, borderRadius: 10, padding: 12, alignItems: 'center', marginBottom: 14 },
+    addEntryBtnText: { color: C.surface, fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
+    entryList: { gap: 8 },
+    entryRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surfaceAlt, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderLeftWidth: 3 },
+    entryText: { fontSize: 14, fontWeight: '700', flex: 1 },
+    entryRemoveBtn: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
+    entryRemoveText: { color: C.dust, fontSize: 13, fontWeight: '800' },
+    pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+    pickerSheet: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 40 },
+    pickerSheetHandle: { width: 36, height: 4, backgroundColor: C.borderLight, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 8 },
+    pickerSheetTitle: { fontSize: 13, fontWeight: '800', color: C.ink, letterSpacing: 0.3, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10 },
+    pickerOption: { paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: C.borderLight },
+    pickerOptionSelected: { backgroundColor: C.surfaceAlt },
+    pickerOptionText: { fontSize: 15, fontWeight: '700', color: C.sand },
+    pickerOptionTextSelected: { color: C.ink },
+    pickerCheckmark: { fontSize: 13, color: C.terra, fontWeight: '800' },
 
     resInner: { padding: 18, paddingLeft: 24 },
     resTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
