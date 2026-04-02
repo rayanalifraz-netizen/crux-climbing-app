@@ -7,6 +7,13 @@ export type GradeEntry = {
   sends: number;
 };
 
+export type ClimbEntry = {
+  id: string;
+  grade: string;
+  attempts: number;
+  sends: number;
+};
+
 export type Session = {
   date: string;
   gradeData: Record<string, GradeEntry>;
@@ -16,6 +23,7 @@ export type Session = {
   res: number;
   notes?: string;
   mediaUris?: string[];
+  climbs?: ClimbEntry[]; // ordered individual climb entries (one per logged climb)
 };
 
 export type CheckIn = {

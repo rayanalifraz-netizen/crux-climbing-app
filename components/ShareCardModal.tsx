@@ -59,8 +59,13 @@ function fmt(dateStr: string) {
 
 function SessionCard({ session, date }: { session: Session; date: string }) {
   const color = resColor(session.res);
-  const totalAttempts = Object.values(session.gradeData || {}).reduce((a, e) => a + e.attempts, 0);
-  const grades = Object.entries(session.gradeData || {}).filter(([, e]) => e.attempts > 0);
+  // use individual climb entries if available, else fall back to gradeData
+  const grades = session.climbs && session.climbs.length > 0
+    ? session.climbs
+    : Object.entries(session.gradeData || {})
+        .filter(([, e]) => e.attempts > 0)
+        .map(([grade, e]) => ({ id: grade, grade, attempts: e.attempts, sends: e.sends }));
+  const totalAttempts = grades.reduce((a, e) => a + e.attempts, 0);
 
   return (
     <View style={sc.card}>
@@ -92,14 +97,14 @@ function SessionCard({ session, date }: { session: Session; date: string }) {
         <View style={sc.block}>
           <Text style={sc.blockLabel}>Grades</Text>
           <View style={sc.chipRow}>
-            {grades.map(([grade, entry]) => {
-              const color = gradeColor(grade);
+            {grades.map(entry => {
+              const color = gradeColor(entry.grade);
               let label: string;
-              if (entry.attempts === 1 && entry.sends === 1) label = `${grade} · Flash`;
-              else if (entry.sends >= 1) label = `${grade} · ${entry.attempts} att · Sent ✓`;
-              else label = `${grade} · ${entry.attempts} att`;
+              if (entry.attempts === 1 && entry.sends === 1) label = `${entry.grade} · Flash`;
+              else if (entry.sends >= 1) label = `${entry.grade} · ${entry.attempts} att · Sent ✓`;
+              else label = `${entry.grade} · ${entry.attempts} att`;
               return (
-                <View key={grade} style={[sc.gradeChip, { borderColor: color + '50', backgroundColor: color + '15' }]}>
+                <View key={entry.id} style={[sc.gradeChip, { borderColor: color + '50', backgroundColor: color + '15' }]}>
                   <Text style={[sc.gradeChipText, { color }]}>{label}</Text>
                 </View>
               );

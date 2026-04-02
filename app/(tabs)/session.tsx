@@ -6,7 +6,7 @@ import { editStore } from '../../lib/editStore';
 import { Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { scheduleRecoveryReminder } from '../../notifications';
-import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession, type GradeEntry } from '../../storage';
+import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession, type ClimbEntry, type GradeEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13+'];
@@ -104,7 +104,7 @@ export default function SessionScreen() {
   const styles = useMemo(() => makeStyles(C), [C]);
   const [targetDate, setTargetDate] = useState(getTodayDate());
   const [isEditing, setIsEditing] = useState(false);
-  const [gradeData, setGradeData] = useState<Record<string, GradeEntry>>({});
+  const [climbs, setClimbs] = useState<ClimbEntry[]>([]);
   const hasUnsavedProgress = useRef(false);
   const [holdTypes, setHoldTypes] = useState([]);
   const [movementTypes, setMovementTypes] = useState([]);
@@ -147,13 +147,18 @@ export default function SessionScreen() {
     setAlreadySaved(!!existing);
     setSavedSession(existing || null);
     if (existing) {
-      setGradeData(existing.gradeData || {});
+      // restore climbs — fall back to gradeData for older sessions
+      const restored: ClimbEntry[] = existing.climbs ||
+        Object.entries(existing.gradeData || {})
+          .filter(([, e]) => e.attempts > 0)
+          .map(([grade, e]) => ({ id: grade, grade, attempts: e.attempts, sends: e.sends }));
+      setClimbs(restored);
       setHoldTypes(existing.holdTypes || []);
       setMovementTypes(existing.movementTypes || []);
       setNotes(existing.notes || '');
       setSavedMedia(existing.mediaUris || []);
     } else {
-      setGradeData({});
+      setClimbs([]);
       setHoldTypes([]);
       setMovementTypes([]);
       setNotes('');
@@ -168,17 +173,14 @@ export default function SessionScreen() {
     hasUnsavedProgress.current = true;
     const attNum = draftAttempts === 'Flash' ? 1 : draftAttempts === '10+' ? 10 : parseInt(draftAttempts);
     const sends = draftAttempts === 'Flash' ? 1 : draftSent ? 1 : 0;
-    setGradeData(prev => ({ ...prev, [draftGrade]: { attempts: attNum, sends } }));
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setClimbs(prev => [...prev, { id, grade: draftGrade, attempts: attNum, sends }]);
   };
 
-  const removeGradeEntry = (grade: string) => {
+  const removeClimbEntry = (id: string) => {
     Haptics.selectionAsync();
     hasUnsavedProgress.current = true;
-    setGradeData(prev => {
-      const u = { ...prev };
-      delete u[grade];
-      return u;
-    });
+    setClimbs(prev => prev.filter(c => c.id !== id));
   };
 
   const toggleHold = (id) => {
@@ -215,19 +217,24 @@ export default function SessionScreen() {
     hasUnsavedProgress.current = false;
     const persistedUris = await Promise.all(pendingMedia.map(uri => copyMediaToStorage(uri)));
     const mergedMedia = [...savedMedia, ...persistedUris];
-    await saveSession({ date: targetDate, gradeData, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
+    await saveSession({ date: targetDate, gradeData, climbs, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
     if (!isEditing) scheduleRecoveryReminder(res).catch(() => {});
     setAlreadySaved(true);
-    setSavedSession({ gradeData, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
+    setSavedSession({ gradeData, climbs, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
     setSavedMedia(mergedMedia);
     setPendingMedia([]);
     if (isEditing) router.navigate('/(tabs)/calendar');
   };
 
   const locked = alreadySaved && !isEditing;
-  const hasGrades = Object.keys(gradeData).length > 0;
-  const totalAttempts = Object.values(gradeData).reduce((a, e) => a + e.attempts, 0);
-  const totalSends = Object.values(gradeData).reduce((a, e) => a + e.sends, 0);
+  const hasGrades = climbs.length > 0;
+  const totalAttempts = climbs.reduce((a, c) => a + c.attempts, 0);
+  const totalSends = climbs.reduce((a, c) => a + c.sends, 0);
+  // aggregate climbs into gradeData for RES calculation
+  const gradeData = climbs.reduce((acc, c) => {
+    const ex = acc[c.grade] || { attempts: 0, sends: 0 };
+    return { ...acc, [c.grade]: { attempts: ex.attempts + c.attempts, sends: ex.sends + c.sends } };
+  }, {} as Record<string, GradeEntry>);
   const res = maxGrade ? calculateRES(gradeData, maxGrade, holdTypes) : 0;
 
   const getResColor = (val) => val <= 40 ? C.terra : val <= 70 ? C.amber : C.red;
@@ -287,17 +294,23 @@ export default function SessionScreen() {
                   <Text style={[styles.resBoxLabel, { color: getResColor(savedSession.res) }]}>RES</Text>
                 </View>
               </View>
-              {savedSession.gradeData && Object.keys(savedSession.gradeData).length > 0 && (
-                <View style={styles.savedGrades}>
-                  {Object.entries(savedSession.gradeData).filter(([, e]) => e.attempts > 0).map(([grade, entry]) => (
-                    <View key={grade} style={[styles.savedGradeChip, { backgroundColor: gradeColorBg(grade), borderColor: gradeColor(grade) + '40' }]}>
-                      <Text style={[styles.savedGradeText, { color: gradeColor(grade) }]}>
-                        {entryLabel(grade, entry, gradeSystem)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
+              {(() => {
+                const entries: ClimbEntry[] = savedSession.climbs ||
+                  Object.entries(savedSession.gradeData || {})
+                    .filter(([, e]) => e.attempts > 0)
+                    .map(([grade, e]) => ({ id: grade, grade, attempts: e.attempts, sends: e.sends }));
+                return entries.length > 0 ? (
+                  <View style={styles.savedGrades}>
+                    {entries.map(c => (
+                      <View key={c.id} style={[styles.savedGradeChip, { backgroundColor: gradeColorBg(c.grade), borderColor: gradeColor(c.grade) + '40' }]}>
+                        <Text style={[styles.savedGradeText, { color: gradeColor(c.grade) }]}>
+                          {entryLabel(c.grade, c, gradeSystem)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null;
+              })()}
               {savedSession.notes ? (
                 <View style={styles.savedNotesBox}>
                   <Text style={styles.savedNotesText}>{savedSession.notes}</Text>
@@ -364,12 +377,12 @@ export default function SessionScreen() {
                 {/* Entry list */}
                 {hasGrades && (
                   <View style={styles.entryList}>
-                    {Object.entries(gradeData).filter(([, e]) => e.attempts > 0).map(([grade, entry]) => {
-                      const color = gradeColor(grade);
+                    {climbs.map(climb => {
+                      const color = gradeColor(climb.grade);
                       return (
-                        <View key={grade} style={[styles.entryRow, { borderLeftColor: color }]}>
-                          <Text style={[styles.entryText, { color }]}>{entryLabel(grade, entry, gradeSystem)}</Text>
-                          <TouchableOpacity onPress={() => removeGradeEntry(grade)} style={styles.entryRemoveBtn}>
+                        <View key={climb.id} style={[styles.entryRow, { borderLeftColor: color }]}>
+                          <Text style={[styles.entryText, { color }]}>{entryLabel(climb.grade, climb, gradeSystem)}</Text>
+                          <TouchableOpacity onPress={() => removeClimbEntry(climb.id)} style={styles.entryRemoveBtn}>
                             <Text style={styles.entryRemoveText}>✕</Text>
                           </TouchableOpacity>
                         </View>
