@@ -9,6 +9,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
+        lazy: false,
         headerShown: false,
         tabBarStyle: {
           backgroundColor: C.surface,
