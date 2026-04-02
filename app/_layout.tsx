@@ -2,6 +2,7 @@ import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet, Text } from 'react-native';
 import 'react-native-reanimated';
@@ -41,11 +42,23 @@ function CustomSplash({ onDone }: { onDone: () => void }) {
   );
 }
 
+async function checkForUpdate() {
+  try {
+    if (!Updates.isEmbeddedLaunch) return; // skip in dev
+    const update = await Updates.checkForUpdateAsync();
+    if (update.isAvailable) {
+      await Updates.fetchUpdateAsync();
+      await Updates.reloadAsync();
+    }
+  } catch {}
+}
+
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
+    checkForUpdate();
   }, []);
 
   return (

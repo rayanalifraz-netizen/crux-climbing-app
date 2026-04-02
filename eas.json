@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 16.0.0"
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -20,6 +21,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://kfheoistdhwnpmggoqpu.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_KhLHp-V277YyR55_B-pQcQ_MBcJojIj"
@@ -28,11 +30,7 @@
   },
   "submit": {
     "production": {
-      "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
-      }
+      "ios": {}
     }
   }
 }
