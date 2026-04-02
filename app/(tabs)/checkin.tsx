@@ -663,7 +663,7 @@ function makeStyles(C) {
     celebBtn: { backgroundColor: C.ink, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 14, marginTop: 4 },
     celebBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
 
-    stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 16, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
+    stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 90, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
     saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 12, alignItems: 'center' },
     saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   });

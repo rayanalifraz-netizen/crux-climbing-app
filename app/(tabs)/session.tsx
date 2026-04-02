@@ -663,7 +663,7 @@ function makeStyles(C) {
     notesInput: { backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 12, color: C.ink, fontSize: 13, lineHeight: 19, minHeight: 72, borderWidth: 1, borderColor: C.borderLight },
     notesCount: { color: C.dust, fontSize: 10, textAlign: 'right', marginTop: 6 },
 
-    stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 16, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
+    stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 90, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
     saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 12, alignItems: 'center' },
     saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   });
