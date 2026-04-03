@@ -12,6 +12,8 @@ export type ClimbEntry = {
   grade: string;
   attempts: number;
   sends: number;
+  holdTypes?: string[];
+  movementTypes?: string[];
 };
 
 export type Session = {
@@ -342,14 +344,30 @@ export const computeBodyLoads = (
 
   Object.entries(sessions).forEach(([dateStr, sess]) => {
     if (!inWindow(dateStr)) return;
-    sess.holdTypes?.forEach((hid) => {
-      const key = ID_TO_PART[hid]?.id ?? 'low';
-      counts[key] = (counts[key] || 0) + 1;
-    });
-    sess.movementTypes?.forEach((mid) => {
-      const key = ID_TO_PART[mid]?.id ?? 'low';
-      counts[key] = (counts[key] || 0) + 1;
-    });
+    const hasPerClimbData = sess.climbs?.some(c => (c.holdTypes?.length || 0) + (c.movementTypes?.length || 0) > 0);
+    if (hasPerClimbData) {
+      // Per-climb tracking: count each climb's hold/movement contributions individually
+      sess.climbs!.forEach(climb => {
+        climb.holdTypes?.forEach(hid => {
+          const key = ID_TO_PART[hid]?.id ?? 'low';
+          counts[key] = (counts[key] || 0) + 1;
+        });
+        climb.movementTypes?.forEach(mid => {
+          const key = ID_TO_PART[mid]?.id ?? 'low';
+          counts[key] = (counts[key] || 0) + 1;
+        });
+      });
+    } else {
+      // Legacy: session-level holds/movements (one count per session)
+      sess.holdTypes?.forEach((hid) => {
+        const key = ID_TO_PART[hid]?.id ?? 'low';
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      sess.movementTypes?.forEach((mid) => {
+        const key = ID_TO_PART[mid]?.id ?? 'low';
+        counts[key] = (counts[key] || 0) + 1;
+      });
+    }
   });
 
   Object.entries(checkIns).forEach(([dateStr, ci]) => {

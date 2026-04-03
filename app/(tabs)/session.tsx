@@ -106,8 +106,6 @@ export default function SessionScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [climbs, setClimbs] = useState<ClimbEntry[]>([]);
   const hasUnsavedProgress = useRef(false);
-  const [holdTypes, setHoldTypes] = useState([]);
-  const [movementTypes, setMovementTypes] = useState([]);
   const [notes, setNotes] = useState('');
   const [savedMedia, setSavedMedia] = useState<string[]>([]);
   const [pendingMedia, setPendingMedia] = useState<string[]>([]);
@@ -119,8 +117,12 @@ export default function SessionScreen() {
   const [draftGrade, setDraftGrade] = useState('V4');
   const [draftAttempts, setDraftAttempts] = useState('Flash');
   const [draftSent, setDraftSent] = useState(false);
+  const [draftHoldTypes, setDraftHoldTypes] = useState<string[]>([]);
+  const [draftMovementTypes, setDraftMovementTypes] = useState<string[]>([]);
   const [showGradePicker, setShowGradePicker] = useState(false);
   const [showAttemptsPicker, setShowAttemptsPicker] = useState(false);
+  const [showHoldPicker, setShowHoldPicker] = useState(false);
+  const [showMovementPicker, setShowMovementPicker] = useState(false);
 
   useFocusEffect(useCallback(() => {
     const editDate = editStore.sessionDate;
@@ -153,14 +155,10 @@ export default function SessionScreen() {
           .filter(([, e]) => e.attempts > 0)
           .map(([grade, e]) => ({ id: grade, grade, attempts: e.attempts, sends: e.sends }));
       setClimbs(restored);
-      setHoldTypes(existing.holdTypes || []);
-      setMovementTypes(existing.movementTypes || []);
       setNotes(existing.notes || '');
       setSavedMedia(existing.mediaUris || []);
     } else {
       setClimbs([]);
-      setHoldTypes([]);
-      setMovementTypes([]);
       setNotes('');
       setSavedMedia([]);
     }
@@ -174,7 +172,7 @@ export default function SessionScreen() {
     const attNum = draftAttempts === 'Flash' ? 1 : draftAttempts === '10+' ? 10 : parseInt(draftAttempts);
     const sends = draftAttempts === 'Flash' ? 1 : draftSent ? 1 : 0;
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setClimbs(prev => [...prev, { id, grade: draftGrade, attempts: attNum, sends }]);
+    setClimbs(prev => [...prev, { id, grade: draftGrade, attempts: attNum, sends, holdTypes: draftHoldTypes, movementTypes: draftMovementTypes }]);
   };
 
   const removeClimbEntry = (id: string) => {
@@ -183,14 +181,14 @@ export default function SessionScreen() {
     setClimbs(prev => prev.filter(c => c.id !== id));
   };
 
-  const toggleHold = (id) => {
+  const toggleDraftHold = (id: string) => {
     Haptics.selectionAsync();
-    setHoldTypes(prev => prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]);
+    setDraftHoldTypes(prev => prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]);
   };
 
-  const toggleMovement = (id) => {
+  const toggleDraftMovement = (id: string) => {
     Haptics.selectionAsync();
-    setMovementTypes(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
+    setDraftMovementTypes(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
   };
 
   const pickMedia = async () => {
@@ -217,10 +215,13 @@ export default function SessionScreen() {
     hasUnsavedProgress.current = false;
     const persistedUris = await Promise.all(pendingMedia.map(uri => copyMediaToStorage(uri)));
     const mergedMedia = [...savedMedia, ...persistedUris];
-    await saveSession({ date: targetDate, gradeData, climbs, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
+    // Derive session-level hold/movement aggregates from per-climb data (for legacy compatibility)
+    const allHolds = Array.from(new Set(climbs.flatMap(c => c.holdTypes || [])));
+    const allMoves = Array.from(new Set(climbs.flatMap(c => c.movementTypes || [])));
+    await saveSession({ date: targetDate, gradeData, climbs, holdTypes: allHolds, movementTypes: allMoves, res, notes: notes.trim(), mediaUris: mergedMedia });
     if (!isEditing) scheduleRecoveryReminder(res).catch(() => {});
     setAlreadySaved(true);
-    setSavedSession({ gradeData, climbs, holdTypes, movementTypes, res, notes: notes.trim(), mediaUris: mergedMedia });
+    setSavedSession({ gradeData, climbs, holdTypes: allHolds, movementTypes: allMoves, res, notes: notes.trim(), mediaUris: mergedMedia });
     setSavedMedia(mergedMedia);
     setPendingMedia([]);
     if (isEditing) router.navigate('/(tabs)/calendar');
@@ -235,7 +236,8 @@ export default function SessionScreen() {
     const ex = acc[c.grade] || { attempts: 0, sends: 0 };
     return { ...acc, [c.grade]: { attempts: ex.attempts + c.attempts, sends: ex.sends + c.sends } };
   }, {} as Record<string, GradeEntry>);
-  const res = maxGrade ? calculateRES(gradeData, maxGrade, holdTypes) : 0;
+  const allHoldsForRes = Array.from(new Set(climbs.flatMap(c => c.holdTypes || [])));
+  const res = maxGrade ? calculateRES(gradeData, maxGrade, allHoldsForRes) : 0;
 
   const getResColor = (val) => val <= 40 ? C.terra : val <= 70 ? C.amber : C.red;
   const getResBg = (val) => val <= 40 ? C.terraBg : val <= 70 ? C.amberBg : C.redBg;
@@ -369,9 +371,31 @@ export default function SessionScreen() {
                   </TouchableOpacity>
                 )}
 
+                {/* Hold Types picker */}
+                <View style={[styles.pickerRow, { marginBottom: 10 }]}>
+                  <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowHoldPicker(true); }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerBtnLabel}>Hold Types</Text>
+                      <Text style={[styles.pickerBtnValue, { color: draftHoldTypes.length > 0 ? C.terra : C.dust, fontSize: 13 }]} numberOfLines={1}>
+                        {draftHoldTypes.length === 0 ? 'None' : draftHoldTypes.map(id => HOLD_TYPES.find(h => h.id === id)?.label).join(' · ')}
+                      </Text>
+                    </View>
+                    <Text style={styles.pickerBtnChevron}>▾</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowMovementPicker(true); }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerBtnLabel}>Movement</Text>
+                      <Text style={[styles.pickerBtnValue, { color: draftMovementTypes.length > 0 ? C.amber : C.dust, fontSize: 13 }]} numberOfLines={1}>
+                        {draftMovementTypes.length === 0 ? 'None' : draftMovementTypes.map(id => MOVEMENT_TYPES.find(m => m.id === id)?.label).join(' · ')}
+                      </Text>
+                    </View>
+                    <Text style={styles.pickerBtnChevron}>▾</Text>
+                  </TouchableOpacity>
+                </View>
+
                 {/* Add button */}
                 <TouchableOpacity style={styles.addEntryBtn} onPress={addGradeEntry}>
-                  <Text style={styles.addEntryBtnText}>+ Add</Text>
+                  <Text style={styles.addEntryBtnText}>+ Add Climb</Text>
                 </TouchableOpacity>
 
                 {/* Entry list */}
@@ -379,9 +403,15 @@ export default function SessionScreen() {
                   <View style={styles.entryList}>
                     {climbs.map(climb => {
                       const color = gradeColor(climb.grade);
+                      const holdTags = [...(climb.holdTypes || []).map(id => HOLD_TYPES.find(h => h.id === id)?.label), ...(climb.movementTypes || []).map(id => MOVEMENT_TYPES.find(m => m.id === id)?.label)].filter(Boolean);
                       return (
                         <View key={climb.id} style={[styles.entryRow, { borderLeftColor: color }]}>
-                          <Text style={[styles.entryText, { color }]}>{entryLabel(climb.grade, climb, gradeSystem)}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.entryText, { color }]}>{entryLabel(climb.grade, climb, gradeSystem)}</Text>
+                            {holdTags.length > 0 && (
+                              <Text style={styles.entryTags}>{holdTags.join(' · ')}</Text>
+                            )}
+                          </View>
                           <TouchableOpacity onPress={() => removeClimbEntry(climb.id)} style={styles.entryRemoveBtn}>
                             <Text style={styles.entryRemoveText}>✕</Text>
                           </TouchableOpacity>
@@ -414,48 +444,6 @@ export default function SessionScreen() {
                 </View>
               </Card>
             )}
-
-            {/* Hold Types */}
-            <Card label="Hold Types · affects RES">
-              <View style={styles.sectionInner}>
-                <View style={styles.tagGrid}>
-                  {HOLD_TYPES.map((hold) => {
-                    const selected = holdTypes.includes(hold.id);
-                    return (
-                      <TouchableOpacity
-                        key={hold.id}
-                        style={[styles.tagChip, selected && { backgroundColor: C.terraBg, borderColor: C.terraBorder }]}
-                        onPress={() => toggleHold(hold.id)}
-                      >
-                        <Text style={[styles.tagLabel, selected && { color: C.terra }]}>{hold.label}</Text>
-                        <Text style={[styles.tagRisk, selected && { color: C.terraDark }]}>{hold.risk}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            </Card>
-
-            {/* Movement Types */}
-            <Card label="Movement Types · injury tracking">
-              <View style={styles.sectionInner}>
-                <View style={styles.tagGrid}>
-                  {MOVEMENT_TYPES.map((move) => {
-                    const selected = movementTypes.includes(move.id);
-                    return (
-                      <TouchableOpacity
-                        key={move.id}
-                        style={[styles.tagChip, selected && { backgroundColor: C.amberBg, borderColor: C.amberBorder }]}
-                        onPress={() => toggleMovement(move.id)}
-                      >
-                        <Text style={[styles.tagLabel, selected && { color: C.amber }]}>{move.label}</Text>
-                        <Text style={[styles.tagRisk, selected && { color: C.amber }]}>{move.risk}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            </Card>
 
             {/* Notes */}
             <Card label="Session Notes · optional">
@@ -524,6 +512,68 @@ export default function SessionScreen() {
           date={targetDate}
         />
       )}
+
+      {/* Hold Type Picker Modal */}
+      <Modal visible={showHoldPicker} transparent animationType="slide" onRequestClose={() => setShowHoldPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowHoldPicker(false)}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerSheetHandle} />
+            <Text style={styles.pickerSheetTitle}>Hold Types</Text>
+            <ScrollView style={{ maxHeight: 340 }}>
+              {HOLD_TYPES.map(hold => {
+                const active = draftHoldTypes.includes(hold.id);
+                return (
+                  <TouchableOpacity
+                    key={hold.id}
+                    style={[styles.pickerOption, active && { backgroundColor: C.terraBg }]}
+                    onPress={() => { Haptics.selectionAsync(); toggleDraftHold(hold.id); }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pickerOptionText, active && { color: C.terra, fontWeight: '800' }]}>{hold.label}</Text>
+                      <Text style={{ fontSize: 11, color: active ? C.terra + 'aa' : C.dust, marginTop: 1 }}>{hold.risk}</Text>
+                    </View>
+                    {active && <Text style={[styles.pickerCheckmark, { color: C.terra }]}>✓</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity style={styles.sheetDoneBtn} onPress={() => setShowHoldPicker(false)}>
+              <Text style={styles.sheetDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Movement Type Picker Modal */}
+      <Modal visible={showMovementPicker} transparent animationType="slide" onRequestClose={() => setShowMovementPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowMovementPicker(false)}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerSheetHandle} />
+            <Text style={styles.pickerSheetTitle}>Movement Types</Text>
+            <ScrollView style={{ maxHeight: 340 }}>
+              {MOVEMENT_TYPES.map(move => {
+                const active = draftMovementTypes.includes(move.id);
+                return (
+                  <TouchableOpacity
+                    key={move.id}
+                    style={[styles.pickerOption, active && { backgroundColor: C.amberBg }]}
+                    onPress={() => { Haptics.selectionAsync(); toggleDraftMovement(move.id); }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pickerOptionText, active && { color: C.amber, fontWeight: '800' }]}>{move.label}</Text>
+                      <Text style={{ fontSize: 11, color: active ? C.amber + 'aa' : C.dust, marginTop: 1 }}>{move.risk}</Text>
+                    </View>
+                    {active && <Text style={[styles.pickerCheckmark, { color: C.amber }]}>✓</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity style={styles.sheetDoneBtn} onPress={() => setShowMovementPicker(false)}>
+              <Text style={styles.sheetDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Grade Picker Modal */}
       <Modal visible={showGradePicker} transparent animationType="slide" onRequestClose={() => setShowGradePicker(false)}>
@@ -634,9 +684,12 @@ function makeStyles(C) {
     addEntryBtnText: { color: C.surface, fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
     entryList: { gap: 8 },
     entryRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surfaceAlt, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderLeftWidth: 3 },
-    entryText: { fontSize: 14, fontWeight: '700', flex: 1 },
+    entryText: { fontSize: 14, fontWeight: '700' },
+    entryTags: { fontSize: 10, color: C.dust, marginTop: 2, fontWeight: '600' },
     entryRemoveBtn: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
     entryRemoveText: { color: C.dust, fontSize: 13, fontWeight: '800' },
+    sheetDoneBtn: { margin: 16, backgroundColor: C.ink, padding: 14, borderRadius: 12, alignItems: 'center' },
+    sheetDoneBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
     pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
     pickerSheet: { backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 40 },
     pickerSheetHandle: { width: 36, height: 4, backgroundColor: C.borderLight, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 8 },
@@ -655,10 +708,6 @@ function makeStyles(C) {
     resTrack: { height: 6, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' },
     resFill: { height: 6, borderRadius: 3 },
 
-    tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    tagChip: { paddingHorizontal: 13, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight },
-    tagLabel: { color: C.sand, fontSize: 13, fontWeight: '700' },
-    tagRisk: { color: C.dust, fontSize: 9, marginTop: 2, letterSpacing: 0.3 },
 
     notesInput: { backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 12, color: C.ink, fontSize: 13, lineHeight: 19, minHeight: 72, borderWidth: 1, borderColor: C.borderLight },
     notesCount: { color: C.dust, fontSize: 10, textAlign: 'right', marginTop: 6 },
