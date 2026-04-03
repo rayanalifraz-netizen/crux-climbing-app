@@ -704,7 +704,7 @@ export default function ProfileScreen() {
     }
 
     // Body part stress load (14-day window, mirrors heatmap)
-    const [checkIns, allSessions] = await Promise.all([getCheckIns(), getSessions()]);
+    const [checkIns, allSessions, bodyOverrides] = await Promise.all([getCheckIns(), getSessions(), getBodyOverrides()]);
     const windowStart = new Date(now); windowStart.setDate(windowStart.getDate() - 14);
     const bodyLoads: Record<string, number> = {};
     const applyHolds = (holds: string[]) => {
