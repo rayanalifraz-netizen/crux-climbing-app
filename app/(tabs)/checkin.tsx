@@ -430,7 +430,7 @@ export default function CheckInScreen() {
         </Card>
 
             {/* Notes */}
-            <Card label="Notes · optional" accentColor={C.dust} bgColor={C.surface} labelColor={C.dust}>
+            <Card label="Notes · optional">
               <View style={styles.sectionInner}>
                 {locked ? (
                   notes ? (
@@ -454,7 +454,7 @@ export default function CheckInScreen() {
             </Card>
 
             {/* Photos */}
-            <Card label="Photos · optional" accentColor={C.dust} bgColor={C.surface} labelColor={C.dust}>
+            <Card label="Photos · optional">
               <View style={styles.sectionInner}>
                 {!locked && (
                   <Text style={styles.sectionHint}>Skin condition, tape jobs, or injury photos</Text>
