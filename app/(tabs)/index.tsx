@@ -707,20 +707,34 @@ export default function ProfileScreen() {
     const [checkIns, allSessions] = await Promise.all([getCheckIns(), getSessions()]);
     const windowStart = new Date(now); windowStart.setDate(windowStart.getDate() - 14);
     const bodyLoads: Record<string, number> = {};
-    Object.entries(allSessions).forEach(([ds, sess]: [string, any]) => {
-      if (new Date(ds) < windowStart) return;
-      sess.holdTypes?.forEach(h => {
+    const applyHolds = (holds: string[]) => {
+      holds.forEach(h => {
         if (h === 'crimps' || h === 'pockets') bodyLoads.fingers = (bodyLoads.fingers || 0) + 1;
         if (h === 'pinches') bodyLoads.thumb = (bodyLoads.thumb || 0) + 1;
         if (h === 'slopers') bodyLoads.shoulder = (bodyLoads.shoulder || 0) + 1;
       });
-      sess.movementTypes?.forEach(m => {
+    };
+    const applyMoves = (moves: string[]) => {
+      moves.forEach(m => {
         if (m === 'dynos') bodyLoads.shoulder = (bodyLoads.shoulder || 0) + 1;
         if (m === 'heelhooks') bodyLoads.knee = (bodyLoads.knee || 0) + 1;
         if (m === 'toehooks') bodyLoads.ankle = (bodyLoads.ankle || 0) + 1;
         if (m === 'compression') bodyLoads.hip = (bodyLoads.hip || 0) + 1;
         if (m === 'mantles') bodyLoads.wrist = (bodyLoads.wrist || 0) + 1;
       });
+    };
+    Object.entries(allSessions).forEach(([ds, sess]: [string, any]) => {
+      if (new Date(ds) < windowStart) return;
+      const hasPerClimbData = sess.climbs?.some((c: any) => (c.holdTypes?.length || 0) + (c.movementTypes?.length || 0) > 0);
+      if (hasPerClimbData) {
+        sess.climbs.forEach((c: any) => {
+          applyHolds(c.holdTypes || []);
+          applyMoves(c.movementTypes || []);
+        });
+      } else {
+        applyHolds(sess.holdTypes || []);
+        applyMoves(sess.movementTypes || []);
+      }
     });
     Object.entries(checkIns).forEach(([ds, ci]: [string, any]) => {
       if (new Date(ds) < windowStart) return;
