@@ -26,7 +26,7 @@ function Card({ label, labelColor, accentColor, bgColor, children, style, collap
   const { C } = useTheme();
   const hasAccent = !!accentColor;
   const labelStyle = {
-    fontSize: 10, fontWeight: '700' as const, color: labelColor || C.dust,
+    fontSize: 10, fontWeight: '700' as const, color: labelColor || C.terra,
     letterSpacing: 1, textTransform: 'uppercase' as const,
   };
   return (
@@ -57,12 +57,12 @@ function Card({ label, labelColor, accentColor, bgColor, children, style, collap
               <TouchableOpacity
                 onPress={(e) => { e.stopPropagation(); onInfoPress(); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: (labelColor || C.dust) + '60', justifyContent: 'center', alignItems: 'center' }}
+                style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: (labelColor || C.terra) + '60', justifyContent: 'center', alignItems: 'center' }}
               >
-                <Text style={{ fontSize: 11, fontWeight: '800', color: labelColor || C.dust }}>?</Text>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: labelColor || C.terra }}>?</Text>
               </TouchableOpacity>
             )}
-            <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={labelColor || C.dust} />
+            <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={labelColor || C.terra} />
           </View>
         </TouchableOpacity>
       ) : (
