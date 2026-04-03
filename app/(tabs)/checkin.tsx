@@ -151,6 +151,8 @@ export default function CheckInScreen() {
   const [mediaUris, setMediaUris] = useState<string[]>([]);
   const [pendingMedia, setPendingMedia] = useState<string[]>([]);
   const [showShareCard, setShowShareCard] = useState(false);
+  const [showFingerPicker, setShowFingerPicker] = useState(false);
+  const [showPainPicker, setShowPainPicker] = useState(false);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] }>({ current: 0, last7: Array(7).fill(false) });
   const [celebrationStreak, setCelebrationStreak] = useState<number | null>(null);
 
@@ -375,54 +377,54 @@ export default function CheckInScreen() {
         {/* Finger Condition */}
         <Card label="Finger Condition">
           <View style={styles.sectionInner}>
-            {!locked && <Text style={styles.sectionHint}>Tap any fingers that feel sore or tweaked</Text>}
-            <View style={styles.fingerTable}>
-              {FINGER_ZONES.map((finger) => (
-                <View key={finger.id} style={styles.fingerRow}>
-                  <Text style={styles.fingerLabel}>{finger.label}</Text>
-                  <View style={styles.fingerSides}>
-                    {SIDES.map((side) => {
-                      const id = `${side}_${finger.id}`;
-                      const selected = affectedFingers.includes(id);
-                      return (
-                        <TouchableOpacity
-                          key={side}
-                          style={[styles.sideChip, selected && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
-                          onPress={() => toggleFinger(id)}
-                        >
-                          <Text style={[styles.sideChipText, selected && { color: C.red }]}>{side}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+            {locked ? (
+              affectedFingers.length > 0 ? (
+                <View style={styles.pickerTagRow}>
+                  {affectedFingers.map(id => (
+                    <View key={id} style={[styles.pickerTag, { borderColor: C.redBorder, backgroundColor: C.redBg }]}>
+                      <Text style={[styles.pickerTagText, { color: C.red }]}>{id.replace('_', ' ')}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
+              ) : (
+                <Text style={styles.pickerNone}>No fingers affected</Text>
+              )
+            ) : (
+              <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowFingerPicker(true); }}>
+                <Text style={styles.pickerBtnValue} numberOfLines={1}>
+                  {affectedFingers.length === 0 ? 'None affected' : affectedFingers.map(id => id.replace('_', ' ')).join(' · ')}
+                </Text>
+                <Text style={styles.pickerBtnChevron}>▾</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Card>
 
         {/* Pain Areas */}
         <Card label="Pain or Strain">
-              <View style={styles.sectionInner}>
-                {!locked && <Text style={styles.sectionHint}>Select all areas that feel off today</Text>}
-                <View style={styles.chipRow}>
-                  {PAIN_AREAS.map((area) => {
-                    const selected = painAreas.includes(area.id);
-                    return (
-                      <TouchableOpacity
-                        key={area.id}
-                        style={[styles.chip, selected && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
-                        onPress={() => togglePain(area.id)}
-                      >
-                        <Text style={[styles.chipText, selected && { color: C.red }]}>
-                          {area.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+          <View style={styles.sectionInner}>
+            {locked ? (
+              painAreas.length > 0 ? (
+                <View style={styles.pickerTagRow}>
+                  {painAreas.map(id => (
+                    <View key={id} style={[styles.pickerTag, { borderColor: C.redBorder, backgroundColor: C.redBg }]}>
+                      <Text style={[styles.pickerTagText, { color: C.red }]}>{PAIN_AREAS.find(a => a.id === id)?.label}</Text>
+                    </View>
+                  ))}
                 </View>
-              </View>
-            </Card>
+              ) : (
+                <Text style={styles.pickerNone}>No pain areas</Text>
+              )
+            ) : (
+              <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowPainPicker(true); }}>
+                <Text style={styles.pickerBtnValue} numberOfLines={1}>
+                  {painAreas.length === 0 ? 'None today' : painAreas.map(id => PAIN_AREAS.find(a => a.id === id)?.label).join(' · ')}
+                </Text>
+                <Text style={styles.pickerBtnChevron}>▾</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Card>
 
             {/* Notes */}
             <Card label="Notes · optional" accentColor={C.dust} bgColor={C.surface} labelColor={C.dust}>
@@ -556,6 +558,77 @@ export default function CheckInScreen() {
         />
       )}
 
+      {/* Finger Picker Modal */}
+      <Modal visible={showFingerPicker} transparent animationType="slide" onRequestClose={() => setShowFingerPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowFingerPicker(false)} />
+        <View style={styles.pickerSheet}>
+          <View style={styles.pickerSheetHandle} />
+          <Text style={styles.pickerSheetTitle}>Finger Condition</Text>
+          <Text style={styles.pickerSheetSub}>Select affected fingers</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {FINGER_ZONES.map(finger => (
+              <View key={finger.id} style={styles.fingerPickerRow}>
+                <Text style={styles.fingerPickerLabel}>{finger.label}</Text>
+                <View style={styles.fingerPickerSides}>
+                  {SIDES.map(side => {
+                    const id = `${side}_${finger.id}`;
+                    const active = affectedFingers.includes(id);
+                    return (
+                      <TouchableOpacity
+                        key={side}
+                        style={[styles.fingerSideBtn, active && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
+                        onPress={() => { Haptics.selectionAsync(); toggleFinger(id); }}
+                      >
+                        <Text style={[styles.fingerSideBtnText, active && { color: C.red }]}>{side}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+            <TouchableOpacity
+              style={styles.pickerDoneBtn}
+              onPress={() => setShowFingerPicker(false)}
+            >
+              <Text style={styles.pickerDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Pain Picker Modal */}
+      <Modal visible={showPainPicker} transparent animationType="slide" onRequestClose={() => setShowPainPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowPainPicker(false)} />
+        <View style={styles.pickerSheet}>
+          <View style={styles.pickerSheetHandle} />
+          <Text style={styles.pickerSheetTitle}>Pain or Strain</Text>
+          <Text style={styles.pickerSheetSub}>Select all areas that apply</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {PAIN_AREAS.map(area => {
+              const active = painAreas.includes(area.id);
+              return (
+                <TouchableOpacity
+                  key={area.id}
+                  style={[styles.painPickerRow, active && { backgroundColor: C.redBg }]}
+                  onPress={() => { Haptics.selectionAsync(); togglePain(area.id); }}
+                >
+                  <Text style={[styles.painPickerLabel, active && { color: C.red, fontWeight: '800' }]}>{area.label}</Text>
+                  {active && <Text style={[styles.painPickerCheck, { color: C.red }]}>✓</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={styles.pickerDoneBtn}
+              onPress={() => setShowPainPicker(false)}
+            >
+              <Text style={styles.pickerDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* Streak milestone celebration */}
       <Modal visible={celebrationStreak !== null} transparent animationType="fade" onRequestClose={() => setCelebrationStreak(null)}>
         <View style={styles.celebOverlay}>
@@ -666,5 +739,39 @@ function makeStyles(C) {
     stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 90, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
     saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 12, alignItems: 'center' },
     saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+
+    // Picker button (in card)
+    pickerBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surfaceAlt, borderRadius: 12, borderWidth: 1, borderColor: C.borderLight, paddingHorizontal: 14, paddingVertical: 13 },
+    pickerBtnValue: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '600' },
+    pickerBtnChevron: { color: C.dust, fontSize: 14, marginLeft: 8 },
+
+    // Locked tag row
+    pickerTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    pickerTag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+    pickerTagText: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
+    pickerNone: { color: C.dust, fontSize: 12, fontStyle: 'italic' },
+
+    // Bottom sheet
+    pickerOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
+    pickerSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 14, maxHeight: '75%' },
+    pickerSheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 16 },
+    pickerSheetTitle: { fontSize: 18, fontWeight: '800', color: C.ink, letterSpacing: -0.5, marginBottom: 2 },
+    pickerSheetSub: { fontSize: 12, color: C.dust, fontWeight: '600', marginBottom: 16 },
+
+    // Finger picker rows
+    fingerPickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.borderLight },
+    fingerPickerLabel: { fontSize: 14, fontWeight: '700', color: C.ink, width: 70 },
+    fingerPickerSides: { flexDirection: 'row', gap: 10, flex: 1 },
+    fingerSideBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight, backgroundColor: C.surfaceAlt, alignItems: 'center' },
+    fingerSideBtnText: { fontSize: 13, fontWeight: '800', color: C.sand, letterSpacing: 0.5 },
+
+    // Pain picker rows
+    painPickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: C.borderLight, borderRadius: 8 },
+    painPickerLabel: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
+    painPickerCheck: { fontSize: 16, fontWeight: '800' },
+
+    // Done button inside sheet
+    pickerDoneBtn: { backgroundColor: C.ink, padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 20, marginBottom: 4 },
+    pickerDoneBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
   });
 }
