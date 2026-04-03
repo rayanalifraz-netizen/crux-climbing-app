@@ -43,7 +43,7 @@ function Card({ label, labelColor, accentColor, bgColor, children, style }: {
         <Text style={{
           fontSize: 10,
           fontWeight: '700',
-          color: labelColor || C.dust,
+          color: labelColor || C.terra,
           letterSpacing: 1,
           textTransform: 'uppercase',
           paddingHorizontal: hasAccent ? 24 : 20,
