@@ -151,6 +151,7 @@ export default function CheckInScreen() {
   const [mediaUris, setMediaUris] = useState<string[]>([]);
   const [pendingMedia, setPendingMedia] = useState<string[]>([]);
   const [showShareCard, setShowShareCard] = useState(false);
+  const [showSorenessPicker, setShowSorenessPicker] = useState(false);
   const [showFingerPicker, setShowFingerPicker] = useState(false);
   const [showPainPicker, setShowPainPicker] = useState(false);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] }>({ current: 0, last7: Array(7).fill(false) });
@@ -349,27 +350,29 @@ export default function CheckInScreen() {
         {/* Soreness */}
         <Card label="Overall Soreness">
           <View style={styles.sectionInner}>
-            <View style={styles.sorenessRow}>
-              {SORENESS_LEVELS.map((level) => {
-                const selected = soreness === level;
-                const color = getSorenessColor(C, level);
-                return (
-                  <TouchableOpacity
-                    key={level}
-                    style={[styles.sorenessBtn, selected && { backgroundColor: color, borderColor: color }]}
-                    onPress={() => { if (!locked) { Haptics.selectionAsync(); setSoreness(level); } }}
-                  >
-                    <Text style={[styles.sorenessBtnText, selected && { color: '#fff' }]}>{level}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {soreness && (
-              <Text style={styles.sorenessHint}>
-                {parseInt(soreness) <= 3 ? '→ Feeling good' :
-                 parseInt(soreness) <= 6 ? '→ Some fatigue present' :
-                 '→ High soreness — consider resting'}
-              </Text>
+            {locked ? (
+              soreness ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={[styles.sorenessTagBox, { borderColor: getSorenessColor(C, soreness) + '60', backgroundColor: getSorenessColor(C, soreness) + '18' }]}>
+                    <Text style={[styles.sorenessTagNum, { color: getSorenessColor(C, soreness) }]}>{soreness}</Text>
+                    <Text style={[styles.sorenessTagDen, { color: getSorenessColor(C, soreness) + 'aa' }]}>/10</Text>
+                  </View>
+                  <Text style={[styles.sorenessTagHint, { color: getSorenessColor(C, soreness) }]}>
+                    {parseInt(soreness) <= 3 ? 'Feeling good' :
+                     parseInt(soreness) <= 6 ? 'Some fatigue present' :
+                     'High soreness — consider resting'}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.pickerNone}>Not logged</Text>
+              )
+            ) : (
+              <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowSorenessPicker(true); }}>
+                <Text style={[styles.pickerBtnValue, !soreness && { color: C.dust }]}>
+                  {soreness ? `${soreness} / 10 — ${parseInt(soreness) <= 3 ? 'Feeling good' : parseInt(soreness) <= 6 ? 'Some fatigue' : 'High soreness'}` : 'Select level'}
+                </Text>
+                <Text style={styles.pickerBtnChevron}>▾</Text>
+              </TouchableOpacity>
             )}
           </View>
         </Card>
@@ -558,6 +561,37 @@ export default function CheckInScreen() {
         />
       )}
 
+      {/* Soreness Picker Modal */}
+      <Modal visible={showSorenessPicker} transparent animationType="slide" onRequestClose={() => setShowSorenessPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowSorenessPicker(false)} />
+        <View style={styles.pickerSheet}>
+          <View style={styles.pickerSheetHandle} />
+          <Text style={styles.pickerSheetTitle}>Overall Soreness</Text>
+          <Text style={styles.pickerSheetSub}>1 = no soreness · 10 = extreme</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {SORENESS_LEVELS.map(level => {
+              const active = soreness === level;
+              const color = getSorenessColor(C, level);
+              const hint = parseInt(level) <= 3 ? 'Feeling good' : parseInt(level) <= 6 ? 'Some fatigue' : 'High soreness';
+              return (
+                <TouchableOpacity
+                  key={level}
+                  style={[styles.sorenessPickerRow, active && { backgroundColor: color + '18' }]}
+                  onPress={() => { Haptics.selectionAsync(); setSoreness(level); setShowSorenessPicker(false); }}
+                >
+                  <View style={[styles.sorenessPickerNum, { borderColor: active ? color : C.borderLight, backgroundColor: active ? color : C.surfaceAlt }]}>
+                    <Text style={[styles.sorenessPickerNumText, { color: active ? '#fff' : C.sand }]}>{level}</Text>
+                  </View>
+                  <Text style={[styles.sorenessPickerHint, active && { color, fontWeight: '800' }]}>{hint}</Text>
+                  {active && <Text style={{ color, fontSize: 16, fontWeight: '800' }}>✓</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <View style={{ height: 30 }} />
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* Finger Picker Modal */}
       <Modal visible={showFingerPicker} transparent animationType="slide" onRequestClose={() => setShowFingerPicker(false)}>
         <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowFingerPicker(false)} />
@@ -689,6 +723,18 @@ function makeStyles(C) {
     sorenessBtn: { width: 44, height: 44, backgroundColor: C.surfaceAlt, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
     sorenessBtnText: { color: C.sand, fontSize: 13, fontWeight: '800' },
     sorenessHint: { color: C.sand, fontSize: 11, marginTop: 12, fontWeight: '600' },
+
+    // Locked soreness display
+    sorenessTagBox: { flexDirection: 'row', alignItems: 'baseline', borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
+    sorenessTagNum: { fontSize: 28, fontWeight: '900', letterSpacing: -1 },
+    sorenessTagDen: { fontSize: 13, fontWeight: '700' },
+    sorenessTagHint: { fontSize: 13, fontWeight: '700', flex: 1 },
+
+    // Soreness picker sheet rows
+    sorenessPickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: C.borderLight, borderRadius: 8, gap: 14 },
+    sorenessPickerNum: { width: 40, height: 40, borderRadius: 10, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+    sorenessPickerNumText: { fontSize: 15, fontWeight: '800' },
+    sorenessPickerHint: { flex: 1, fontSize: 14, color: C.inkLight, fontWeight: '600' },
 
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
     chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight },
