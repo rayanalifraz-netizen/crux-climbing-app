@@ -368,7 +368,7 @@ export default function CheckInScreen() {
               )
             ) : (
               <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowSorenessPicker(true); }}>
-                <Text style={[styles.pickerBtnValue, !soreness && { color: C.dust }]}>
+                <Text style={[styles.pickerBtnValue, { color: soreness ? getSorenessColor(C, soreness) : C.dust }]}>
                   {soreness ? `${soreness} / 10 — ${parseInt(soreness) <= 3 ? 'Feeling good' : parseInt(soreness) <= 6 ? 'Some fatigue' : 'High soreness'}` : 'Select level'}
                 </Text>
                 <Text style={styles.pickerBtnChevron}>▾</Text>
@@ -394,7 +394,7 @@ export default function CheckInScreen() {
               )
             ) : (
               <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowFingerPicker(true); }}>
-                <Text style={styles.pickerBtnValue} numberOfLines={1}>
+                <Text style={[styles.pickerBtnValue, { color: affectedFingers.length > 0 ? C.red : C.dust }]} numberOfLines={1}>
                   {affectedFingers.length === 0 ? 'None affected' : affectedFingers.map(id => id.replace('_', ' ')).join(' · ')}
                 </Text>
                 <Text style={styles.pickerBtnChevron}>▾</Text>
@@ -420,7 +420,7 @@ export default function CheckInScreen() {
               )
             ) : (
               <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowPainPicker(true); }}>
-                <Text style={styles.pickerBtnValue} numberOfLines={1}>
+                <Text style={[styles.pickerBtnValue, { color: painAreas.length > 0 ? C.red : C.dust }]} numberOfLines={1}>
                   {painAreas.length === 0 ? 'None today' : painAreas.map(id => PAIN_AREAS.find(a => a.id === id)?.label).join(' · ')}
                 </Text>
                 <Text style={styles.pickerBtnChevron}>▾</Text>
