@@ -5,7 +5,7 @@ import { editStore } from '../../lib/editStore';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
-import { cancelRecoveryReminder, cancelStreakProtection, rescheduleReminderForTomorrow, scheduleStreakProtection } from '../../notifications';
+import { cancelDailyReminder, cancelRecoveryReminder, cancelStreakProtection, rescheduleReminderForTomorrow, scheduleStreakProtection } from '../../notifications';
 import { copyMediaToStorage, deleteSessionsByKey, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -239,6 +239,7 @@ export default function CheckInScreen() {
     if (!isEditing) {
       cancelStreakProtection().catch(() => {});
       cancelRecoveryReminder().catch(() => {});
+      cancelDailyReminder().catch(() => {});
       rescheduleReminderForTomorrow().catch(() => {});
     }
     setMediaUris(mergedUris);
