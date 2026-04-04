@@ -1041,9 +1041,6 @@ export default function ProfileScreen() {
                     {Math.round(Math.min(progressCount / progressMax, 1) * 100)}%
                   </Text>
                 </View>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${Math.min(progressCount / progressMax, 1) * 100}%` }]} />
-                </View>
                 <Text style={styles.progressHint}>
                   {showCongrats ? 'Grade updated — new goal set' : `${progressMax - progressCount} more to unlock ${toDisplayGrade(profile.projectGrade, gradeSystem)}`}
                 </Text>
