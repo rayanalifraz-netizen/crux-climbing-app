@@ -86,6 +86,15 @@ export default function RootLayout() {
           >
             <Text style={styles.updateBannerBtnText}>Restart now →</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              Animated.timing(bannerOpacity, { toValue: 0, duration: 250, useNativeDriver: true })
+                .start(() => setUpdateReady(false));
+            }}
+            style={styles.updateBannerClose}
+          >
+            <Text style={styles.updateBannerCloseText}>✕</Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
     </AppThemeProvider>
@@ -154,5 +163,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.3,
+  },
+  updateBannerClose: {
+    marginLeft: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  updateBannerCloseText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
   },
 });
