@@ -8,7 +8,7 @@ if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
 import { applyReminderSettings, cancelRecoveryReminder, cancelStreakProtection, getReminderSettings, saveReminderSettings, scheduleInsightNotifications, scheduleStreakProtection, type ReminderSettings } from '../../notifications';
-import { getAlertSettings, getBodyOverrides, getCheckIns, getInjuryAlerts, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
+import { getAlertSettings, getBodyOverrides, getCheckIns, getInjuryAlerts, getInjuryLog, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
 import { gradeColor, toDisplayGrade, useTheme } from '../../context/ThemeContext';
 import { getCurrentUser, signOut } from '../../lib/supabase';
 import { computeCHI, V_GRADES } from '../../lib/scoring';
@@ -704,7 +704,7 @@ export default function ProfileScreen() {
     }
 
     // Body part stress load (14-day window, mirrors heatmap)
-    const [checkIns, allSessions, bodyOverrides] = await Promise.all([getCheckIns(), getSessions(), getBodyOverrides()]);
+    const [checkIns, allSessions, bodyOverrides, injuryLog] = await Promise.all([getCheckIns(), getSessions(), getBodyOverrides(), getInjuryLog()]);
     const windowStart = new Date(now); windowStart.setDate(windowStart.getDate() - 14);
     const bodyLoads: Record<string, number> = {};
     const applyHolds = (holds: string[]) => {
@@ -764,6 +764,26 @@ export default function ProfileScreen() {
       lines.push(`  ${p.label.padEnd(10)} ${String(load).padStart(2)} signal(s)  —  ${status}`);
     });
     lines.push('');
+
+    // Injury log
+    if (injuryLog.length > 0) {
+      const active = injuryLog.filter(e => !e.resolved);
+      const resolved = injuryLog.filter(e => e.resolved);
+      lines.push('INJURY LOG');
+      if (active.length > 0) {
+        lines.push('  Active injuries:');
+        active.forEach(e => {
+          lines.push(`    • ${e.partName}  —  onset ${e.date}${e.note ? `  |  "${e.note}"` : ''}`);
+        });
+      }
+      if (resolved.length > 0) {
+        lines.push('  Resolved injuries:');
+        resolved.forEach(e => {
+          lines.push(`    • ${e.partName}  —  onset ${e.date}  →  resolved ${e.resolvedDate || 'unknown'}${e.note ? `  |  "${e.note}"` : ''}`);
+        });
+      }
+      lines.push('');
+    }
 
     // Check-in pain log
     const recentDates = Array.from({ length: 14 }, (_, i) => {
