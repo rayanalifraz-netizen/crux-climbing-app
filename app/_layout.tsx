@@ -44,7 +44,7 @@ function CustomSplash({ onDone }: { onDone: () => void }) {
 
 async function checkForUpdate() {
   try {
-    if (!Updates.isEmbeddedLaunch) return; // skip in dev
+    if (!Updates.isEnabled) return; // skip in dev / Expo Go
     const update = await Updates.checkForUpdateAsync();
     if (update.isAvailable) {
       await Updates.fetchUpdateAsync();
