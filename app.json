@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "updates": {
       "url": "https://u.expo.dev/91db9dd1-8148-4e97-bc86-e1591f8903ae",
-      "checkAutomatically": "ON_LOAD"
+      "checkAutomatically": "NEVER"
     },
     "runtimeVersion": {
       "policy": "appVersion"
