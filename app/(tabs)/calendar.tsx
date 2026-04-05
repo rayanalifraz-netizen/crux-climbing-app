@@ -388,18 +388,6 @@ export default function CalendarScreen() {
                     )}
                   </View>
 
-                  <View style={{ marginBottom: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Recovery readiness</Text>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red }}>
-                        {pr.healthDays === 0 ? 'Clear' : `${pr.healthDays}d needed`}
-                      </Text>
-                    </View>
-                    <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
-                      <View style={{ height: 5, width: healthBarW, backgroundColor: pr.healthDays === 0 ? C.green : pr.healthDays <= 2 ? C.amber : C.red, borderRadius: 3 }} />
-                    </View>
-                  </View>
-
                   <View style={{ marginBottom: 12 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                       <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>Project sends</Text>

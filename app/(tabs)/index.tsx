@@ -952,6 +952,50 @@ export default function ProfileScreen() {
             {/* CHI */}
             {(totalSessions > 0 || totalCheckIns > 0) && chiData && <CHICard data={chiData} collapsed={!!collapsedCards.chi} onToggle={() => toggleCard('chi')} hasCheckInToday={!!todayCheckIn} />}
 
+            {/* Recovery */}
+            {totalSessions > 0 && recovery && (
+              <Card
+                label="Recovery Readiness"
+                collapsible
+                collapsed={!!collapsedCards.recovery}
+                onToggle={() => toggleCard('recovery')}
+                onInfoPress={() => setShowRecoveryInfo(true)}
+              >
+                <View style={styles.recoveryInner}>
+                  <View style={styles.recoveryTopRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.recoveryStatus, { color: recovery.isReady ? C.green : C.amber }]}>
+                        {recovery.isReady ? 'Ready to train' : 'Rest recommended'}
+                      </Text>
+                      <Text style={[styles.recoverySub, { color: C.sand }]}>
+                        {recovery.isReady
+                          ? `Last session RES ${recovery.res} — body is recovered`
+                          : `${recovery.days} day${recovery.days !== 1 ? 's' : ''} recommended · back ${recovery.earliestDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`}
+                      </Text>
+                    </View>
+                    <View style={[styles.recoveryDaysBox, { borderColor: recovery.isReady ? C.green : C.amber }]}>
+                      <Text style={[styles.recoveryDaysNum, { color: recovery.isReady ? C.green : C.amber }]}>
+                        {recovery.isReady ? '✓' : recovery.days}
+                      </Text>
+                      {!recovery.isReady && (
+                        <Text style={[styles.recoveryDaysLabel, { color: C.amber }]}>days</Text>
+                      )}
+                    </View>
+                  </View>
+                  {recovery.factors.length > 0 && (
+                    <View style={styles.recoveryFactors}>
+                      {recovery.factors.map(f => (
+                        <View key={f} style={[styles.recoveryFactor, { borderColor: C.amber + '60' }]}>
+                          <Text style={[styles.recoveryFactorText, { color: C.amber }]}>{f}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  <Text style={styles.recoveryDisclaimer}>Estimate only — listen to your body</Text>
+                </View>
+              </Card>
+            )}
+
             {/* Trend Chart */}
             {(totalCheckIns >= 2 || totalSessions >= 2) && (
               <Card label="Trends" style={{ marginTop: 8 }} collapsible collapsed={!!collapsedCards.trends} onToggle={() => toggleCard('trends')}>
@@ -1040,6 +1084,9 @@ export default function ProfileScreen() {
                   <Text style={styles.progressPct}>
                     {Math.round(Math.min(progressCount / progressMax, 1) * 100)}%
                   </Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.round(Math.min(progressCount / progressMax, 1) * 100)}%` }]} />
                 </View>
                 <Text style={styles.progressHint}>
                   {showCongrats ? 'Grade updated — new goal set' : `${progressMax - progressCount} more to unlock ${toDisplayGrade(profile.projectGrade, gradeSystem)}`}
