@@ -86,8 +86,7 @@ function computeStreak(checkIns: Record<string, any>) {
   return { current, last7 };
 }
 
-function calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRestDay = false) {
-  if (isRestDay) return 100;
+function calculateDRS(soreness, painAreas, affectedFingers, recentSessions, recentCheckIns = []) {
   let score = 100;
   const sorenessNum = parseInt(soreness || '0');
   if (sorenessNum >= 8) score -= 40;
@@ -105,6 +104,10 @@ function calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRe
   else if (consecutiveHardDays >= 2) score -= 15;
   if (consecutiveDays >= 3) score -= 15;
   else if (consecutiveDays >= 2) score -= 5;
+  // Rest day recovery bonus: recent rest days improve readiness
+  const recentRestCount = recentCheckIns.slice(0, 3).filter(ci => ci?.isRestDay).length;
+  if (recentRestCount >= 2) score = Math.min(score + 15, 100);
+  else if (recentRestCount >= 1) score = Math.min(score + 10, 100);
   return Math.min(Math.max(score, 0), 100);
 }
 
@@ -145,6 +148,7 @@ export default function CheckInScreen() {
   const [isRestDay, setIsRestDay] = useState(false);
   const [drs, setDrs] = useState(null);
   const [recentSessions, setRecentSessions] = useState([]);
+  const [recentCheckIns, setRecentCheckIns] = useState([]);
   const [injuryAlerts, setInjuryAlerts] = useState([]);
   const [alertSettings, setAlertSettings] = useState({ injuryOverload: true });
   const [notes, setNotes] = useState('');
@@ -172,7 +176,9 @@ export default function CheckInScreen() {
       getCheckIns(), getSessions(), getInjuryAlerts(), getAlertSettings(),
     ]);
     const last7 = getLast7Days().map(date => sessions[date] || null);
+    const last7CheckIns = getLast7Days().map(d => checkIns[d] || null);
     setRecentSessions(last7);
+    setRecentCheckIns(last7CheckIns);
     setInjuryAlerts(alerts);
     setAlertSettings(alertPrefs);
     setStreak(computeStreak(checkIns));
@@ -186,7 +192,7 @@ export default function CheckInScreen() {
       setIsRestDay(ci.isRestDay || false);
       setMediaUris(ci.mediaUris || []);
       setNotes(ci.notes || '');
-      setDrs(calculateDRS(ci.soreness, ci.painAreas, ci.affectedFingers, last7, ci.isRestDay));
+      setDrs(calculateDRS(ci.soreness, ci.painAreas, ci.affectedFingers, last7, last7CheckIns));
     } else {
       setAlreadyCheckedIn(false);
       setSoreness(null);
@@ -244,7 +250,7 @@ export default function CheckInScreen() {
     }
     setMediaUris(mergedUris);
     setPendingMedia([]);
-    const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRestDay);
+    const score = calculateDRS(soreness, painAreas, affectedFingers, recentSessions, recentCheckIns);
     setDrs(score);
     setAlreadyCheckedIn(true);
 
@@ -269,7 +275,7 @@ export default function CheckInScreen() {
 
   const verdict = drs !== null ? getDRSVerdict(C, drs) : null;
   const liveScore = !locked && (soreness || isRestDay)
-    ? calculateDRS(soreness, painAreas, affectedFingers, recentSessions, isRestDay)
+    ? calculateDRS(soreness, painAreas, affectedFingers, recentSessions, recentCheckIns)
     : null;
   const liveVerdict = liveScore !== null ? getDRSVerdict(C, liveScore) : null;
   const displayVerdict = locked ? verdict : liveVerdict;
