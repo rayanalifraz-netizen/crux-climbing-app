@@ -104,35 +104,31 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-function Card({ label, labelColor, accentColor, bgColor, children, style }: {
-  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+function Card({ label, labelColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; bgColor?: string; children?: any; style?: any;
 }) {
   const { C } = useTheme();
-  const hasAccent = !!accentColor;
   return (
     <View style={[{
       backgroundColor: bgColor || C.surface,
-      borderRadius: 20,
+      borderRadius: 24,
       marginHorizontal: 16,
       marginBottom: 14,
-      shadowColor: '#000',
+      shadowColor: '#2B2118',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 12,
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
       elevation: 3,
       overflow: 'hidden',
     }, style]}>
-      {hasAccent && (
-        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
-      )}
       {label && (
         <Text style={{
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: '700',
           color: labelColor || C.dust,
-          letterSpacing: 1,
+          letterSpacing: 1.5,
           textTransform: 'uppercase',
-          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingHorizontal: 20,
           paddingTop: 18,
           paddingBottom: 2,
         }}>{label}</Text>
@@ -307,7 +303,7 @@ export default function CalendarScreen() {
 
         {/* Goal Date */}
         {goalDate ? (
-          <Card label="Project Goal" accentColor={C.goal} bgColor={C.goalBg} labelColor={C.goal}>
+          <Card label="Project Goal" bgColor={C.goalBg}>
             <View style={styles.goalInner}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.goalDate}>{formatGoalDate(goalDate)}</Text>
@@ -336,6 +332,7 @@ export default function CalendarScreen() {
           <TouchableOpacity
             style={styles.setGoalBtn}
             onPress={() => { setGoalPickerMonth(new Date()); setShowGoalModal(true); }}
+            activeOpacity={0.7}
           >
             <Text style={styles.setGoalBtnText}>+ Set Project Goal Date</Text>
           </TouchableOpacity>
@@ -348,17 +345,16 @@ export default function CalendarScreen() {
           const accentColor = isReady ? C.green : pr.primaryFactor === 'health' ? C.red : C.amber;
           const bgColor = showProjectedProgress ? (isReady ? C.greenBg : pr.primaryFactor === 'health' ? C.redBg : C.amberBg) : C.surface;
           const dateStr = pr.recommendedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-          const healthBarW = `${Math.max(0, Math.min(100, 100 - pr.healthDays * 12))}%`;
           const progressBarW = `${Math.round(pr.progressRate * 100)}%`;
           return (
-            <Card accentColor={showProjectedProgress ? accentColor : undefined} bgColor={bgColor}>
+            <Card bgColor={bgColor}>
               {/* Header row with toggle */}
               <TouchableOpacity
                 onPress={toggleProjectedProgress}
                 activeOpacity={0.7}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: showProjectedProgress ? 2 : 16 }}
               >
-                <Text style={{ fontSize: 10, fontWeight: '700', color: showProjectedProgress ? accentColor : C.dust, letterSpacing: 1, textTransform: 'uppercase' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase' }}>
                   Projected Progress
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -381,8 +377,8 @@ export default function CalendarScreen() {
                       </Text>
                     </View>
                     {!isReady && (
-                      <View style={{ alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: 12, borderWidth: 1.5, borderColor: accentColor + '60', marginLeft: 12 }}>
-                        <Text style={{ fontSize: 20, fontWeight: '900', color: accentColor, lineHeight: 24 }}>{pr.totalDays}</Text>
+                      <View style={{ alignItems: 'center', justifyContent: 'center', width: 62, height: 62, borderRadius: 16, backgroundColor: C.surface, marginLeft: 12, shadowColor: '#2B2118', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 }}>
+                        <Text style={{ fontSize: 22, fontWeight: '900', color: accentColor, lineHeight: 26 }}>{pr.totalDays}</Text>
                         <Text style={{ fontSize: 9, fontWeight: '700', color: accentColor, letterSpacing: 0.5 }}>DAYS</Text>
                       </View>
                     )}
@@ -395,8 +391,8 @@ export default function CalendarScreen() {
                         {Math.round(pr.progressRate * 100)}%
                       </Text>
                     </View>
-                    <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
-                      <View style={{ height: 5, width: progressBarW, backgroundColor: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red, borderRadius: 3 }} />
+                    <View style={{ height: 9, backgroundColor: C.surfaceAlt, borderRadius: 100, overflow: 'hidden' }}>
+                      <View style={{ height: 9, width: progressBarW, backgroundColor: pr.progressRate >= 0.8 ? C.green : pr.progressRate >= 0.5 ? C.amber : C.red, borderRadius: 100 }} />
                     </View>
                   </View>
 
@@ -502,21 +498,23 @@ export default function CalendarScreen() {
                     key={dateStr}
                     style={[
                       styles.cell,
-                      hasActivity && { backgroundColor: (dotColor || C.dust) + '22', borderColor: (dotColor || C.dust) + '66' },
-                      isSelected && { backgroundColor: C.ink + '12', borderColor: C.ink },
-                      isToday && !isSelected && { borderColor: C.terraBorder },
-                      isGoalDay && { backgroundColor: C.goalBg, borderColor: C.goalBorder },
+                      hasActivity && { backgroundColor: (dotColor || C.dust) + '20' },
+                      isGoalDay && { backgroundColor: C.plumSoft },
+                      isSelected && { backgroundColor: C.surfaceAlt },
+                      isToday && { backgroundColor: C.ink },
                     ]}
                     onPress={() => setSelectedDate(isSelected ? null : dateStr)}
                   >
                     <Text style={[
                       styles.cellText,
-                      isToday && { color: C.terra, fontWeight: '800' },
-                      isGoalDay && { color: C.goal, fontWeight: '800' },
+                      hasActivity && { color: dotColor || C.sand, fontWeight: '700' },
+                      isGoalDay && { color: C.plumText, fontWeight: '800' },
                       isSelected && { color: C.ink, fontWeight: '800' },
+                      isToday && { color: C.surface, fontWeight: '800' },
                     ]}>{day}</Text>
-                    {hasActivity && <View style={[styles.dot, { backgroundColor: dotColor }]} />}
-                    {isGoalDay && !hasActivity && <View style={[styles.dot, { backgroundColor: C.goal }]} />}
+                    {isToday && <View style={[styles.dot, { backgroundColor: C.amber }]} />}
+                    {!isToday && hasActivity && <View style={[styles.dot, { backgroundColor: dotColor }]} />}
+                    {isGoalDay && !hasActivity && !isToday && <View style={[styles.dot, { backgroundColor: C.plumText }]} />}
                   </TouchableOpacity>
                 );
               })}
@@ -584,25 +582,23 @@ export default function CalendarScreen() {
         {selectedDate && (isRestDay || selectedSession) && (
           <Card
             label={new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            accentColor={selectedSession ? getResColor(C, selectedSession.res) : C.green}
-            bgColor={selectedSession ? getResBg(C, selectedSession.res) : C.greenBg}
-            labelColor={selectedSession ? getResColor(C, selectedSession.res) : C.green}
+            labelColor={selectedSession ? getResColor(C, selectedSession.res) : C.sageText}
             style={{ marginTop: 4 }}
           >
             <View style={styles.detailInner}>
               {/* Share button */}
               {selectedSession && (
                 <TouchableOpacity
-                  style={[styles.shareCardBtn, { borderColor: getResBorder(C, selectedSession.res) }]}
+                  style={[styles.shareCardBtn, { backgroundColor: C.accentSoft }]}
                   onPress={() => setShowShareCard(true)}
                 >
-                  <Text style={[styles.shareCardBtnText, { color: getResColor(C, selectedSession.res) }]}>↑ Share Session</Text>
+                  <Text style={[styles.shareCardBtnText, { color: C.accentText }]}>↑ Share Session</Text>
                 </TouchableOpacity>
               )}
 
               {/* Rest Day Badge */}
               {isRestDay && (
-                <View style={[styles.restBadge, { borderColor: C.greenBorder }]}>
+                <View style={styles.restBadge}>
                   <Text style={styles.restBadgeText}>Rest Day</Text>
                 </View>
               )}
@@ -611,16 +607,13 @@ export default function CalendarScreen() {
                 <>
                   {/* RES + intensity row */}
                   <View style={styles.detailTopRow}>
-                    <View style={[styles.intensityTag, {
-                      borderColor: getResBorder(C, selectedSession.res),
-                      backgroundColor: getResBg(C, selectedSession.res),
-                    }]}>
+                    <View style={[styles.intensityTag, { backgroundColor: getResBg(C, selectedSession.res) }]}>
                       <Text style={[styles.intensityTagText, { color: getResColor(C, selectedSession.res) }]}>
                         {getResLabel(selectedSession.res)} Session
                       </Text>
                     </View>
                     <View style={styles.detailRight}>
-                      <View style={[styles.resScoreBox, { borderColor: getResBorder(C, selectedSession.res) }]}>
+                      <View style={styles.resScoreBox}>
                         <Text style={[styles.resScoreNum, { color: getResColor(C, selectedSession.res) }]}>
                           {selectedSession.res}
                         </Text>
@@ -642,14 +635,13 @@ export default function CalendarScreen() {
                         .filter(([, e]) => e.attempts > 0)
                         .map(([grade, e]) => ({ id: grade, grade, attempts: e.attempts, sends: e.sends }))
                     ).map((c: ClimbEntry) => {
-                      const color = gradeColor(c.grade);
                       let label: string;
                       if (c.attempts === 1 && c.sends === 1) label = `${toDisplayGrade(c.grade, gradeSystem)} · Flash`;
                       else if (c.sends >= 1) label = `${toDisplayGrade(c.grade, gradeSystem)} · ${c.attempts} att · Sent ✓`;
                       else label = `${toDisplayGrade(c.grade, gradeSystem)} · ${c.attempts} att`;
                       return (
-                        <View key={c.id} style={[styles.climbEntryRow, { borderLeftColor: color }]}>
-                          <Text style={[styles.climbEntryText, { color }]}>{label}</Text>
+                        <View key={c.id} style={styles.climbEntryRow}>
+                          <Text style={styles.climbEntryText}>{label}</Text>
                         </View>
                       );
                     })}
@@ -660,7 +652,7 @@ export default function CalendarScreen() {
                       <Text style={styles.detailSectionLabel}>Holds</Text>
                       <View style={styles.chipRow}>
                         {selectedSession.holdTypes.map(h => (
-                          <View key={h} style={[styles.chip, { borderColor: C.borderLight }]}>
+                          <View key={h} style={[styles.chip, { backgroundColor: C.surfaceAlt }]}>
                             <Text style={[styles.chipGrade, { color: C.sand }]}>{h}</Text>
                           </View>
                         ))}
@@ -673,8 +665,8 @@ export default function CalendarScreen() {
                       <Text style={styles.detailSectionLabel}>Movements</Text>
                       <View style={styles.chipRow}>
                         {selectedSession.movementTypes.map(m => (
-                          <View key={m} style={[styles.chip, { borderColor: C.amberBorder, backgroundColor: C.amberBg }]}>
-                            <Text style={[styles.chipGrade, { color: C.amber }]}>{m}</Text>
+                          <View key={m} style={[styles.chip, { backgroundColor: C.amberBg }]}>
+                            <Text style={[styles.chipGrade, { color: C.amberText }]}>{m}</Text>
                           </View>
                         ))}
                       </View>
@@ -725,17 +717,17 @@ export default function CalendarScreen() {
 
         {/* Check-in Summary */}
         {selectedDate && selectedCheckIn && !isRestDay && (
-          <Card label="Check-in" accentColor={C.green} bgColor={C.greenBg} labelColor={C.green} style={{ marginTop: 4 }}>
+          <Card label="Check-in" labelColor={C.sageText} style={{ marginTop: 4 }}>
             <View style={styles.detailInner}>
               <Text style={styles.detailSectionLabel}>Soreness</Text>
-              <Text style={{ color: C.green, fontSize: 22, fontWeight: '800', marginBottom: 14 }}>{selectedCheckIn.soreness}/10</Text>
+              <Text style={{ color: C.sageText, fontSize: 22, fontWeight: '800', marginBottom: 14 }}>{selectedCheckIn.soreness}/10</Text>
               {selectedCheckIn.painAreas?.length > 0 && (
                 <>
                   <Text style={styles.detailSectionLabel}>Pain Areas</Text>
                   <View style={styles.chipRow}>
                     {selectedCheckIn.painAreas.map(area => (
-                      <View key={area} style={[styles.chip, { borderColor: C.redBorder, backgroundColor: C.redBg }]}>
-                        <Text style={[styles.chipGrade, { color: C.red }]}>{area}</Text>
+                      <View key={area} style={[styles.chip, { backgroundColor: C.claySoft }]}>
+                        <Text style={[styles.chipGrade, { color: C.clayText }]}>{area}</Text>
                       </View>
                     ))}
                   </View>
@@ -746,8 +738,8 @@ export default function CalendarScreen() {
                   <Text style={styles.detailSectionLabel}>Affected Fingers</Text>
                   <View style={styles.chipRow}>
                     {selectedCheckIn.affectedFingers.map(f => (
-                      <View key={f} style={[styles.chip, { borderColor: C.amberBorder, backgroundColor: C.amberBg }]}>
-                        <Text style={[styles.chipGrade, { color: C.amber }]}>{f}</Text>
+                      <View key={f} style={[styles.chip, { backgroundColor: C.claySoft }]}>
+                        <Text style={[styles.chipGrade, { color: C.clayText }]}>{f}</Text>
                       </View>
                     ))}
                   </View>
@@ -765,7 +757,7 @@ export default function CalendarScreen() {
 
         {/* Check-in Photos */}
         {selectedDate && selectedCheckIn && !selectedCheckIn.isRestDay && (selectedCheckIn.mediaUris?.length ?? 0) > 0 && (
-          <Card label="Check-in Photos" accentColor={C.green} bgColor={C.greenBg} labelColor={C.green} style={{ marginTop: 0 }}>
+          <Card label="Check-in Photos" labelColor={C.sageText} style={{ marginTop: 0 }}>
             <View style={styles.detailInner}>
               <Text style={styles.detailSectionLabel}>Skin &amp; Injury Photos</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -788,18 +780,18 @@ export default function CalendarScreen() {
         {selectedDate && selectedDate <= todayStr && (
           <View style={styles.editBtnRow}>
             <TouchableOpacity
-              style={[styles.editBtnStandalone, { borderColor: C.terraBorder, flex: 1 }]}
+              style={[styles.editBtnStandalone, { backgroundColor: C.accentSoft, flex: 1 }]}
               onPress={() => { editStore.sessionDate = selectedDate; router.navigate('/(tabs)/session'); }}
             >
-              <Text style={[styles.editBtnText, { color: C.terra }]}>
+              <Text style={[styles.editBtnText, { color: C.accentText }]}>
                 {selectedSession ? 'Edit Session →' : '+ Log Session'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.editBtnStandalone, { borderColor: C.greenBorder, flex: 1 }]}
+              style={[styles.editBtnStandalone, { backgroundColor: C.sageSoft, flex: 1 }]}
               onPress={() => { editStore.checkinDate = selectedDate; router.navigate('/(tabs)/checkin'); }}
             >
-              <Text style={[styles.editBtnText, { color: C.green }]}>
+              <Text style={[styles.editBtnText, { color: C.sageText }]}>
                 {selectedCheckIn ? 'Edit Check-in →' : '+ Log Check-in'}
               </Text>
             </TouchableOpacity>
@@ -872,8 +864,8 @@ function makeStyles(C) {
     scrollContent: { paddingBottom: 110 },
 
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 28, paddingBottom: 16 },
-    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    greeting: { fontSize: 12, color: C.dust, fontWeight: '700', letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 6 },
+    title: { fontSize: 36, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 40 },
     statsBox: {
       flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12,
       backgroundColor: C.surface, marginTop: 6, borderRadius: 16,
@@ -885,26 +877,26 @@ function makeStyles(C) {
     statLabel: { color: C.dust, fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
     statDivider: { width: 1, height: 24, backgroundColor: C.borderLight },
 
-    goalInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingLeft: 24, paddingTop: 14, gap: 12 },
-    goalDate: { color: C.ink, fontSize: 14, fontWeight: '800', marginBottom: 3 },
-    goalCountdown: { color: C.goal, fontSize: 11, fontWeight: '600' },
+    goalInner: { flexDirection: 'row', alignItems: 'center', padding: 18, paddingTop: 14, gap: 12 },
+    goalDate: { color: C.ink, fontSize: 15, fontWeight: '800', marginBottom: 3 },
+    goalCountdown: { color: C.plumText, fontSize: 12, fontWeight: '600' },
     goalActions: { gap: 6 },
-    goalBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
-    goalBtnText: { fontSize: 11, fontWeight: '800' },
+    goalBtn: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: C.surface },
+    goalBtnText: { fontSize: 12, fontWeight: '800' },
 
-    setGoalBtn: { marginHorizontal: 16, marginBottom: 14, borderWidth: 1, borderColor: C.goalBorder, borderRadius: 20, padding: 12, alignItems: 'center', backgroundColor: C.goalBg },
-    setGoalBtnText: { color: C.goal, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+    setGoalBtn: { marginHorizontal: 16, marginBottom: 14, borderRadius: 16, height: 52, justifyContent: 'center', alignItems: 'center', backgroundColor: C.plumSoft },
+    setGoalBtnText: { color: C.plumText, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
 
     calendarInner: { padding: 16, paddingTop: 14 },
     monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-    navBtn: { width: 30, height: 30, borderWidth: 1, borderColor: C.borderLight, borderRadius: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceAlt },
+    navBtn: { width: 32, height: 32, borderRadius: 11, justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceAlt },
     navBtnText: { color: C.ink, fontSize: 18, fontWeight: '800', lineHeight: 22 },
     monthTitle: { color: C.ink, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
     dayHeaders: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
     dayHeader: { color: C.dust, fontSize: 9, fontWeight: '800', width: '14.28%', textAlign: 'center', letterSpacing: 0.5, textTransform: 'uppercase' },
     grid: { flexDirection: 'row', flexWrap: 'wrap' },
     emptyCell: { width: '14.28%', aspectRatio: 1 },
-    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: 'transparent', marginBottom: 2 },
+    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 13, marginBottom: 2 },
     cellText: { color: C.dust, fontSize: 12, fontWeight: '600' },
     dot: { width: 3, height: 3, borderRadius: 1.5, marginTop: 1 },
     legend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.borderLight },
@@ -916,47 +908,47 @@ function makeStyles(C) {
     progressTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
     progressSubtitle: { flex: 1, fontSize: 11, color: C.dust },
     progressBtns: { flexDirection: 'row', gap: 5 },
-    progressBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3, backgroundColor: C.surfaceAlt },
-    progressBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
+    progressBtn: { borderRadius: 9, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.surfaceAlt },
+    progressBtnActive: { backgroundColor: C.surface, shadowColor: '#2B2118', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 },
     progressBtnText: { fontSize: 10, fontWeight: '800', color: C.dust },
-    progressBtnTextActive: { color: C.terra },
+    progressBtnTextActive: { color: C.accentText },
 
     emptyState: { marginHorizontal: 16, padding: 32, alignItems: 'center', gap: 6 },
     emptyTitle: { color: C.sand, fontSize: 14, fontWeight: '800' },
     emptyText: { color: C.dust, fontSize: 12, textAlign: 'center', lineHeight: 18 },
     hintText: { color: C.dust, textAlign: 'center', fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8 },
 
-    detailInner: { padding: 18, paddingLeft: 24 },
+    detailInner: { padding: 18 },
     detailTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-    intensityTag: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-    intensityTagText: { fontSize: 11, fontWeight: '800' },
+    intensityTag: { borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6 },
+    intensityTagText: { fontSize: 12, fontWeight: '800' },
     detailRight: { alignItems: 'flex-end', gap: 4 },
-    resScoreBox: { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
-    resScoreNum: { fontSize: 18, fontWeight: '800', lineHeight: 20 },
+    resScoreBox: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', backgroundColor: C.surface, shadowColor: '#2B2118', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 6 },
+    resScoreNum: { fontSize: 20, fontWeight: '800', lineHeight: 22 },
     resScoreLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
     detailAttempts: { color: C.dust, fontSize: 11 },
     detailRule: { height: 1, backgroundColor: C.borderLight, marginBottom: 12 },
     detailSectionLabel: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 12 },
-    chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5 },
     chipGrade: { fontSize: 12, fontWeight: '800' },
     chipCount: { fontSize: 11 },
     climbEntryList: { gap: 7, marginBottom: 12 },
-    climbEntryRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surfaceAlt, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, borderLeftWidth: 3 },
-    climbEntryText: { fontSize: 13, fontWeight: '700' },
+    climbEntryRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surfaceAlt, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
+    climbEntryText: { fontSize: 13, fontWeight: '700', color: C.ink },
     notesText: { color: C.sand, fontSize: 12, lineHeight: 18, marginBottom: 8 },
-    restBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
-    restBadgeText: { color: C.green, fontSize: 11, fontWeight: '800' },
+    restBadge: { borderRadius: 100, paddingHorizontal: 14, paddingVertical: 6, alignSelf: 'flex-start', marginBottom: 12, backgroundColor: C.sageSoft },
+    restBadgeText: { color: C.sageText, fontSize: 12, fontWeight: '800' },
     restMsg: { color: C.sand, fontSize: 12 },
     editBtnRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginBottom: 10 },
-    editBtnStandalone: { marginTop: 0, padding: 14, borderWidth: 1, borderRadius: 16, alignItems: 'center' },
+    editBtnStandalone: { marginTop: 0, padding: 14, borderRadius: 16, alignItems: 'center' },
     editBtnText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
 
     emptyDayInner: { padding: 20, alignItems: 'center' },
     emptyDayText: { color: C.dust, fontSize: 12, fontWeight: '600' },
 
-    shareCardBtn: { alignSelf: 'flex-end', borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 12 },
-    shareCardBtnText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+    shareCardBtn: { alignSelf: 'flex-end', borderRadius: 100, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 12 },
+    shareCardBtnText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
 
     mediaThumbnail: { width: 88, height: 88, borderRadius: 10, backgroundColor: C.borderLight },
 
@@ -989,11 +981,11 @@ function makeModalStyles(C) {
     dayHeader: { color: C.dust, fontSize: 9, fontWeight: '700', width: '14.28%', textAlign: 'center', textTransform: 'uppercase' },
     grid: { flexDirection: 'row', flexWrap: 'wrap' },
     emptyCell: { width: '14.28%', aspectRatio: 1 },
-    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: C.borderLight, marginBottom: 4 },
+    cell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 11, marginBottom: 4 },
     cellPast: { opacity: 0.25 },
-    cellGoal: { backgroundColor: C.goalBg, borderColor: C.goalBorder },
+    cellGoal: { backgroundColor: C.plumSoft },
     cellText: { color: C.ink, fontSize: 13, fontWeight: '600' },
     cellTextPast: { color: C.dust },
-    cellTextGoal: { color: C.goal, fontWeight: '800' },
+    cellTextGoal: { color: C.plumText, fontWeight: '800' },
   });
 }

@@ -9,37 +9,28 @@ import { cancelDailyReminder, cancelRecoveryReminder, cancelStreakProtection, re
 import { copyMediaToStorage, deleteSessionsByKey, getAlertSettings, getCheckIns, getInjuryAlerts, getSessions, getTodayDate, saveCheckIn } from '../../storage';
 import { useTheme } from '../../context/ThemeContext';
 
-function Card({ label, labelColor, accentColor, bgColor, children, style }: {
-  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+function Card({ label, labelColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; bgColor?: string; children?: any; style?: any;
 }) {
   const { C } = useTheme();
-  const hasAccent = !!accentColor;
   return (
     <View style={[{
       backgroundColor: bgColor || C.surface,
-      borderRadius: 20,
+      borderRadius: 24,
       marginHorizontal: 16,
       marginBottom: 14,
-      shadowColor: '#000',
+      shadowColor: '#2B2118',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 12,
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
       elevation: 3,
       overflow: 'hidden',
     }, style]}>
-      {hasAccent && (
-        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
-      )}
       {label && (
         <Text style={{
-          fontSize: 10,
-          fontWeight: '700',
-          color: labelColor || C.terra,
-          letterSpacing: 1,
-          textTransform: 'uppercase',
-          paddingHorizontal: hasAccent ? 24 : 20,
-          paddingTop: 18,
-          paddingBottom: 2,
+          fontSize: 11, fontWeight: '700', color: labelColor || C.dust,
+          letterSpacing: 1.5, textTransform: 'uppercase',
+          paddingHorizontal: 18, paddingTop: 18, paddingBottom: 2,
         }}>{label}</Text>
       )}
       {children}
@@ -104,7 +95,6 @@ function calculateDRS(soreness, painAreas, affectedFingers, recentSessions, rece
   else if (consecutiveHardDays >= 2) score -= 15;
   if (consecutiveDays >= 3) score -= 15;
   else if (consecutiveDays >= 2) score -= 5;
-  // Rest day recovery bonus: recent rest days improve readiness
   const recentRestCount = recentCheckIns.slice(0, 3).filter(ci => ci?.isRestDay).length;
   if (recentRestCount >= 2) score = Math.min(score + 15, 100);
   else if (recentRestCount >= 1) score = Math.min(score + 10, 100);
@@ -112,9 +102,9 @@ function calculateDRS(soreness, painAreas, affectedFingers, recentSessions, rece
 }
 
 function getDRSVerdict(C, score) {
-  if (score >= 70) return { label: 'Train Hard', color: C.terra, bg: C.terraBg, border: C.terraBorder };
-  if (score >= 40) return { label: 'Take it Easy', color: C.amber, bg: C.amberBg, border: C.amberBorder };
-  return { label: 'Rest Day', color: C.red, bg: C.redBg, border: C.redBorder };
+  if (score >= 70) return { label: 'Train Hard', color: C.terra, bg: C.terraBg, textColor: C.accentText };
+  if (score >= 40) return { label: 'Take it Easy', color: C.amber, bg: C.amberBg, textColor: C.amberText };
+  return { label: 'Rest Day', color: C.red, bg: C.redBg, textColor: C.clayText };
 }
 
 function getLast7Days() {
@@ -127,11 +117,11 @@ function getLast7Days() {
   return dates;
 }
 
-function getSorenessColor(C, level) {
+function getSorenessHint(level: string) {
   const num = parseInt(level);
-  if (num <= 3) return C.terra;
-  if (num <= 6) return C.amber;
-  return C.red;
+  if (num <= 3) return 'Feeling good';
+  if (num <= 6) return 'Some fatigue present';
+  return 'High soreness — consider resting';
 }
 
 export default function CheckInScreen() {
@@ -155,9 +145,6 @@ export default function CheckInScreen() {
   const [mediaUris, setMediaUris] = useState<string[]>([]);
   const [pendingMedia, setPendingMedia] = useState<string[]>([]);
   const [showShareCard, setShowShareCard] = useState(false);
-  const [showSorenessPicker, setShowSorenessPicker] = useState(false);
-  const [showFingerPicker, setShowFingerPicker] = useState(false);
-  const [showPainPicker, setShowPainPicker] = useState(false);
   const [streak, setStreak] = useState<{ current: number; last7: boolean[] }>({ current: 0, last7: Array(7).fill(false) });
   const [celebrationStreak, setCelebrationStreak] = useState<number | null>(null);
 
@@ -254,7 +241,6 @@ export default function CheckInScreen() {
     setDrs(score);
     setAlreadyCheckedIn(true);
 
-    // Streak milestone celebration
     if (!isEditing) {
       const updatedCheckIns = await getCheckIns();
       const newStreak = computeStreak(updatedCheckIns);
@@ -304,13 +290,7 @@ export default function CheckInScreen() {
 
         {/* Injury Alert */}
         {alertSettings.injuryOverload && injuryAlerts.length > 0 && (
-          <Card
-            label="⚠ Overload Warning"
-            accentColor={C.red}
-            bgColor={C.redBg}
-            labelColor={C.red}
-            style={{ marginTop: 0 }}
-          >
+          <Card label="⚠ Overload Warning" bgColor={C.redBg} labelColor={C.red} style={{ marginTop: 0 }}>
             <View style={styles.alertInner}>
               {injuryAlerts.map(alert => (
                 <Text key={alert.partId} style={styles.alertText}>
@@ -322,15 +302,10 @@ export default function CheckInScreen() {
         )}
 
         {/* Rest Day Toggle */}
-        <Card
-          label="Rest Day"
-          accentColor={isRestDay ? C.green : undefined}
-          bgColor={isRestDay ? C.greenBg : undefined}
-          labelColor={isRestDay ? C.green : undefined}
-        >
+        <Card label="Rest Day" bgColor={isRestDay ? C.greenBg : undefined} labelColor={isRestDay ? C.sageText : undefined}>
           {locked ? (
             <View style={styles.restDayConfirmed}>
-              <Text style={[styles.restDayConfirmedTitle, { color: isRestDay ? C.green : C.dust }]}>
+              <Text style={[styles.restDayConfirmedTitle, { color: isRestDay ? C.sageText : C.dust }]}>
                 {isRestDay ? 'Rest Day' : 'Training Day'}
               </Text>
               <Text style={styles.restDayConfirmedSub}>
@@ -340,211 +315,190 @@ export default function CheckInScreen() {
           ) : (
             <TouchableOpacity style={styles.restDayBtn} onPress={toggleRestDay} activeOpacity={0.7}>
               <View style={styles.restDayBtnLeft}>
-                <Text style={[styles.restDayBtnTitle, { color: isRestDay ? C.green : C.ink }]}>
+                <Text style={[styles.restDayBtnTitle, { color: isRestDay ? C.sageText : C.ink }]}>
                   {isRestDay ? 'Rest Day — ON' : 'Mark as Rest Day'}
                 </Text>
                 <Text style={styles.restDayBtnSub}>
                   {isRestDay ? 'Tap to remove rest day' : 'No session today — still log how you feel below'}
                 </Text>
               </View>
-              <View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: isRestDay ? C.green : C.borderLight, padding: 3, justifyContent: 'center' }}>
+              <View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: isRestDay ? C.green : C.surfaceAlt, padding: 3, justifyContent: 'center' }}>
                 <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: C.surface, transform: [{ translateX: isRestDay ? 18 : 0 }] }} />
               </View>
             </TouchableOpacity>
           )}
         </Card>
 
-        {/* Soreness */}
+        {/* Soreness — inline grid */}
         <Card label="Overall Soreness">
-          <View style={styles.sectionInner}>
-            {locked ? (
-              soreness ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={[styles.sorenessTagBox, { borderColor: getSorenessColor(C, soreness) + '60', backgroundColor: getSorenessColor(C, soreness) + '18' }]}>
-                    <Text style={[styles.sorenessTagNum, { color: getSorenessColor(C, soreness) }]}>{soreness}</Text>
-                    <Text style={[styles.sorenessTagDen, { color: getSorenessColor(C, soreness) + 'aa' }]}>/10</Text>
-                  </View>
-                  <Text style={[styles.sorenessTagHint, { color: getSorenessColor(C, soreness) }]}>
-                    {parseInt(soreness) <= 3 ? 'Feeling good' :
-                     parseInt(soreness) <= 6 ? 'Some fatigue present' :
-                     'High soreness — consider resting'}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.pickerNone}>Not logged</Text>
-              )
-            ) : (
-              <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowSorenessPicker(true); }}>
-                <Text style={[styles.pickerBtnValue, { color: soreness ? getSorenessColor(C, soreness) : C.dust }]}>
-                  {soreness ? `${soreness} / 10 — ${parseInt(soreness) <= 3 ? 'Feeling good' : parseInt(soreness) <= 6 ? 'Some fatigue' : 'High soreness'}` : 'Select level'}
-                </Text>
-                <Text style={styles.pickerBtnChevron}>▾</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </Card>
-
-        {/* Finger Condition */}
-        <Card label="Finger Condition">
-          <View style={styles.sectionInner}>
-            {locked ? (
-              affectedFingers.length > 0 ? (
-                <View style={styles.pickerTagRow}>
-                  {affectedFingers.map(id => (
-                    <View key={id} style={[styles.pickerTag, { borderColor: C.redBorder, backgroundColor: C.redBg }]}>
-                      <Text style={[styles.pickerTagText, { color: C.red }]}>{id.replace('_', ' ')}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.pickerNone}>No fingers affected</Text>
-              )
-            ) : (
-              <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowFingerPicker(true); }}>
-                <Text style={[styles.pickerBtnValue, { color: affectedFingers.length > 0 ? C.red : C.dust }]} numberOfLines={1}>
-                  {affectedFingers.length === 0 ? 'None affected' : affectedFingers.map(id => id.replace('_', ' ')).join(' · ')}
-                </Text>
-                <Text style={styles.pickerBtnChevron}>▾</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </Card>
-
-        {/* Pain Areas */}
-        <Card label="Pain or Strain">
-          <View style={styles.sectionInner}>
-            {locked ? (
-              painAreas.length > 0 ? (
-                <View style={styles.pickerTagRow}>
-                  {painAreas.map(id => (
-                    <View key={id} style={[styles.pickerTag, { borderColor: C.redBorder, backgroundColor: C.redBg }]}>
-                      <Text style={[styles.pickerTagText, { color: C.red }]}>{PAIN_AREAS.find(a => a.id === id)?.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.pickerNone}>No pain areas</Text>
-              )
-            ) : (
-              <TouchableOpacity style={styles.pickerBtn} onPress={() => { Haptics.selectionAsync(); setShowPainPicker(true); }}>
-                <Text style={[styles.pickerBtnValue, { color: painAreas.length > 0 ? C.red : C.dust }]} numberOfLines={1}>
-                  {painAreas.length === 0 ? 'None today' : painAreas.map(id => PAIN_AREAS.find(a => a.id === id)?.label).join(' · ')}
-                </Text>
-                <Text style={styles.pickerBtnChevron}>▾</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </Card>
-
-            {/* Notes */}
-            <Card label="Notes · optional">
-              <View style={styles.sectionInner}>
-                {locked ? (
-                  notes ? (
-                    <Text style={styles.notesText}>{notes}</Text>
-                  ) : (
-                    <Text style={styles.notesPlaceholder}>No notes logged</Text>
-                  )
-                ) : (
-                  <TextInput
-                    style={styles.notesInput}
-                    value={notes}
-                    onChangeText={setNotes}
-                    placeholder="How did you feel? Any tweaks, tightness, or wins..."
-                    placeholderTextColor={C.dust}
-                    multiline
-                    numberOfLines={3}
-                    maxLength={500}
-                  />
-                )}
-              </View>
-            </Card>
-
-            {/* Photos */}
-            <Card label="Photos · optional">
-              <View style={styles.sectionInner}>
-                {!locked && (
-                  <Text style={styles.sectionHint}>Skin condition, tape jobs, or injury photos</Text>
-                )}
-                {(mediaUris.length > 0 || pendingMedia.length > 0) && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {[...mediaUris, ...pendingMedia].map((uri) => (
-                        <View key={uri} style={styles.mediaThumbnailWrap}>
-                          <Image source={{ uri }} style={styles.mediaThumbnail} />
-                          {!locked && (
-                            <TouchableOpacity style={styles.mediaRemove} onPress={() => removeMedia(uri)}>
-                              <Text style={styles.mediaRemoveText}>✕</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  </ScrollView>
-                )}
-                {!locked && (
-                  <TouchableOpacity style={styles.mediaAddBtn} onPress={pickMedia}>
-                    <Text style={styles.mediaAddText}>+ Add Photos</Text>
+          <View style={{ padding: 18, paddingTop: 14 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {SORENESS_LEVELS.map(n => {
+                const on = soreness === n;
+                return (
+                  <TouchableOpacity
+                    key={n}
+                    onPress={() => { if (locked) return; Haptics.selectionAsync(); setSoreness(n); }}
+                    activeOpacity={locked ? 1 : 0.7}
+                    style={[styles.sorenessCell, {
+                      width: '17%',
+                      backgroundColor: on ? C.terra : C.surfaceAlt,
+                      shadowColor: on ? C.terra : 'transparent',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: on ? 0.25 : 0,
+                      shadowRadius: 6,
+                    }]}
+                  >
+                    <Text style={[styles.sorenessCellText, { color: on ? '#fff' : C.sand }]}>{n}</Text>
                   </TouchableOpacity>
-                )}
+                );
+              })}
+            </View>
+            {soreness && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.amberText }}>
+                  {getSorenessHint(soreness)}
+                </Text>
               </View>
-            </Card>
-
-            {/* DRS */}
-            {displayVerdict && displayScore !== null && (
-              <Card
-                label={locked ? 'Daily Readiness Score' : 'Readiness Preview'}
-                accentColor={displayVerdict.color}
-                bgColor={displayVerdict.bg}
-                labelColor={displayVerdict.color}
-              >
-                <View style={styles.drsInner}>
-                  <View style={styles.drsTopRow}>
-                    <Text style={[styles.drsVerdict, { color: displayVerdict.color }]}>
-                      {displayVerdict.label}
-                    </Text>
-                    <View style={[styles.drsScoreBox, { borderColor: displayVerdict.border }]}>
-                      <Text style={[styles.drsScoreNum, { color: displayVerdict.color }]}>{displayScore}</Text>
-                    </View>
-                  </View>
-
-                  {locked && (
-                    <View style={[styles.drsBreakdown, { borderTopColor: displayVerdict.border + '60' }]}>
-                      {[
-                        { label: 'Soreness', val: `${soreness}/10` },
-                        { label: 'Pain Areas', val: painAreas.length },
-                        { label: '7d Sessions', val: recentSessions.filter(s => s !== null).length },
-                      ].map((item, i, arr) => (
-                        <View key={item.label} style={styles.drsBreakdownGroup}>
-                          <Text style={[styles.drsBreakdownLabel, { color: displayVerdict.color + 'aa' }]}>
-                            {item.label}
-                          </Text>
-                          <Text style={[styles.drsBreakdownVal, { color: displayVerdict.color }]}>
-                            {item.val}
-                          </Text>
-                          {i < arr.length - 1 && (
-                            <View style={[styles.drsBreakdownTick, { backgroundColor: displayVerdict.border + '40' }]} />
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  {!locked && (
-                    <Text style={[styles.drsHint, { color: displayVerdict.color + 'aa' }]}>
-                      → Save check-in to confirm
-                    </Text>
-                  )}
-                </View>
-              </Card>
             )}
+          </View>
+        </Card>
 
-          {/* Share button after check-in saved */}
-          {alreadyCheckedIn && !isRestDay && (
-            <TouchableOpacity style={styles.shareCardBtn} onPress={() => setShowShareCard(true)}>
-              <Text style={styles.shareCardBtnText}>Share Recovery Card</Text>
-            </TouchableOpacity>
-          )}
+        {/* Finger Condition — inline L/R table */}
+        <Card label="Finger Condition">
+          <View style={{ padding: 18, paddingTop: 12 }}>
+            <Text style={{ fontSize: 13, color: C.dust, marginBottom: 14 }}>Tap any fingers that feel sore or tweaked</Text>
+            {FINGER_ZONES.map((finger, idx) => (
+              <View key={finger.id} style={[styles.fingerRow, idx > 0 && { marginTop: 9 }]}>
+                <Text style={styles.fingerLabel}>{finger.label}</Text>
+                <View style={styles.fingerSides}>
+                  {SIDES.map(side => {
+                    const id = `${side}_${finger.id}`;
+                    const active = affectedFingers.includes(id);
+                    return (
+                      <TouchableOpacity
+                        key={side}
+                        onPress={() => toggleFinger(id)}
+                        activeOpacity={locked ? 1 : 0.7}
+                        style={[styles.fingerBtn, {
+                          backgroundColor: active ? C.claySoft : C.surfaceAlt,
+                        }]}
+                      >
+                        <Text style={[styles.fingerBtnText, { color: active ? C.clayText : C.sand }]}>{side}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </View>
+        </Card>
+
+        {/* Pain or Strain — inline chips */}
+        <Card label="Pain or Strain">
+          <View style={{ padding: 18, paddingTop: 12 }}>
+            <Text style={{ fontSize: 13, color: C.dust, marginBottom: 12 }}>Select all areas that feel off today</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 9 }}>
+              {PAIN_AREAS.map(area => {
+                const active = painAreas.includes(area.id);
+                return (
+                  <TouchableOpacity
+                    key={area.id}
+                    onPress={() => togglePain(area.id)}
+                    activeOpacity={locked ? 1 : 0.7}
+                    style={[styles.painChip, {
+                      backgroundColor: active ? C.claySoft : C.surfaceAlt,
+                    }]}
+                  >
+                    <Text style={[styles.painChipText, { color: active ? C.clayText : C.sand }]}>{area.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </Card>
+
+        {/* Notes */}
+        <Card label="Notes · optional">
+          <View style={styles.sectionInner}>
+            {locked ? (
+              notes ? (
+                <Text style={styles.notesText}>{notes}</Text>
+              ) : (
+                <Text style={styles.notesPlaceholder}>No notes logged</Text>
+              )
+            ) : (
+              <TextInput
+                style={styles.notesInput}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="How did you feel? Any tweaks, tightness, or wins..."
+                placeholderTextColor={C.dust}
+                multiline
+                numberOfLines={3}
+                maxLength={500}
+              />
+            )}
+          </View>
+        </Card>
+
+        {/* Photos */}
+        <Card label="Photos · optional">
+          <View style={styles.sectionInner}>
+            {!locked && (
+              <Text style={styles.sectionHint}>Skin condition, tape jobs, or injury photos</Text>
+            )}
+            {(mediaUris.length > 0 || pendingMedia.length > 0) && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[...mediaUris, ...pendingMedia].map((uri) => (
+                    <View key={uri} style={styles.mediaThumbnailWrap}>
+                      <Image source={{ uri }} style={styles.mediaThumbnail} />
+                      {!locked && (
+                        <TouchableOpacity style={styles.mediaRemove} onPress={() => removeMedia(uri)}>
+                          <Text style={styles.mediaRemoveText}>✕</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
+            {!locked && (
+              <TouchableOpacity style={styles.mediaAddBtn} onPress={pickMedia}>
+                <Text style={styles.mediaAddText}>+ Add Photos</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Card>
+
+        {/* DRS */}
+        {displayVerdict && displayScore !== null && (
+          <View style={[styles.drsPanelWrap, { backgroundColor: displayVerdict.bg }]}>
+            <Text style={[styles.drsPanelLabel, { color: displayVerdict.textColor }]}>
+              {locked ? 'Daily Readiness Score' : 'Readiness Preview'}
+            </Text>
+            <View style={styles.drsPanelRow}>
+              <Text style={[styles.drsPanelVerdict, { color: displayVerdict.color }]}>{displayVerdict.label}</Text>
+              <View style={[styles.drsPanelScoreTile, { backgroundColor: C.surface }]}>
+                <Text style={[styles.drsPanelScoreNum, { color: displayVerdict.color }]}>{displayScore}</Text>
+              </View>
+            </View>
+            <View style={{ height: 9, borderRadius: 100, backgroundColor: 'rgba(0,0,0,0.07)', overflow: 'hidden', marginTop: 14 }}>
+              <View style={{ width: `${displayScore}%`, height: '100%', borderRadius: 100, backgroundColor: displayVerdict.color }} />
+            </View>
+            {!locked && (
+              <Text style={[styles.drsPanelHint, { color: displayVerdict.textColor }]}>Save check-in to confirm</Text>
+            )}
+          </View>
+        )}
+
+        {/* Share button after check-in saved */}
+        {alreadyCheckedIn && !isRestDay && (
+          <TouchableOpacity style={styles.shareCardBtn} onPress={() => setShowShareCard(true)}>
+            <Text style={styles.shareCardBtnText}>Share Recovery Card</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={{ height: 20 }} />
       </ScrollView>
@@ -567,108 +521,6 @@ export default function CheckInScreen() {
           streak={streak}
         />
       )}
-
-      {/* Soreness Picker Modal */}
-      <Modal visible={showSorenessPicker} transparent animationType="slide" onRequestClose={() => setShowSorenessPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowSorenessPicker(false)} />
-        <View style={styles.pickerSheet}>
-          <View style={styles.pickerSheetHandle} />
-          <Text style={styles.pickerSheetTitle}>Overall Soreness</Text>
-          <Text style={styles.pickerSheetSub}>1 = no soreness · 10 = extreme</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {SORENESS_LEVELS.map(level => {
-              const active = soreness === level;
-              const color = getSorenessColor(C, level);
-              const hint = parseInt(level) <= 3 ? 'Feeling good' : parseInt(level) <= 6 ? 'Some fatigue' : 'High soreness';
-              return (
-                <TouchableOpacity
-                  key={level}
-                  style={[styles.sorenessPickerRow, active && { backgroundColor: color + '18' }]}
-                  onPress={() => { Haptics.selectionAsync(); setSoreness(level); setShowSorenessPicker(false); }}
-                >
-                  <View style={[styles.sorenessPickerNum, { borderColor: active ? color : C.borderLight, backgroundColor: active ? color : C.surfaceAlt }]}>
-                    <Text style={[styles.sorenessPickerNumText, { color: active ? '#fff' : C.sand }]}>{level}</Text>
-                  </View>
-                  <Text style={[styles.sorenessPickerHint, active && { color, fontWeight: '800' }]}>{hint}</Text>
-                  {active && <Text style={{ color, fontSize: 16, fontWeight: '800' }}>✓</Text>}
-                </TouchableOpacity>
-              );
-            })}
-            <View style={{ height: 30 }} />
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Finger Picker Modal */}
-      <Modal visible={showFingerPicker} transparent animationType="slide" onRequestClose={() => setShowFingerPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowFingerPicker(false)} />
-        <View style={styles.pickerSheet}>
-          <View style={styles.pickerSheetHandle} />
-          <Text style={styles.pickerSheetTitle}>Finger Condition</Text>
-          <Text style={styles.pickerSheetSub}>Select affected fingers</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {FINGER_ZONES.map(finger => (
-              <View key={finger.id} style={styles.fingerPickerRow}>
-                <Text style={styles.fingerPickerLabel}>{finger.label}</Text>
-                <View style={styles.fingerPickerSides}>
-                  {SIDES.map(side => {
-                    const id = `${side}_${finger.id}`;
-                    const active = affectedFingers.includes(id);
-                    return (
-                      <TouchableOpacity
-                        key={side}
-                        style={[styles.fingerSideBtn, active && { backgroundColor: C.redBg, borderColor: C.redBorder }]}
-                        onPress={() => { Haptics.selectionAsync(); toggleFinger(id); }}
-                      >
-                        <Text style={[styles.fingerSideBtnText, active && { color: C.red }]}>{side}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-            <TouchableOpacity
-              style={styles.pickerDoneBtn}
-              onPress={() => setShowFingerPicker(false)}
-            >
-              <Text style={styles.pickerDoneBtnText}>Done</Text>
-            </TouchableOpacity>
-            <View style={{ height: 20 }} />
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Pain Picker Modal */}
-      <Modal visible={showPainPicker} transparent animationType="slide" onRequestClose={() => setShowPainPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowPainPicker(false)} />
-        <View style={styles.pickerSheet}>
-          <View style={styles.pickerSheetHandle} />
-          <Text style={styles.pickerSheetTitle}>Pain or Strain</Text>
-          <Text style={styles.pickerSheetSub}>Select all areas that apply</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {PAIN_AREAS.map(area => {
-              const active = painAreas.includes(area.id);
-              return (
-                <TouchableOpacity
-                  key={area.id}
-                  style={[styles.painPickerRow, active && { backgroundColor: C.redBg }]}
-                  onPress={() => { Haptics.selectionAsync(); togglePain(area.id); }}
-                >
-                  <Text style={[styles.painPickerLabel, active && { color: C.red, fontWeight: '800' }]}>{area.label}</Text>
-                  {active && <Text style={[styles.painPickerCheck, { color: C.red }]}>✓</Text>}
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity
-              style={styles.pickerDoneBtn}
-              onPress={() => setShowPainPicker(false)}
-            >
-              <Text style={styles.pickerDoneBtnText}>Done</Text>
-            </TouchableOpacity>
-            <View style={{ height: 20 }} />
-          </ScrollView>
-        </View>
-      </Modal>
 
       {/* Streak milestone celebration */}
       <Modal visible={celebrationStreak !== null} transparent animationType="fade" onRequestClose={() => setCelebrationStreak(null)}>
@@ -701,130 +553,76 @@ function makeStyles(C) {
     scrollContent: { paddingBottom: 110 },
 
     header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
-    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+    greeting: { fontSize: 12, color: C.dust, fontWeight: '700', letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 6 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
-    doneBadge: { backgroundColor: C.greenBg, borderWidth: 1, borderColor: C.greenBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
-    doneBadgeText: { color: C.green, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+    title: { fontSize: 36, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 40 },
+    doneBadge: { backgroundColor: C.sageSoft, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6, marginTop: 2 },
+    doneBadgeText: { color: C.sageText, fontSize: 13, fontWeight: '800' },
 
-    alertInner: { padding: 14, paddingLeft: 24, gap: 4 },
-    alertText: { color: C.red, fontSize: 12, lineHeight: 18 },
+    alertInner: { padding: 14, gap: 4 },
+    alertText: { color: C.clayText, fontSize: 12, lineHeight: 18 },
 
-    restDayBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingLeft: 24, gap: 12 },
+    restDayBtn: { flexDirection: 'row', alignItems: 'center', padding: 18, gap: 12 },
     restDayBtnLeft: { flex: 1 },
-    restDayBtnTitle: { color: C.green, fontSize: 14, fontWeight: '800' },
-    restDayBtnSub: { color: C.sand, fontSize: 12, marginTop: 2 },
-    restDayBtnArrow: { fontSize: 18, fontWeight: '700' },
+    restDayBtnTitle: { fontSize: 14, fontWeight: '800', marginBottom: 2 },
+    restDayBtnSub: { color: C.sand, fontSize: 12 },
 
     restDayConfirmed: { padding: 24, alignItems: 'center', gap: 6 },
-    restDayConfirmedTitle: { fontSize: 32, fontWeight: '800', color: C.green, letterSpacing: -1 },
+    restDayConfirmedTitle: { fontSize: 28, fontWeight: '800', letterSpacing: -1 },
     restDayConfirmedSub: { color: C.sand, fontSize: 12, textAlign: 'center' },
-    restDayDRS: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 8 },
-    restDayDRSLabel: { fontSize: 10, fontWeight: '800', color: C.green, letterSpacing: 2, textTransform: 'uppercase' },
-    restDayDRSScore: { fontSize: 16, fontWeight: '800', color: C.green, letterSpacing: 0.5 },
+
+    // Soreness grid cell
+    sorenessCell: { flex: 1, minWidth: 48, height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+    sorenessCellText: { fontSize: 18, fontWeight: '800' },
+
+    // Finger table
+    fingerRow: { flexDirection: 'row', alignItems: 'center' },
+    fingerLabel: { width: 68, fontSize: 15, fontWeight: '700', color: C.ink },
+    fingerSides: { flex: 1, flexDirection: 'row', gap: 8 },
+    fingerBtn: { flex: 1, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    fingerBtnText: { fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+
+    // Pain chips
+    painChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100 },
+    painChipText: { fontSize: 14, fontWeight: '800' },
 
     sectionInner: { padding: 16, paddingTop: 14 },
     sectionHint: { color: C.dust, fontSize: 12, marginBottom: 12 },
 
-    sorenessRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-    sorenessBtn: { width: 44, height: 44, backgroundColor: C.surfaceAlt, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
-    sorenessBtnText: { color: C.sand, fontSize: 13, fontWeight: '800' },
-    sorenessHint: { color: C.sand, fontSize: 11, marginTop: 12, fontWeight: '600' },
-
-    // Locked soreness display
-    sorenessTagBox: { flexDirection: 'row', alignItems: 'baseline', borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
-    sorenessTagNum: { fontSize: 28, fontWeight: '900', letterSpacing: -1 },
-    sorenessTagDen: { fontSize: 13, fontWeight: '700' },
-    sorenessTagHint: { fontSize: 13, fontWeight: '700', flex: 1 },
-
-    // Soreness picker sheet rows
-    sorenessPickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: C.borderLight, borderRadius: 8, gap: 14 },
-    sorenessPickerNum: { width: 40, height: 40, borderRadius: 10, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
-    sorenessPickerNumText: { fontSize: 15, fontWeight: '800' },
-    sorenessPickerHint: { flex: 1, fontSize: 14, color: C.inkLight, fontWeight: '600' },
-
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight },
-    chipText: { color: C.sand, fontSize: 12, fontWeight: '700' },
-
-    fingerTable: { gap: 8 },
-    fingerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    fingerLabel: { color: C.inkLight, fontSize: 13, fontWeight: '700', width: 60 },
-    fingerSides: { flexDirection: 'row', gap: 8, flex: 1 },
-    sideChip: { flex: 1, paddingVertical: 8, backgroundColor: C.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center' },
-    sideChipText: { color: C.sand, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-
-    drsInner: { padding: 18, paddingTop: 14, paddingLeft: 24 },
-    drsTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    drsVerdict: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-    drsScoreBox: { width: 56, height: 56, borderWidth: 1.5, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    drsScoreNum: { fontSize: 22, fontWeight: '800' },
-    drsBreakdown: { flexDirection: 'row', paddingTop: 14, borderTopWidth: 1 },
-    drsBreakdownGroup: { flex: 1, alignItems: 'center', position: 'relative' },
-    drsBreakdownLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
-    drsBreakdownVal: { fontSize: 18, fontWeight: '800' },
-    drsBreakdownTick: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 1 },
-    drsHint: { fontSize: 11, fontWeight: '600' },
-
-    shareCardBtn: { marginHorizontal: 16, marginBottom: 14, borderWidth: 1, borderColor: C.borderLight, borderRadius: 12, padding: 14, alignItems: 'center' },
-    shareCardBtnText: { fontSize: 12, fontWeight: '700', color: C.sand, letterSpacing: 0.3 },
-
     notesInput: { color: C.ink, fontSize: 13, lineHeight: 20, minHeight: 72, textAlignVertical: 'top', paddingTop: 2 },
-    notesText: { color: C.inkLight, fontSize: 13, lineHeight: 20 },
+    notesText: { color: C.sand, fontSize: 13, lineHeight: 20 },
     notesPlaceholder: { color: C.dust, fontSize: 12, fontStyle: 'italic' },
 
     mediaThumbnailWrap: { position: 'relative' },
-    mediaThumbnail: { width: 88, height: 88, borderRadius: 10, backgroundColor: C.borderLight },
+    mediaThumbnail: { width: 88, height: 88, borderRadius: 12, backgroundColor: C.surfaceAlt },
     mediaRemove: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
     mediaRemoveText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-    mediaAddBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 10, borderStyle: 'dashed', padding: 12, alignItems: 'center' },
+    mediaAddBtn: { borderWidth: 1.5, borderColor: C.borderLight, borderRadius: 12, borderStyle: 'dashed', padding: 12, alignItems: 'center' },
     mediaAddText: { color: C.dust, fontSize: 12, fontWeight: '700' },
+
+    // DRS panel (tonal container, no card wrapper)
+    drsPanelWrap: { marginHorizontal: 16, marginBottom: 14, borderRadius: 22, padding: 20 },
+    drsPanelLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 14 },
+    drsPanelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    drsPanelVerdict: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5, flex: 1 },
+    drsPanelScoreTile: { width: 62, height: 62, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#2B2118', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8 },
+    drsPanelScoreNum: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+    drsPanelHint: { fontSize: 12, fontWeight: '600', marginTop: 10 },
+
+    shareCardBtn: { marginHorizontal: 16, marginBottom: 14, backgroundColor: C.surfaceAlt, borderRadius: 16, padding: 14, alignItems: 'center' },
+    shareCardBtnText: { fontSize: 13, fontWeight: '700', color: C.sand },
 
     celebOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 32 },
     celebCard: { backgroundColor: C.surface, borderRadius: 28, padding: 32, alignItems: 'center', width: '100%', gap: 8 },
     celebEmoji: { fontSize: 52, marginBottom: 4 },
     celebNum: { fontSize: 72, fontWeight: '900', color: C.terra, letterSpacing: -3, lineHeight: 76 },
     celebUnit: { fontSize: 16, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
-    celebMsg: { fontSize: 15, color: C.inkLight, textAlign: 'center', lineHeight: 22, marginBottom: 12 },
-    celebBtn: { backgroundColor: C.ink, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 14, marginTop: 4 },
+    celebMsg: { fontSize: 15, color: C.sand, textAlign: 'center', lineHeight: 22, marginBottom: 12 },
+    celebBtn: { backgroundColor: C.ink, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 16, marginTop: 4 },
     celebBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
 
-    stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 90, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.borderLight },
-    saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 12, alignItems: 'center' },
-    saveBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
-
-    // Picker button (in card)
-    pickerBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surfaceAlt, borderRadius: 12, borderWidth: 1, borderColor: C.borderLight, paddingHorizontal: 14, paddingVertical: 13 },
-    pickerBtnValue: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '600' },
-    pickerBtnChevron: { color: C.dust, fontSize: 14, marginLeft: 8 },
-
-    // Locked tag row
-    pickerTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    pickerTag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-    pickerTagText: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
-    pickerNone: { color: C.dust, fontSize: 12, fontStyle: 'italic' },
-
-    // Bottom sheet
-    pickerOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
-    pickerSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 14, maxHeight: '75%' },
-    pickerSheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 16 },
-    pickerSheetTitle: { fontSize: 18, fontWeight: '800', color: C.ink, letterSpacing: -0.5, marginBottom: 2 },
-    pickerSheetSub: { fontSize: 12, color: C.dust, fontWeight: '600', marginBottom: 16 },
-
-    // Finger picker rows
-    fingerPickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.borderLight },
-    fingerPickerLabel: { fontSize: 14, fontWeight: '700', color: C.ink, width: 70 },
-    fingerPickerSides: { flexDirection: 'row', gap: 10, flex: 1 },
-    fingerSideBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight, backgroundColor: C.surfaceAlt, alignItems: 'center' },
-    fingerSideBtnText: { fontSize: 13, fontWeight: '800', color: C.sand, letterSpacing: 0.5 },
-
-    // Pain picker rows
-    painPickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: C.borderLight, borderRadius: 8 },
-    painPickerLabel: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
-    painPickerCheck: { fontSize: 16, fontWeight: '800' },
-
-    // Done button inside sheet
-    pickerDoneBtn: { backgroundColor: C.ink, padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 20, marginBottom: 4 },
-    pickerDoneBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+    stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 90, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.hairline },
+    saveBtn: { backgroundColor: C.ink, padding: 16, borderRadius: 16, alignItems: 'center' },
+    saveBtnText: { color: C.surface, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
   });
 }

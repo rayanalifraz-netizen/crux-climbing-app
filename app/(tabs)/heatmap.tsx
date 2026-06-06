@@ -64,34 +64,30 @@ function getLabel(load, thresholds) {
   return 'High load';
 }
 
-function Card({ label, labelColor, accentColor, bgColor, children, style }: {
-  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+function Card({ label, labelColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; bgColor?: string; children?: any; style?: any;
 }) {
   const { C } = useTheme();
-  const hasAccent = !!accentColor;
   return (
     <View style={[{
       backgroundColor: bgColor || C.surface,
-      borderRadius: 20,
+      borderRadius: 24,
       marginBottom: 14,
-      shadowColor: '#000',
+      shadowColor: '#2B2118',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 12,
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
       elevation: 3,
       overflow: 'hidden',
     }, style]}>
-      {hasAccent && (
-        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
-      )}
       {label && (
         <Text style={{
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: '700',
           color: labelColor || C.dust,
-          letterSpacing: 1,
+          letterSpacing: 1.5,
           textTransform: 'uppercase',
-          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingHorizontal: 20,
           paddingTop: 18,
           paddingBottom: 2,
         }}>{label}</Text>
@@ -195,10 +191,13 @@ function BodyDiagram({ loads, injuries, onPartPress }: { loads: any; injuries: I
         const load = loads[part.id] || 0;
         const thresholds = THRESHOLDS[part.id];
         const color = getColor(C, load, thresholds);
+        const bgColor = getBgColor(C, load, thresholds);
         const px = part.x * W;
         const py = part.y * H;
         const r = part.radius * W;
         const isInjured = activePartIds.has(part.id);
+        const outerFill = isInjured ? C.redBg : bgColor;
+        const innerFill = isInjured ? C.red : color;
 
         return (
           <G key={part.id} onPress={() => onPartPress(part)}>
@@ -209,23 +208,19 @@ function BodyDiagram({ loads, injuries, onPartPress }: { loads: any; injuries: I
                 stroke={isInjured ? C.red : color}
                 strokeWidth={1.5}
                 strokeDasharray="4,3"
-                opacity={0.7}
+                opacity={0.6}
               />
             )}
-            <Circle
-              cx={px}
-              cy={py}
-              r={r}
-              fill={isInjured ? C.red + '33' : color + '55'}
-              stroke={isInjured ? C.red : color}
-              strokeWidth={isInjured ? 2.5 : 2}
-            />
+            {/* Outer soft circle — no stroke */}
+            <Circle cx={px} cy={py} r={r} fill={outerFill} />
+            {/* Inner solid core */}
+            <Circle cx={px} cy={py} r={r * 0.48} fill={innerFill} />
             {isInjured && (
               <>
-                <Line x1={px - r * 0.4} y1={py - r * 0.4} x2={px + r * 0.4} y2={py + r * 0.4}
-                  stroke={C.red} strokeWidth={2} strokeLinecap="round" />
-                <Line x1={px + r * 0.4} y1={py - r * 0.4} x2={px - r * 0.4} y2={py + r * 0.4}
-                  stroke={C.red} strokeWidth={2} strokeLinecap="round" />
+                <Line x1={px - r * 0.22} y1={py - r * 0.22} x2={px + r * 0.22} y2={py + r * 0.22}
+                  stroke="#fff" strokeWidth={1.5} strokeLinecap="round" />
+                <Line x1={px + r * 0.22} y1={py - r * 0.22} x2={px - r * 0.22} y2={py + r * 0.22}
+                  stroke="#fff" strokeWidth={1.5} strokeLinecap="round" />
               </>
             )}
           </G>
@@ -400,9 +395,8 @@ export default function HeatmapScreen() {
         {alertSettings.bodyHighLoad && highParts.length > 0 && (
           <Card
             label="⚠ High Load Detected"
-            accentColor={C.red}
             bgColor={C.redBg}
-            labelColor={C.red}
+            labelColor={C.clayText}
             style={{ marginHorizontal: 16 }}
           >
             <View style={styles.alertInner}>
@@ -462,14 +456,14 @@ export default function HeatmapScreen() {
                         <View style={[styles.breakdownFill, { width: `${pct * 100}%`, backgroundColor: activeInjury ? C.red : color }]} />
                       </View>
                     </View>
-                    <View style={[styles.breakdownBadge, { borderColor: activeInjury ? C.redBorder : borderColor, backgroundColor: activeInjury ? C.redBg : bgColor }]}>
-                      <Text style={[styles.breakdownBadgeText, { color: activeInjury ? C.red : color }]}>
+                    <View style={[styles.breakdownBadge, { backgroundColor: activeInjury ? C.claySoft : bgColor }]}>
+                      <Text style={[styles.breakdownBadgeText, { color: activeInjury ? C.clayText : color }]}>
                         {activeInjury ? 'Injured' : isOverridden ? 'Feels Fine' : getLabel(load, thresholds)}
                       </Text>
                     </View>
                     {isOverridden && rawLoad > 0 && (
                       <TouchableOpacity
-                        style={[styles.breakdownBadge, { borderColor: C.borderLight, backgroundColor: C.surfaceAlt, marginLeft: 4 }]}
+                        style={[styles.breakdownBadge, { backgroundColor: C.surfaceAlt, marginLeft: 4 }]}
                         onPress={() => { setSelectedPart(BODY_PARTS.find(p => p.id === part.id) || null); setShowInjuryModal(true); }}
                       >
                         <Text style={[styles.breakdownBadgeText, { color: C.dust }]}>✕ Remove</Text>
@@ -518,7 +512,7 @@ export default function HeatmapScreen() {
 
         {/* Active Injuries */}
         {activeInjuries.length > 0 && (
-          <Card label="Active Injuries" accentColor={C.red} bgColor={C.redBg} labelColor={C.red} style={{ marginHorizontal: 16 }}>
+          <Card label="Active Injuries" bgColor={C.redBg} labelColor={C.clayText} style={{ marginHorizontal: 16 }}>
             <View style={styles.injuryListInner}>
               {activeInjuries.map((entry, i) => (
                 <View key={entry.id}>
@@ -573,10 +567,10 @@ export default function HeatmapScreen() {
             {/* Feeling fine / override section */}
             {selectedPart && overrides[selectedPart.id] ? (
               <>
-                <View style={[styles.modalFineTag, { backgroundColor: C.greenBg, borderColor: C.greenBorder }]}>
-                  <Text style={[styles.modalFineTagText, { color: C.green }]}>✓ Marked as feeling fine — load ignored</Text>
+                <View style={[styles.modalFineTag, { backgroundColor: C.sageSoft }]}>
+                  <Text style={[styles.modalFineTagText, { color: C.sageText }]}>✓ Marked as feeling fine — load ignored</Text>
                 </View>
-                <TouchableOpacity style={[styles.modalFineBtn, { borderColor: C.borderLight, backgroundColor: C.surfaceAlt }]} onPress={handleRemoveOverride}>
+                <TouchableOpacity style={[styles.modalFineBtn, { backgroundColor: C.surfaceAlt }]} onPress={handleRemoveOverride}>
                   <Text style={[styles.modalFineBtnText, { color: C.sand }]}>Remove Override</Text>
                 </TouchableOpacity>
               </>
@@ -585,8 +579,8 @@ export default function HeatmapScreen() {
                 <Text style={styles.modalLoadHint}>
                   {getLabel(loads[selectedPart.id] || 0, THRESHOLDS[selectedPart.id])} load detected — tap below if it feels fine
                 </Text>
-                <TouchableOpacity style={[styles.modalFineBtn, { borderColor: C.greenBorder, backgroundColor: C.greenBg }]} onPress={handleMarkFine}>
-                  <Text style={[styles.modalFineBtnText, { color: C.green }]}>Feels Fine — Clear Load</Text>
+                <TouchableOpacity style={[styles.modalFineBtn, { backgroundColor: C.sageSoft }]} onPress={handleMarkFine}>
+                  <Text style={[styles.modalFineBtnText, { color: C.sageText }]}>Feels Fine — Clear Load</Text>
                 </TouchableOpacity>
               </>
             ) : null}
@@ -624,20 +618,20 @@ function makeStyles(C) {
     scrollContent: { paddingBottom: 110 },
 
     header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 16 },
-    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    greeting: { fontSize: 12, color: C.dust, fontWeight: '700', letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 6 },
+    title: { fontSize: 36, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 40 },
 
     windowRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
-    windowLabel: { fontSize: 10, fontWeight: '800', color: C.dust, letterSpacing: 1, textTransform: 'uppercase' },
-    windowBtns: { flexDirection: 'row', gap: 6 },
-    windowBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.surface },
-    windowBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
+    windowLabel: { fontSize: 11, fontWeight: '700', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase' },
+    windowBtns: { flexDirection: 'row', gap: 4, backgroundColor: C.surfaceAlt, borderRadius: 11, padding: 3 },
+    windowBtn: { borderRadius: 9, paddingHorizontal: 11, paddingVertical: 5 },
+    windowBtnActive: { backgroundColor: C.surface, shadowColor: '#2B2118', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 },
     windowBtnText: { fontSize: 11, fontWeight: '800', color: C.dust },
-    windowBtnTextActive: { color: C.terra },
+    windowBtnTextActive: { color: C.accentText },
     updatedText: { fontSize: 9, color: C.dust, marginLeft: 'auto' },
 
-    alertInner: { padding: 14, paddingLeft: 24 },
-    alertText: { color: C.red, fontSize: 12, fontWeight: '600', lineHeight: 17 },
+    alertInner: { padding: 14 },
+    alertText: { color: C.clayText, fontSize: 12, fontWeight: '600', lineHeight: 17 },
 
     diagramInner: { padding: 16, paddingTop: 14, alignItems: 'center' },
 
@@ -652,10 +646,10 @@ function makeStyles(C) {
     breakdownDot: { width: 8, height: 8, borderRadius: 4 },
     breakdownLabel: { width: 64, fontSize: 12, fontWeight: '700', color: C.ink },
     breakdownBarWrap: { flex: 1 },
-    breakdownTrack: { height: 6, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' },
-    breakdownFill: { height: 6, borderRadius: 3 },
-    breakdownBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-    breakdownBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+    breakdownTrack: { height: 9, backgroundColor: C.surfaceAlt, borderRadius: 100, overflow: 'hidden' },
+    breakdownFill: { height: 9, borderRadius: 100 },
+    breakdownBadge: { borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 },
+    breakdownBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
 
     summaryInner: { flexDirection: 'row', padding: 18 },
     summaryItem: { flex: 1, alignItems: 'center' },
@@ -667,18 +661,18 @@ function makeStyles(C) {
     breakdownInjuryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 18, paddingBottom: 8, flexWrap: 'wrap' },
     breakdownInjuryDate: { fontSize: 10, fontWeight: '600', color: C.red + 'aa', letterSpacing: 0.3 },
     breakdownInjuryNote: { flex: 1, fontSize: 10, color: C.dust, fontStyle: 'italic' },
-    breakdownHealBtn: { borderWidth: 1, borderColor: C.greenBorder, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: C.greenBg },
-    breakdownHealBtnText: { fontSize: 9, fontWeight: '800', color: C.green, letterSpacing: 0.5 },
+    breakdownHealBtn: { borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.sageSoft },
+    breakdownHealBtnText: { fontSize: 9, fontWeight: '800', color: C.sageText, letterSpacing: 0.5 },
 
     injuryListInner: { padding: 16, paddingTop: 14 },
-    injuryDivider: { height: 1, backgroundColor: C.redBorder + '55', marginVertical: 8 },
+    injuryDivider: { height: 1, backgroundColor: C.hairline, marginVertical: 8 },
     injuryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     injuryInfo: { flex: 1 },
-    injuryPart: { fontSize: 13, fontWeight: '800', color: C.red },
-    injuryDate: { fontSize: 10, fontWeight: '600', color: C.red + 'aa', marginTop: 1, letterSpacing: 0.5 },
-    injuryNote: { fontSize: 12, color: C.inkLight, marginTop: 4, lineHeight: 17 },
-    resolveBtn: { borderWidth: 1, borderColor: C.redBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
-    resolveBtnText: { fontSize: 10, fontWeight: '800', color: C.red, letterSpacing: 0.5 },
+    injuryPart: { fontSize: 13, fontWeight: '800', color: C.clayText },
+    injuryDate: { fontSize: 10, fontWeight: '600', color: C.dust, marginTop: 1, letterSpacing: 0.5 },
+    injuryNote: { fontSize: 12, color: C.sand, marginTop: 4, lineHeight: 17 },
+    resolveBtn: { borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.sageSoft },
+    resolveBtnText: { fontSize: 10, fontWeight: '800', color: C.sageText, letterSpacing: 0.5 },
 
     historyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
     historyDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
@@ -690,17 +684,17 @@ function makeStyles(C) {
     modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 8 },
     modalTitle: { fontSize: 22, fontWeight: '800', color: C.ink, letterSpacing: -0.5 },
     modalLoadHint: { fontSize: 12, color: C.dust, marginTop: -6 },
-    modalFineTag: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+    modalFineTag: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
     modalFineTagText: { fontSize: 12, fontWeight: '700' },
-    modalFineBtn: { borderWidth: 1.5, borderRadius: 12, padding: 14, alignItems: 'center' },
+    modalFineBtn: { borderRadius: 14, padding: 14, alignItems: 'center' },
     modalFineBtnText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-    modalDivider: { height: 1, backgroundColor: C.borderLight },
-    modalInjuryLabel: { fontSize: 11, fontWeight: '800', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: -4 },
-    modalInput: { backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.borderLight, borderRadius: 12, padding: 14, color: C.ink, fontSize: 13, lineHeight: 20, minHeight: 80, textAlignVertical: 'top' },
+    modalDivider: { height: 1, backgroundColor: C.hairline },
+    modalInjuryLabel: { fontSize: 11, fontWeight: '700', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: -4 },
+    modalInput: { backgroundColor: C.surfaceAlt, borderRadius: 12, padding: 14, color: C.ink, fontSize: 13, lineHeight: 20, minHeight: 80, textAlignVertical: 'top' },
     modalBtns: { flexDirection: 'row', gap: 10 },
-    modalCancel: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center' },
+    modalCancel: { flex: 1, padding: 14, borderRadius: 14, backgroundColor: C.surfaceAlt, alignItems: 'center' },
     modalCancelText: { fontSize: 13, fontWeight: '700', color: C.sand },
-    modalConfirm: { flex: 2, padding: 14, borderRadius: 12, backgroundColor: C.red, alignItems: 'center' },
+    modalConfirm: { flex: 2, padding: 14, borderRadius: 14, backgroundColor: C.clay, alignItems: 'center' },
     modalConfirmText: { fontSize: 13, fontWeight: '800', color: '#fff' },
   });
 }

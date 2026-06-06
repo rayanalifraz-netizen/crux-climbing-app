@@ -24,32 +24,28 @@ function Card({ label, labelColor, accentColor, bgColor, children, style, collap
   collapsible?: boolean; collapsed?: boolean; onToggle?: () => void; onInfoPress?: () => void;
 }) {
   const { C } = useTheme();
-  const hasAccent = !!accentColor;
   const labelStyle = {
-    fontSize: 10, fontWeight: '700' as const, color: labelColor || C.terra,
-    letterSpacing: 1, textTransform: 'uppercase' as const,
+    fontSize: 11, fontWeight: '700' as const, color: labelColor || C.dust,
+    letterSpacing: 1.5, textTransform: 'uppercase' as const,
   };
   return (
     <View style={[{
       backgroundColor: bgColor || C.surface,
-      borderRadius: 20,
+      borderRadius: 24,
       marginHorizontal: 16,
       marginBottom: 14,
-      shadowColor: '#000',
+      shadowColor: '#2B2118',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 12,
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
       elevation: 3,
       overflow: 'hidden',
     }, style]}>
-      {hasAccent && (
-        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
-      )}
       {label && (collapsible ? (
         <TouchableOpacity
           onPress={onToggle}
           activeOpacity={0.7}
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: hasAccent ? 24 : 20, paddingTop: 16, paddingBottom: collapsed ? 16 : 2 }}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 18, paddingBottom: collapsed ? 18 : 2 }}
         >
           <Text style={labelStyle}>{label}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -57,16 +53,16 @@ function Card({ label, labelColor, accentColor, bgColor, children, style, collap
               <TouchableOpacity
                 onPress={(e) => { e.stopPropagation(); onInfoPress(); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: (labelColor || C.terra) + '60', justifyContent: 'center', alignItems: 'center' }}
+                style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: C.surfaceAlt, justifyContent: 'center', alignItems: 'center' }}
               >
-                <Text style={{ fontSize: 11, fontWeight: '800', color: labelColor || C.terra }}>?</Text>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: C.dust }}>?</Text>
               </TouchableOpacity>
             )}
-            <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={labelColor || C.terra} />
+            <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={C.dust} />
           </View>
         </TouchableOpacity>
       ) : (
-        <Text style={{ ...labelStyle, paddingHorizontal: hasAccent ? 24 : 20, paddingTop: 18, paddingBottom: 2 }}>{label}</Text>
+        <Text style={{ ...labelStyle, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 2 }}>{label}</Text>
       ))}
       {!collapsed && children}
     </View>
@@ -89,6 +85,8 @@ function CHICard({ data, collapsed, onToggle, hasCheckInToday }: { data: any; co
     : chi >= 45
     ? 'Your body is under stress. Consider active recovery.'
     : 'High recovery need. Prioritize rest over training.';
+  const barColorFor = (val: number) => val >= 80 ? C.green : val >= 55 ? C.amber : C.red;
+  const barTextFor = (val: number) => val >= 80 ? C.sageText : val >= 55 ? C.amberText : C.clayText;
 
   const circumference = 2 * Math.PI * GAUGE_R;
   const arcLength = circumference * 0.75;
@@ -98,9 +96,9 @@ function CHICard({ data, collapsed, onToggle, hasCheckInToday }: { data: any; co
 
   return (
     <View style={{
-      backgroundColor: C.surface, borderRadius: 20, marginHorizontal: 16, marginBottom: 14,
-      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12,
-      elevation: 3, padding: 20,
+      backgroundColor: C.surface, borderRadius: 24, marginHorizontal: 16, marginBottom: 14,
+      shadowColor: '#2B2118', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 14,
+      elevation: 3, padding: 22,
     }}>
       {/* Info modal */}
       <Modal visible={showInfo} animationType="slide" transparent>
@@ -139,18 +137,15 @@ function CHICard({ data, collapsed, onToggle, hasCheckInToday }: { data: any; co
 
       {/* Title row */}
       <TouchableOpacity onPress={onToggle} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed ? 0 : 8 }}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: C.ink, letterSpacing: 0.2 }}>Climber Health Index</Text>
+        <Text style={{ fontSize: 17, fontWeight: '800', color: C.ink, letterSpacing: -0.2 }}>Climber Health Index</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity
             onPress={(e) => { e.stopPropagation(); setShowInfo(true); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.borderLight, justifyContent: 'center', alignItems: 'center' }}
+            style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: C.surfaceAlt, justifyContent: 'center', alignItems: 'center' }}
           >
             <Text style={{ fontSize: 11, fontWeight: '800', color: C.dust }}>?</Text>
           </TouchableOpacity>
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.terra, justifyContent: 'center', alignItems: 'center' }}>
-            <Ionicons name="fitness" size={18} color="#fff" />
-          </View>
           <Ionicons name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} color={C.dust} />
         </View>
       </TouchableOpacity>
@@ -160,7 +155,7 @@ function CHICard({ data, collapsed, onToggle, hasCheckInToday }: { data: any; co
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
           <Svg width={GAUGE_SIZE} height={GAUGE_SIZE}>
             <Circle cx={cx} cy={cy} r={GAUGE_R} fill="none"
-              stroke={C.borderLight} strokeWidth={GAUGE_SW}
+              stroke={C.surfaceAlt} strokeWidth={GAUGE_SW}
               strokeDasharray={`${arcLength} ${circumference - arcLength}`}
               strokeLinecap="round"
               transform={`rotate(135 ${cx} ${cy})`}
@@ -184,28 +179,29 @@ function CHICard({ data, collapsed, onToggle, hasCheckInToday }: { data: any; co
         </Text>
 
         {/* Sub-component bars */}
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 14 }}>
           {[
             { label: 'Readiness', value: readiness },
             { label: 'Load Balance', value: load },
             { label: 'Injury Status', value: injury },
           ].map(item => {
-            const barColor = item.value >= 80 ? C.green : item.value >= 55 ? C.amber : C.red;
+            const barColor = barColorFor(item.value);
+            const barText = barTextFor(item.value);
             return (
               <View key={item.label}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: C.sand }}>{item.label}</Text>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: barColor }}>{item.value}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: C.ink }}>{item.label}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: barText }}>{item.value}</Text>
                 </View>
-                <View style={{ height: 5, backgroundColor: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
-                  <View style={{ height: 5, width: `${item.value}%`, backgroundColor: barColor, borderRadius: 3 }} />
+                <View style={{ height: 9, backgroundColor: C.surfaceAlt, borderRadius: 100, overflow: 'hidden' }}>
+                  <View style={{ height: 9, width: `${item.value}%`, backgroundColor: barColor, borderRadius: 100 }} />
                 </View>
               </View>
             );
           })}
         </View>
-        <Text style={{ fontSize: 10, color: C.dust, marginTop: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 15 }}>
-          For informational purposes only. Not a substitute for professional medical advice. Always consult a doctor or physio for injuries.
+        <Text style={{ fontSize: 11, color: C.dust, marginTop: 16, lineHeight: 16, textAlign: 'center' }}>
+          For informational purposes only — not a substitute for professional medical advice.
         </Text>
 
         {/* Check-in shortcut */}
@@ -880,7 +876,7 @@ export default function ProfileScreen() {
             {/* Alerts */}
             {/* ── Getting started (no sessions yet) ── */}
             {totalSessions === 0 && totalCheckIns === 0 && (
-              <Card label="Getting Started" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra} style={{ marginTop: 8 }}>
+              <Card label="Getting Started" bgColor={C.terraBg} labelColor={C.terra} style={{ marginTop: 8 }}>
                 <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 }}>
                   <Text style={{ fontSize: 13, color: C.sand, lineHeight: 19, marginBottom: 16 }}>
                     Your recovery scores, CHI, and progress appear here once you start logging. Do these two things first:
@@ -920,7 +916,6 @@ export default function ProfileScreen() {
             {totalSessions > 0 && alertSettings.weeklyLoad && weeklySummary?.totalRes >= 280 && (
               <Card
                 label="⚠ Notice"
-                accentColor={C.amber}
                 bgColor={C.amberBg}
                 labelColor={C.amber}
                 style={{ marginTop: 8 }}
@@ -936,7 +931,6 @@ export default function ProfileScreen() {
             {totalSessions > 0 && alertSettings.injuryOverload && injuryAlerts.length > 0 && (
               <Card
                 label="⚠ Overload"
-                accentColor={C.red}
                 bgColor={C.redBg}
                 labelColor={C.red}
                 style={{ marginTop: weeklySummary?.totalRes >= 280 ? 0 : 8 }}
@@ -973,20 +967,20 @@ export default function ProfileScreen() {
                           : `${recovery.days} day${recovery.days !== 1 ? 's' : ''} recommended · back ${recovery.earliestDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`}
                       </Text>
                     </View>
-                    <View style={[styles.recoveryDaysBox, { borderColor: recovery.isReady ? C.green : C.amber }]}>
-                      <Text style={[styles.recoveryDaysNum, { color: recovery.isReady ? C.green : C.amber }]}>
+                    <View style={[styles.recoveryDaysBox, { backgroundColor: recovery.isReady ? C.greenBg : C.amberBg }]}>
+                      <Text style={[styles.recoveryDaysNum, { color: recovery.isReady ? C.sageText : C.amberText }]}>
                         {recovery.isReady ? '✓' : recovery.days}
                       </Text>
                       {!recovery.isReady && (
-                        <Text style={[styles.recoveryDaysLabel, { color: C.amber }]}>days</Text>
+                        <Text style={[styles.recoveryDaysLabel, { color: C.amberText }]}>days</Text>
                       )}
                     </View>
                   </View>
                   {recovery.factors.length > 0 && (
                     <View style={styles.recoveryFactors}>
                       {recovery.factors.map(f => (
-                        <View key={f} style={[styles.recoveryFactor, { borderColor: C.amber + '60' }]}>
-                          <Text style={[styles.recoveryFactorText, { color: C.amber }]}>{f}</Text>
+                        <View key={f} style={[styles.recoveryFactor, { backgroundColor: C.amberBg }]}>
+                          <Text style={[styles.recoveryFactorText, { color: C.amberText }]}>{f}</Text>
                         </View>
                       ))}
                     </View>
@@ -1071,7 +1065,7 @@ export default function ProfileScreen() {
             </Card>
 
             {/* Progress */}
-            <Card label="Project Progress" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra} collapsible collapsed={!!collapsedCards.progress} onToggle={() => toggleCard('progress')}>
+            <Card label="Project Progress" bgColor={C.terraBg} labelColor={C.terra} collapsible collapsed={!!collapsedCards.progress} onToggle={() => toggleCard('progress')}>
               <View style={styles.progressInner}>
                 <View style={styles.progressTopRow}>
                   <View>
@@ -1158,10 +1152,10 @@ export default function ProfileScreen() {
                     {[6, 7, 8, 9, 10].map(h => (
                       <TouchableOpacity
                         key={h}
-                        style={[styles.timeChip, reminderSettings.hour === h && { backgroundColor: C.terraBg, borderColor: C.terraBorder }]}
+                        style={[styles.timeChip, reminderSettings.hour === h && { backgroundColor: C.accentSoft }]}
                         onPress={() => handleReminderTime(h)}
                       >
-                        <Text style={[styles.timeChipText, reminderSettings.hour === h && { color: C.terra }]}>
+                        <Text style={[styles.timeChipText, reminderSettings.hour === h && styles.timeChipTextActive]}>
                           {h <= 12 ? h : h - 12}{h < 12 ? 'am' : 'pm'}
                         </Text>
                       </TouchableOpacity>
@@ -1295,15 +1289,15 @@ function makeStyles(C) {
     scrollContent: { paddingBottom: 110 },
 
     header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
-    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    greeting: { fontSize: 12, color: C.dust, fontWeight: '700', letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 6 },
+    title: { fontSize: 36, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 40 },
 
     emptyTitle: { fontSize: 18, fontWeight: '800', color: C.ink },
     emptyText: { color: C.sand, fontSize: 13, textAlign: 'center' },
     setupButton: { backgroundColor: C.terra, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, marginTop: 4 },
     setupButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
-    alertInner: { padding: 14, paddingLeft: 24 },
+    alertInner: { padding: 14 },
     alertText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
 
     gradeHeroInner: { flexDirection: 'row', padding: 20, paddingBottom: 8 },
@@ -1314,28 +1308,28 @@ function makeStyles(C) {
     editGradesBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, padding: 12, alignItems: 'center' },
     editGradesBtnText: { color: C.sand, fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
 
-    progressInner: { padding: 18, paddingLeft: 24 },
+    progressInner: { padding: 18 },
     progressTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
     progressEyebrow: { fontSize: 10, fontWeight: '700', color: C.terraDark || C.sand, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
     progressNumRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
     progressBigNum: { fontSize: 48, fontWeight: '800', color: C.terra, letterSpacing: -2, lineHeight: 52 },
     progressDenom: { fontSize: 18, fontWeight: '600', color: C.sand },
     progressPct: { fontSize: 13, fontWeight: '700', color: C.sand },
-    progressTrack: { height: 6, backgroundColor: C.borderLight, borderRadius: 3, marginBottom: 10, overflow: 'hidden' },
-    progressFill: { height: 6, backgroundColor: C.terra, borderRadius: 3 },
+    progressTrack: { height: 9, backgroundColor: C.surfaceAlt, borderRadius: 100, marginBottom: 10, overflow: 'hidden' },
+    progressFill: { height: 9, backgroundColor: C.terra, borderRadius: 100 },
     progressHint: { color: C.sand, fontSize: 11 },
-    sendsTargetBtn: { borderTopWidth: 1, borderTopColor: C.terraBorder + '40', paddingHorizontal: 24, paddingVertical: 10 },
+    sendsTargetBtn: { borderTopWidth: 1, borderTopColor: C.hairline, paddingHorizontal: 18, paddingVertical: 10 },
     sendsTargetText: { color: C.terraDark || C.terra, fontSize: 11, fontWeight: '600' },
 
-    recoveryInner: { padding: 18, paddingTop: 14, paddingLeft: 24 },
+    recoveryInner: { padding: 18, paddingTop: 14 },
     recoveryTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     recoveryStatus: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5, marginBottom: 4 },
     recoverySub: { fontSize: 11, fontWeight: '600', lineHeight: 16 },
-    recoveryDaysBox: { width: 52, height: 52, borderWidth: 1.5, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    recoveryDaysBox: { width: 52, height: 52, borderRadius: 12, backgroundColor: C.surfaceAlt, justifyContent: 'center', alignItems: 'center' },
     recoveryDaysNum: { fontSize: 20, fontWeight: '800', lineHeight: 24 },
     recoveryDaysLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
     recoveryFactors: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
-    recoveryFactor: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+    recoveryFactor: { borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 },
     recoveryFactorText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
     recoveryDisclaimer: { fontSize: 10, color: C.dust, marginTop: 12, fontStyle: 'italic', lineHeight: 15 },
 
@@ -1355,8 +1349,9 @@ function makeStyles(C) {
     reminderTimeRow: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.borderLight },
     reminderTimeLabel: { fontSize: 10, fontWeight: '700', color: C.dust, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
     reminderTimeChips: { flexDirection: 'row', gap: 8 },
-    timeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.borderLight, backgroundColor: C.surfaceAlt },
+    timeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, backgroundColor: C.surfaceAlt },
     timeChipText: { fontSize: 12, fontWeight: '700', color: C.sand },
+    timeChipTextActive: { color: C.accentText },
 
     accountInner: { padding: 16 },
     accountRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
@@ -1368,16 +1363,16 @@ function makeStyles(C) {
     accountNoAccountText: { fontSize: 13, color: C.sand, lineHeight: 19, marginBottom: 14 },
 
     shareBtnRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 4 },
-    shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, borderWidth: 1, borderColor: C.borderLight, borderRadius: 14 },
-    shareBtnText: { fontSize: 12, fontWeight: '600', color: C.sand, letterSpacing: 0.3 },
+    shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, backgroundColor: C.surfaceAlt, borderRadius: 16 },
+    shareBtnText: { fontSize: 12, fontWeight: '700', color: C.sand, letterSpacing: 0.3 },
 
     trendInner: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 10 },
     trendTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 },
     trendSubtitle: { flex: 1, fontSize: 11, color: C.dust, lineHeight: 15 },
     trendWindowBtns: { flexDirection: 'row', gap: 5 },
-    trendWindowBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: C.surfaceAlt },
-    trendWindowBtnActive: { borderColor: C.terraBorder, backgroundColor: C.terraBg },
-    trendWindowBtnText: { fontSize: 10, fontWeight: '800', color: C.dust },
+    trendWindowBtn: { borderRadius: 9, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: C.surfaceAlt },
+    trendWindowBtnActive: { backgroundColor: C.surface, shadowColor: '#2B2118', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 },
+    trendWindowBtnText: { fontSize: 12, fontWeight: '800', color: C.dust },
     trendWindowBtnTextActive: { color: C.terra },
 
     streakInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
@@ -1389,7 +1384,7 @@ function makeStyles(C) {
     streakDots: { alignItems: 'center', gap: 5 },
     streakDot: { width: 10, height: 10, borderRadius: 5 },
     streakDotDone: { backgroundColor: C.terra },
-    streakDotMiss: { backgroundColor: C.borderLight },
+    streakDotMiss: { backgroundColor: C.surfaceAlt },
     streakDotLabel: { fontSize: 9, fontWeight: '600', color: C.dust, letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 4 },
 
     startStep: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12 },
@@ -1418,8 +1413,8 @@ function makeModalStyles(C) {
     body: { padding: 24, paddingBottom: 48 },
     subtitle: { fontSize: 13, color: C.sand, marginBottom: 20 },
     gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
-    selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
+    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    selectedButton: { backgroundColor: C.terra },
     gradeText: { color: C.sand, fontSize: 14, fontWeight: '700' },
     selectedText: { color: '#fff' },
     continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 24 },

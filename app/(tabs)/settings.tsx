@@ -7,35 +7,31 @@ import { toDisplayGrade, useTheme } from '../../context/ThemeContext';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12'];
 
-function Card({ label, labelColor, accentColor, bgColor, children, style }: {
-  label?: string; labelColor?: string; accentColor?: string; bgColor?: string; children?: any; style?: any;
+function Card({ label, labelColor, bgColor, children, style }: {
+  label?: string; labelColor?: string; bgColor?: string; children?: any; style?: any;
 }) {
   const { C } = useTheme();
-  const hasAccent = !!accentColor;
   return (
     <View style={[{
       backgroundColor: bgColor || C.surface,
-      borderRadius: 20,
+      borderRadius: 24,
       marginHorizontal: 16,
       marginBottom: 14,
-      shadowColor: '#000',
+      shadowColor: '#2B2118',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 12,
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
       elevation: 3,
       overflow: 'hidden',
     }, style]}>
-      {hasAccent && (
-        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accentColor, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }} />
-      )}
       {label && (
         <Text style={{
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: '700',
           color: labelColor || C.dust,
-          letterSpacing: 1,
+          letterSpacing: 1.5,
           textTransform: 'uppercase',
-          paddingHorizontal: hasAccent ? 24 : 20,
+          paddingHorizontal: 20,
           paddingTop: 18,
           paddingBottom: 2,
         }}>{label}</Text>
@@ -127,7 +123,6 @@ function AnimatedToggle({ value, onPress }: { value: boolean; onPress: () => voi
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
       <Animated.View style={{
         width: 40, height: 22, borderRadius: 11,
-        borderWidth: 1, borderColor: value ? C.terraBorder : C.borderLight,
         backgroundColor: trackBg, justifyContent: 'center', paddingHorizontal: 2,
       }}>
         <Animated.View style={{
@@ -260,8 +255,8 @@ export default function SettingsScreen() {
               </Text>
             </View>
             {editingName ? (
-              <TouchableOpacity style={[styles.profileBtn, { borderColor: C.terraBorder }]} onPress={saveName}>
-                <Text style={[styles.profileBtnText, { color: C.terra }]}>Save</Text>
+              <TouchableOpacity style={[styles.profileBtn, { backgroundColor: C.accentSoft }]} onPress={saveName}>
+                <Text style={[styles.profileBtnText, { color: C.accentText }]}>Save</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
@@ -328,7 +323,7 @@ export default function SettingsScreen() {
         </Card>
 
         {/* Grades */}
-        <Card label="Grades" accentColor={C.terra} bgColor={C.terraBg} labelColor={C.terra}>
+        <Card label="Grades" bgColor={C.accentSoft}>
           <View style={styles.gradeDisplay}>
             <View style={styles.gradeItem}>
               <Text style={styles.gradeEyebrow}>Level</Text>
@@ -337,10 +332,10 @@ export default function SettingsScreen() {
             <View style={styles.gradeDivider} />
             <View style={styles.gradeItem}>
               <Text style={styles.gradeEyebrow}>Project</Text>
-              <Text style={[styles.gradeBig, { color: C.terra }]}>{profile?.projectGrade ? toDisplayGrade(profile.projectGrade, gradeSystem) : '—'}</Text>
+              <Text style={[styles.gradeBig, { color: C.accentText }]}>{profile?.projectGrade ? toDisplayGrade(profile.projectGrade, gradeSystem) : '—'}</Text>
             </View>
           </View>
-          <View style={[styles.rowDivider, { backgroundColor: C.terraBorder + '40' }]} />
+          <View style={[styles.rowDivider, { backgroundColor: C.hairline }]} />
           <SettingsRow
             label="Edit Grades"
             sublabel="Update your climbing level and project"
@@ -349,13 +344,13 @@ export default function SettingsScreen() {
         </Card>
 
         {/* Data */}
-        <Card label="Data" accentColor={C.amber} bgColor={C.amberBg} labelColor={C.amber}>
+        <Card label="Data" bgColor={C.amberBg}>
           <SettingsRow
             label="Clear Today's Session"
             sublabel="Re-log today's climbing session"
             onPress={clearTodaySession}
           />
-          <View style={[styles.rowDivider, { backgroundColor: C.amberBorder + '30' }]} />
+          <View style={[styles.rowDivider, { backgroundColor: C.hairline }]} />
           <SettingsRow
             label="Clear Today's Check-in"
             sublabel="Re-do today's body check-in"
@@ -364,7 +359,7 @@ export default function SettingsScreen() {
         </Card>
 
         {/* Danger */}
-        <Card label="Danger Zone" accentColor={C.red} bgColor={C.redBg} labelColor={C.red}>
+        <Card label="Danger Zone" bgColor={C.claySoft}>
           <SettingsRow
             label="Clear All Data"
             sublabel="Permanently delete everything"
@@ -393,25 +388,25 @@ function makeStyles(C) {
     scrollContent: { paddingBottom: 110 },
 
     header: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
-    greeting: { fontSize: 11, color: C.dust, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
-    title: { fontSize: 38, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 42 },
+    greeting: { fontSize: 12, color: C.dust, fontWeight: '700', letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 6 },
+    title: { fontSize: 36, fontWeight: '800', color: C.ink, letterSpacing: -1.5, lineHeight: 40 },
 
-    profileInner: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 14, gap: 14 },
-    profileAvatar: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.terraBorder, backgroundColor: C.terraBg, justifyContent: 'center', alignItems: 'center' },
-    profileAvatarText: { fontSize: 20, fontWeight: '800', color: C.terra },
+    profileInner: { flexDirection: 'row', alignItems: 'center', padding: 18, paddingTop: 14, gap: 14 },
+    profileAvatar: { width: 48, height: 48, borderRadius: 14, backgroundColor: C.accentSoft, justifyContent: 'center', alignItems: 'center' },
+    profileAvatarText: { fontSize: 22, fontWeight: '800', color: C.accentText },
     profileInfo: { flex: 1 },
     profileName: { color: C.ink, fontSize: 15, fontWeight: '800', marginBottom: 2 },
     profileGrades: { color: C.dust, fontSize: 11 },
-    profileBtn: { borderWidth: 1, borderColor: C.borderLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
-    profileBtnText: { color: C.sand, fontSize: 11, fontWeight: '800' },
-    nameInput: { color: C.ink, fontSize: 15, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: C.terraBorder, paddingBottom: 2, minWidth: 120 },
+    profileBtn: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: C.surfaceAlt },
+    profileBtnText: { color: C.sand, fontSize: 12, fontWeight: '800' },
+    nameInput: { color: C.ink, fontSize: 15, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: C.hairline, paddingBottom: 2, minWidth: 120 },
 
-    gradeDisplay: { flexDirection: 'row', paddingHorizontal: 24, paddingVertical: 16 },
+    gradeDisplay: { flexDirection: 'row', paddingHorizontal: 22, paddingVertical: 16 },
     gradeItem: { flex: 1, alignItems: 'center' },
-    gradeEyebrow: { fontSize: 10, fontWeight: '700', color: C.terraDark, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+    gradeEyebrow: { fontSize: 11, fontWeight: '700', color: C.accentText, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
     gradeBig: { fontSize: 40, fontWeight: '800', color: C.ink, letterSpacing: -1 },
-    gradeDivider: { width: 1, backgroundColor: C.terraBorder + '40', marginHorizontal: 8 },
-    rowDivider: { height: 1, marginHorizontal: 16 },
+    gradeDivider: { width: 1, backgroundColor: C.hairline, marginHorizontal: 8 },
+    rowDivider: { height: 1, backgroundColor: C.hairline, marginHorizontal: 16 },
 
     row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
     rowContent: { flex: 1 },
@@ -420,7 +415,7 @@ function makeStyles(C) {
     rowArrow: { color: C.sand, fontSize: 14, fontWeight: '700' },
 
     appInfo: { alignItems: 'center', gap: 4, paddingTop: 24, paddingBottom: 8 },
-    appInfoBox: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 8 },
+    appInfoBox: { backgroundColor: C.surfaceAlt, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 9, marginBottom: 8 },
     appInfoName: { color: C.sand, fontSize: 14, fontWeight: '800', letterSpacing: 4 },
     appInfoTagline: { color: C.dust, fontSize: 11 },
     appInfoVersion: { color: C.dust, fontSize: 10, opacity: 0.6 },
@@ -438,8 +433,8 @@ function makeModalStyles(C) {
     body: { padding: 24, paddingBottom: 48 },
     subtitle: { fontSize: 12, color: C.dust, marginBottom: 20 },
     gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.borderLight },
-    selectedButton: { backgroundColor: C.terra, borderColor: C.terra },
+    gradeButton: { width: '22%', aspectRatio: 1, backgroundColor: C.surfaceAlt, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    selectedButton: { backgroundColor: C.terra },
     gradeText: { color: C.sand, fontSize: 14, fontWeight: '800' },
     selectedText: { color: '#fff' },
     continueButton: { backgroundColor: C.ink, padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 24 },
