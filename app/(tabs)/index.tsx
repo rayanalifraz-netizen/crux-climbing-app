@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Dimensions, LayoutAnimation, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
+import { Dimensions, LayoutAnimation, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
@@ -10,7 +10,7 @@ import ShareCardModal from '../../components/ShareCardModal';
 import { applyReminderSettings, cancelDailyReminder, cancelRecoveryReminder, cancelStreakProtection, getReminderSettings, saveReminderSettings, scheduleInsightNotifications, scheduleStreakProtection, type ReminderSettings } from '../../notifications';
 import { getAlertSettings, getBodyOverrides, getCheckIns, getInjuryAlerts, getInjuryLog, getProfile, getSessions, saveAlertSettings, saveProfile } from '../../storage';
 import { gradeColor, toDisplayGrade, useTheme } from '../../context/ThemeContext';
-import { getCurrentUser, signOut } from '../../lib/supabase';
+import { getCurrentUser, restoreFromSupabase, signOut, supabase } from '../../lib/supabase';
 import { computeCHI, V_GRADES } from '../../lib/scoring';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
@@ -550,6 +550,13 @@ export default function ProfileScreen() {
   const [showShareCard, setShowShareCard] = useState(false);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ enabled: false, hour: 8, minute: 0 });
   const [currentUser, setCurrentUser] = useState<{ email?: string | null } | null>(null);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
   const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>({});
   const [showRecoveryInfo, setShowRecoveryInfo] = useState(false);
   const [trendDays, setTrendDays] = useState(14);
@@ -659,6 +666,45 @@ export default function ProfileScreen() {
     if (res <= 40) return C.terra;
     if (res <= 70) return C.amber;
     return C.red;
+  };
+
+  const handleEmailAuth = async () => {
+    setAuthError(null);
+    setAuthSuccess(null);
+    if (!authEmail.trim() || !authPassword.trim()) { setAuthError('Enter your email and password.'); return; }
+    if (authMode === 'signup' && !authName.trim()) { setAuthError('Enter your name.'); return; }
+    if (authPassword.length < 6) { setAuthError('Password must be at least 6 characters.'); return; }
+    setAuthLoading(true);
+    try {
+      if (authMode === 'signup') {
+        const { data, error: signUpError } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword });
+        if (signUpError) throw signUpError;
+        const existing = await getProfile();
+        await saveProfile({ ...(existing || { maxGrade: 'V4', projectGrade: 'V6', sendsToUnlock: 10 }), name: authName.trim() });
+        if (data.session) {
+          await restoreFromSupabase();
+          setCurrentUser(await getCurrentUser());
+          setAuthEmail(''); setAuthPassword(''); setAuthName('');
+        } else {
+          setAuthSuccess('Check your email to confirm your account, then sign in.');
+          setAuthMode('signin');
+        }
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword });
+        if (signInError) throw signInError;
+        await restoreFromSupabase();
+        setCurrentUser(await getCurrentUser());
+        setAuthEmail(''); setAuthPassword('');
+      }
+    } catch (e: any) {
+      const msg = e?.message || '';
+      if (msg.includes('Invalid login')) setAuthError('Wrong email or password.');
+      else if (msg.includes('Email not confirmed')) setAuthError('Check your email to confirm your account first.');
+      else if (msg.includes('already registered')) setAuthError('Account exists. Sign in instead.');
+      else setAuthError(msg || 'Something went wrong.');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleShareReport = async () => {
@@ -1194,18 +1240,71 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <View style={styles.accountInner}>
-              <Text style={styles.accountNoAccountText}>
-                Sign in to back up your data and restore it on any device.
-              </Text>
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                buttonStyle={isDark
-                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                cornerRadius={12}
-                style={{ width: '100%', height: 48 }}
-                onPress={() => router.navigate('/signin')}
+              {Platform.OS === 'ios' && (
+                <>
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={isDark
+                      ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                      : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                    cornerRadius={12}
+                    style={{ width: '100%', height: 48, marginBottom: 14 }}
+                    onPress={() => router.navigate('/signin')}
+                  />
+                  <View style={styles.accountDividerRow}>
+                    <View style={styles.accountDividerLine} />
+                    <Text style={styles.accountDividerText}>or</Text>
+                    <View style={styles.accountDividerLine} />
+                  </View>
+                </>
+              )}
+              {authMode === 'signup' && (
+                <TextInput
+                  style={styles.accountInput}
+                  value={authName}
+                  onChangeText={setAuthName}
+                  placeholder="Your name"
+                  placeholderTextColor={C.dust}
+                  autoCapitalize="words"
+                />
+              )}
+              <TextInput
+                style={styles.accountInput}
+                value={authEmail}
+                onChangeText={setAuthEmail}
+                placeholder="Email"
+                placeholderTextColor={C.dust}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
               />
+              <TextInput
+                style={styles.accountInput}
+                value={authPassword}
+                onChangeText={setAuthPassword}
+                placeholder="Password"
+                placeholderTextColor={C.dust}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              {authError ? <Text style={styles.accountAuthError}>{authError}</Text> : null}
+              {authSuccess ? <Text style={styles.accountAuthSuccess}>{authSuccess}</Text> : null}
+              <TouchableOpacity
+                style={[styles.accountAuthBtn, authLoading && { opacity: 0.5 }]}
+                onPress={handleEmailAuth}
+                disabled={authLoading}
+              >
+                <Text style={styles.accountAuthBtnText}>{authMode === 'signup' ? 'Create Account' : 'Sign In'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => { setAuthMode(m => m === 'signin' ? 'signup' : 'signin'); setAuthError(null); setAuthSuccess(null); }}
+                style={{ alignItems: 'center', paddingVertical: 4 }}
+              >
+                <Text style={styles.accountToggleText}>
+                  {authMode === 'signin' ? "No account? " : 'Have an account? '}
+                  <Text style={styles.accountToggleLink}>{authMode === 'signin' ? 'Create one' : 'Sign in'}</Text>
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </Card>
@@ -1353,7 +1452,7 @@ function makeStyles(C) {
     timeChipText: { fontSize: 12, fontWeight: '700', color: C.sand },
     timeChipTextActive: { color: C.accentText },
 
-    accountInner: { padding: 16 },
+    accountInner: { padding: 16, gap: 10 },
     accountRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
     accountIconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.terraBg, alignItems: 'center', justifyContent: 'center' },
     accountEmail: { fontSize: 13, fontWeight: '700', color: C.ink, marginBottom: 2 },
@@ -1361,6 +1460,16 @@ function makeStyles(C) {
     accountSignOutBtn: { borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 12, alignItems: 'center' },
     accountSignOutText: { fontSize: 12, fontWeight: '600', color: C.dust },
     accountNoAccountText: { fontSize: 13, color: C.sand, lineHeight: 19, marginBottom: 14 },
+    accountDividerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    accountDividerLine: { flex: 1, height: 1, backgroundColor: C.hairline },
+    accountDividerText: { fontSize: 11, color: C.dust, fontWeight: '600' },
+    accountInput: { backgroundColor: C.surfaceAlt, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: C.ink, fontWeight: '600' },
+    accountAuthBtn: { backgroundColor: C.ink, borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+    accountAuthBtnText: { color: C.surface, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+    accountAuthError: { fontSize: 12, color: C.red, fontWeight: '600', textAlign: 'center' },
+    accountAuthSuccess: { fontSize: 12, color: C.sageText, fontWeight: '600', textAlign: 'center', lineHeight: 17 },
+    accountToggleText: { fontSize: 12, color: C.dust, fontWeight: '600' },
+    accountToggleLink: { color: C.accentText, fontWeight: '800' },
 
     shareBtnRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 4 },
     shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, backgroundColor: C.surfaceAlt, borderRadius: 16 },
