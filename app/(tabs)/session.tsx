@@ -1,14 +1,17 @@
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { editStore } from '../../lib/editStore';
-import { Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { scheduleRecoveryReminder } from '../../notifications';
 import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession, type ClimbEntry, type GradeEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
-import { addClimbToGroupSession, getGroupLeaderboard, getOrCreateMyGroupSession, gradeToPoints, joinGroupSessionByCode, leaveGroupSession, supabase, type GroupSession, type LeaderboardEntry } from '../../lib/supabase';
+import { addClimbToGroupSession, endGroupSession, getGroupLeaderboard, getOrCreateMyGroupSession, gradeToPoints, joinGroupSessionByCode, leaveGroupSession, removeClimbFromGroupSession, supabase, type GroupSession, type LeaderboardEntry } from '../../lib/supabase';
+
+// Persists active group session across tab switches within same app session
+let _persistedActiveSessionId: string | null = null;
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13+'];
 const ATTEMPT_OPTIONS = ['Flash', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
@@ -19,8 +22,8 @@ function entryLabel(grade: string, entry: GradeEntry, gradeSystem: string): stri
   if (entry.sends >= 1) return `${g} · ${entry.attempts} att · Sent ✓`;
   return `${g} · ${entry.attempts} att`;
 }
-function Card({ label, labelColor, bgColor, children, style }: {
-  label?: string; labelColor?: string; bgColor?: string; children?: any; style?: any;
+function Card({ label, labelColor, bgColor, children, style, labelAction }: {
+  label?: string; labelColor?: string; bgColor?: string; children?: any; style?: any; labelAction?: React.ReactNode;
 }) {
   const { C } = useTheme();
   return (
@@ -37,16 +40,17 @@ function Card({ label, labelColor, bgColor, children, style }: {
       overflow: 'hidden',
     }, style]}>
       {label && (
-        <Text style={{
-          fontSize: 11,
-          fontWeight: '700',
-          color: labelColor || C.dust,
-          letterSpacing: 1.5,
-          textTransform: 'uppercase',
-          paddingHorizontal: 20,
-          paddingTop: 18,
-          paddingBottom: 2,
-        }}>{label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 2 }}>
+          <Text style={{
+            flex: 1,
+            fontSize: 11,
+            fontWeight: '700',
+            color: labelColor || C.dust,
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
+          }}>{label}</Text>
+          {labelAction}
+        </View>
       )}
       {children}
     </View>
@@ -129,6 +133,8 @@ export default function SessionScreen() {
   const [joinError, setJoinError] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const [groupInitDone, setGroupInitDone] = useState(false);
+  const [showFinalResults, setShowFinalResults] = useState(false);
+  const [showScoringGuide, setShowScoringGuide] = useState(false);
   const groupChannelRef = useRef<any>(null);
 
   useFocusEffect(useCallback(() => {
@@ -158,11 +164,19 @@ export default function SessionScreen() {
       const name = profile?.name || 'Climber';
       const mine = await getOrCreateMyGroupSession(name);
       setMyGroupSession(mine);
-      if (mine) {
-        setActiveGroupSession(prev => prev ?? mine);
-        refreshLeaderboard(mine.id);
-        subscribeToGroup(mine.id);
+      if (!mine) return;
+      // Restore persisted active session (e.g. a friend's session joined earlier)
+      let active: GroupSession = mine;
+      if (_persistedActiveSessionId && _persistedActiveSessionId !== mine.id) {
+        const { data } = await supabase.from('group_sessions').select('*').eq('id', _persistedActiveSessionId).maybeSingle();
+        if (data) active = data as GroupSession;
+        else _persistedActiveSessionId = mine.id;
+      } else {
+        _persistedActiveSessionId = mine.id;
       }
+      setActiveGroupSession(active);
+      refreshLeaderboard(active.id);
+      subscribeToGroup(active.id);
     } catch (e) {
       console.error('initGroupSession error:', e);
     } finally {
@@ -183,19 +197,34 @@ export default function SessionScreen() {
         () => refreshLeaderboard(sessionId))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_session_members', filter: `session_id=eq.${sessionId}` },
         () => refreshLeaderboard(sessionId))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_sessions', filter: `id=eq.${sessionId}` },
+        (payload) => {
+          if (payload.new?.is_ended) {
+            setActiveGroupSession(prev => prev ? { ...prev, is_ended: true } : prev);
+            setMyGroupSession(prev => prev?.id === sessionId ? { ...prev, is_ended: true } : prev);
+            refreshLeaderboard(sessionId).then(() => setShowFinalResults(true));
+          }
+        })
       .subscribe();
   };
 
   const handleJoinGroup = async () => {
     if (!joinCodeInput.trim()) return;
+    if (joinCodeInput.trim().length < 6) { setJoinError('Codes are 6 characters'); return; }
     setJoinLoading(true);
     setJoinError('');
     const profile = await getProfile();
     const name = profile?.name || 'Climber';
     const session = await joinGroupSessionByCode(joinCodeInput, name);
     if (session) {
+      if (session.is_ended) {
+        setJoinError('That session has already ended');
+        setJoinLoading(false);
+        return;
+      }
+      _persistedActiveSessionId = session.id;
       setActiveGroupSession(session);
-      refreshLeaderboard(session.id);
+      await refreshLeaderboard(session.id);
       subscribeToGroup(session.id);
       setJoinCodeInput('');
     } else {
@@ -207,9 +236,28 @@ export default function SessionScreen() {
   const handleLeaveGroup = async () => {
     if (!activeGroupSession || !myGroupSession) return;
     await leaveGroupSession(activeGroupSession.id);
+    _persistedActiveSessionId = myGroupSession.id;
     setActiveGroupSession(myGroupSession);
-    refreshLeaderboard(myGroupSession.id);
+    await refreshLeaderboard(myGroupSession.id);
     subscribeToGroup(myGroupSession.id);
+  };
+
+  const handleEndGroupSession = () => {
+    if (!myGroupSession) return;
+    Alert.alert(
+      'End Group Session?',
+      'Everyone will see the final results. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'End Session', style: 'destructive', onPress: async () => {
+          await endGroupSession(myGroupSession.id);
+          setMyGroupSession(prev => prev ? { ...prev, is_ended: true } : prev);
+          setActiveGroupSession(prev => prev ? { ...prev, is_ended: true } : prev);
+          await refreshLeaderboard(myGroupSession.id);
+          setShowFinalResults(true);
+        }},
+      ]
+    );
   };
 
   const handleShareGroupCode = async () => {
@@ -249,16 +297,25 @@ export default function SessionScreen() {
     const sends = draftAttempts === 'Flash' ? 1 : draftSent ? 1 : 0;
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setClimbs(prev => [...prev, { id, grade: draftGrade, attempts: attNum, sends, holdTypes: draftHoldTypes, movementTypes: draftMovementTypes }]);
-    if (sends > 0 && activeGroupSession) {
+    if (sends > 0 && activeGroupSession && !activeGroupSession.is_ended) {
       const isFlash = draftAttempts === 'Flash';
       const pts = gradeToPoints(draftGrade, attNum, isFlash);
-      addClimbToGroupSession(activeGroupSession.id, draftGrade, pts).catch(() => {});
+      const sessionId = activeGroupSession.id;
+      addClimbToGroupSession(sessionId, draftGrade, pts)
+        .then(() => refreshLeaderboard(sessionId))
+        .catch(e => console.error('group climb error:', e));
     }
   };
 
   const removeClimbEntry = (id: string) => {
     Haptics.selectionAsync();
     hasUnsavedProgress.current = true;
+    const climb = climbs.find(c => c.id === id);
+    if (climb && climb.sends > 0 && activeGroupSession && !activeGroupSession.is_ended) {
+      removeClimbFromGroupSession(activeGroupSession.id, climb.grade)
+        .then(() => refreshLeaderboard(activeGroupSession.id))
+        .catch(() => {});
+    }
     setClimbs(prev => prev.filter(c => c.id !== id));
   };
 
@@ -353,7 +410,18 @@ export default function SessionScreen() {
         </View>
 
         {/* Group Session Card */}
-        <Card label="Group Session">
+        <Card
+          label="Group Session"
+          labelAction={
+            <TouchableOpacity
+              onPress={() => { Haptics.selectionAsync(); setShowScoringGuide(true); }}
+              style={styles.scoringGuideBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.scoringGuideBtnText}>?</Text>
+            </TouchableOpacity>
+          }
+        >
           <View style={styles.groupInner}>
             {!groupInitDone ? (
               <Text style={styles.groupStatusText}>Connecting…</Text>
@@ -361,61 +429,89 @@ export default function SessionScreen() {
               <Text style={styles.groupStatusText}>Sign in to use group sessions</Text>
             ) : (
               <>
-                {/* Code + share row */}
+                {/* Code + share / ended row */}
                 <View style={styles.groupCodeRow}>
                   <View>
-                    <Text style={styles.groupCodeLabel}>Your Code</Text>
-                    <Text style={styles.groupCodeValue}>{myGroupSession.join_code}</Text>
+                    <Text style={styles.groupCodeLabel}>
+                      {activeGroupSession?.id !== myGroupSession.id ? `${activeGroupSession?.host_name}'s Code` : 'Your Code'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Text style={styles.groupCodeValue}>
+                        {activeGroupSession?.id !== myGroupSession.id ? activeGroupSession?.join_code : myGroupSession.join_code}
+                      </Text>
+                      {activeGroupSession?.is_ended && (
+                        <View style={styles.endedBadge}>
+                          <Text style={styles.endedBadgeText}>ENDED</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                  <TouchableOpacity style={styles.groupShareBtn} onPress={handleShareGroupCode}>
-                    <Text style={styles.groupShareBtnText}>Share Code</Text>
-                  </TouchableOpacity>
+                  {!activeGroupSession?.is_ended && (
+                    <TouchableOpacity style={styles.groupShareBtn} onPress={handleShareGroupCode}>
+                      <Text style={styles.groupShareBtnText}>Share Code</Text>
+                    </TouchableOpacity>
+                  )}
+                  {activeGroupSession?.is_ended && (
+                    <TouchableOpacity style={styles.viewResultsBtn} onPress={() => setShowFinalResults(true)}>
+                      <Text style={styles.viewResultsBtnText}>Results</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                {/* Leaderboard */}
+                {/* Leaderboard — always show when members exist */}
                 {leaderboard.length > 0 && (
                   <View style={styles.leaderboard}>
                     <Text style={styles.leaderboardTitle}>
-                      {activeGroupSession?.id !== myGroupSession.id ? `${activeGroupSession?.host_name}'s Group` : 'Leaderboard'}{leaderboard.length > 1 ? ` · ${leaderboard.length} climbers` : ''}
+                      {activeGroupSession?.id !== myGroupSession.id ? `${activeGroupSession?.host_name}'s Group` : 'Leaderboard'}
+                      {leaderboard.length > 1 ? ` · ${leaderboard.length} climbers` : ''}
                     </Text>
                     {leaderboard.map((entry, idx) => (
-                      <View key={entry.user_id} style={[styles.leaderboardRow, idx === 0 && { backgroundColor: C.amberBg }]}>
-                        <View style={[styles.leaderboardRankBadge, idx === 0 && { backgroundColor: C.amber }]}>
-                          <Text style={[styles.leaderboardRankText, idx === 0 && { color: '#fff' }]}>{idx + 1}</Text>
+                      <View key={entry.user_id} style={[styles.leaderboardRow, idx === 0 && entry.points > 0 && { backgroundColor: C.amberBg }]}>
+                        <View style={[styles.leaderboardRankBadge, idx === 0 && entry.points > 0 && { backgroundColor: C.amber }]}>
+                          <Text style={[styles.leaderboardRankText, idx === 0 && entry.points > 0 && { color: '#fff' }]}>{idx + 1}</Text>
                         </View>
                         <Text style={styles.leaderboardName} numberOfLines={1}>{entry.display_name}</Text>
-                        <Text style={[styles.leaderboardPoints, idx === 0 && { color: C.amber }]}>{entry.points} pts</Text>
+                        <Text style={[styles.leaderboardPoints, idx === 0 && entry.points > 0 && { color: C.amber }]}>{entry.points} pts</Text>
                       </View>
                     ))}
                   </View>
                 )}
 
-                {/* Join or Leave */}
-                {activeGroupSession && activeGroupSession.id !== myGroupSession.id ? (
-                  <TouchableOpacity style={styles.leaveGroupBtn} onPress={handleLeaveGroup}>
-                    <Text style={styles.leaveGroupBtnText}>Leave {activeGroupSession.host_name}'s group</Text>
+                {/* Host: End Session button */}
+                {activeGroupSession?.id === myGroupSession.id && !myGroupSession.is_ended && leaderboard.length > 1 && (
+                  <TouchableOpacity style={styles.endSessionBtn} onPress={handleEndGroupSession}>
+                    <Text style={styles.endSessionBtnText}>End Session</Text>
                   </TouchableOpacity>
-                ) : (
-                  <View style={styles.joinRow}>
-                    <TextInput
-                      style={styles.joinInput}
-                      value={joinCodeInput}
-                      onChangeText={v => { setJoinCodeInput(v.toUpperCase()); setJoinError(''); }}
-                      placeholder="Friend's code"
-                      placeholderTextColor={C.dust}
-                      autoCapitalize="characters"
-                      maxLength={6}
-                      returnKeyType="done"
-                      onSubmitEditing={handleJoinGroup}
-                    />
-                    <TouchableOpacity
-                      style={[styles.joinBtn, joinLoading && { opacity: 0.5 }]}
-                      onPress={handleJoinGroup}
-                      disabled={joinLoading}
-                    >
-                      <Text style={styles.joinBtnText}>Join</Text>
+                )}
+
+                {/* Join or Leave (hidden when session ended) */}
+                {!activeGroupSession?.is_ended && (
+                  activeGroupSession && activeGroupSession.id !== myGroupSession.id ? (
+                    <TouchableOpacity style={styles.leaveGroupBtn} onPress={handleLeaveGroup}>
+                      <Text style={styles.leaveGroupBtnText}>Leave {activeGroupSession.host_name}'s group</Text>
                     </TouchableOpacity>
-                  </View>
+                  ) : (
+                    <View style={styles.joinRow}>
+                      <TextInput
+                        style={styles.joinInput}
+                        value={joinCodeInput}
+                        onChangeText={v => { setJoinCodeInput(v.toUpperCase()); setJoinError(''); }}
+                        placeholder="Friend's code"
+                        placeholderTextColor={C.dust}
+                        autoCapitalize="characters"
+                        maxLength={6}
+                        returnKeyType="done"
+                        onSubmitEditing={handleJoinGroup}
+                      />
+                      <TouchableOpacity
+                        style={[styles.joinBtn, joinLoading && { opacity: 0.5 }]}
+                        onPress={handleJoinGroup}
+                        disabled={joinLoading}
+                      >
+                        <Text style={styles.joinBtnText}>Join</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )
                 )}
                 {joinError ? <Text style={styles.joinError}>{joinError}</Text> : null}
               </>
@@ -772,6 +868,70 @@ export default function SessionScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Scoring Guide Modal */}
+      <Modal visible={showScoringGuide} transparent animationType="fade" onRequestClose={() => setShowScoringGuide(false)}>
+        <TouchableOpacity style={styles.finalOverlay} activeOpacity={1} onPress={() => setShowScoringGuide(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.finalSheet}>
+            <Text style={styles.finalTitle}>How Points Work</Text>
+            <View style={{ width: '100%', gap: 10, marginTop: 16, marginBottom: 24 }}>
+              <View style={styles.scoringRow}>
+                <Text style={styles.scoringLabel}>Grade</Text>
+                <Text style={styles.scoringValue}>VB=1 pt · V0=2 · V1=3 … V13+=15</Text>
+              </View>
+              <View style={styles.scoringDivider} />
+              <View style={styles.scoringRow}>
+                <Text style={styles.scoringLabel}>Flash</Text>
+                <Text style={[styles.scoringValue, { color: C.amber }]}>×2 multiplier</Text>
+              </View>
+              <View style={styles.scoringRow}>
+                <Text style={styles.scoringLabel}>1–4 attempts</Text>
+                <Text style={[styles.scoringValue, { color: C.terra }]}>×1.5 multiplier</Text>
+              </View>
+              <View style={styles.scoringRow}>
+                <Text style={styles.scoringLabel}>5+ attempts</Text>
+                <Text style={[styles.scoringValue, { color: C.dust }]}>×1 multiplier</Text>
+              </View>
+              <View style={styles.scoringDivider} />
+              <Text style={styles.scoringNote}>Only sent climbs earn points. Points are awarded when you tap "Add Climb" with "Sent it" checked or Flash selected.</Text>
+            </View>
+            <TouchableOpacity style={styles.finalDoneBtn} onPress={() => { Haptics.selectionAsync(); setShowScoringGuide(false); }}>
+              <Text style={styles.finalDoneBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Final Results Modal */}
+      <Modal visible={showFinalResults} transparent animationType="fade" onRequestClose={() => setShowFinalResults(false)}>
+        <View style={styles.finalOverlay}>
+          <View style={styles.finalSheet}>
+            <Text style={styles.finalEmoji}>🏆</Text>
+            <Text style={styles.finalTitle}>Session Ended</Text>
+            {leaderboard.length > 0 && (
+              <Text style={styles.finalWinnerName}>{leaderboard[0].display_name} wins!</Text>
+            )}
+            <View style={styles.finalLeaderboard}>
+              {leaderboard.map((entry, idx) => (
+                <View key={entry.user_id} style={[styles.finalRow, idx === 0 && { backgroundColor: C.amberBg, borderRadius: 14 }]}>
+                  <Text style={[styles.finalRank, idx === 0 && { color: C.amber }]}>
+                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
+                  </Text>
+                  <Text style={[styles.finalName, idx === 0 && { color: C.amber, fontWeight: '800' }]} numberOfLines={1}>
+                    {entry.display_name}
+                  </Text>
+                  <Text style={[styles.finalPoints, idx === 0 && { color: C.amber }]}>
+                    {entry.points} pts
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.finalDoneBtn} onPress={() => { Haptics.selectionAsync(); setShowFinalResults(false); }}>
+              <Text style={styles.finalDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -888,5 +1048,33 @@ function makeStyles(C) {
     joinError: { fontSize: 11, color: C.red, fontWeight: '600', textAlign: 'center' },
     leaveGroupBtn: { backgroundColor: C.claySoft, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
     leaveGroupBtnText: { fontSize: 12, fontWeight: '700', color: C.clayText },
+
+    scoringGuideBtn: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+    scoringGuideBtnText: { fontSize: 11, fontWeight: '800', color: C.dust },
+    scoringRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    scoringLabel: { fontSize: 13, fontWeight: '700', color: C.ink },
+    scoringValue: { fontSize: 12, fontWeight: '600', color: C.sand, flex: 1, textAlign: 'right' },
+    scoringDivider: { height: 1, backgroundColor: C.hairline },
+    scoringNote: { fontSize: 11, color: C.dust, lineHeight: 17, textAlign: 'center' },
+
+    endedBadge: { backgroundColor: C.claySoft, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+    endedBadgeText: { fontSize: 9, fontWeight: '800', color: C.clayText, letterSpacing: 1.2 },
+    viewResultsBtn: { backgroundColor: C.amberBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9 },
+    viewResultsBtnText: { fontSize: 12, fontWeight: '800', color: C.amber, letterSpacing: 0.3 },
+    endSessionBtn: { backgroundColor: C.claySoft, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
+    endSessionBtnText: { fontSize: 12, fontWeight: '700', color: C.clayText },
+
+    finalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    finalSheet: { backgroundColor: C.surface, borderRadius: 28, padding: 28, width: '100%', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 24, elevation: 20 },
+    finalEmoji: { fontSize: 52, marginBottom: 10 },
+    finalTitle: { fontSize: 13, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
+    finalWinnerName: { fontSize: 26, fontWeight: '900', color: C.ink, letterSpacing: -0.5, marginBottom: 20, textAlign: 'center' },
+    finalLeaderboard: { width: '100%', gap: 6, marginBottom: 24 },
+    finalRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 10 },
+    finalRank: { fontSize: 18, width: 28, textAlign: 'center' },
+    finalName: { flex: 1, fontSize: 15, fontWeight: '700', color: C.ink },
+    finalPoints: { fontSize: 15, fontWeight: '800', color: C.accentText },
+    finalDoneBtn: { backgroundColor: C.ink, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 40, alignItems: 'center' },
+    finalDoneBtnText: { fontSize: 15, fontWeight: '800', color: C.surface, letterSpacing: 0.3 },
   });
 }

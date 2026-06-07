@@ -29,7 +29,7 @@ function generateJoinCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-export type GroupSession = { id: string; join_code: string; host_user_id: string; host_name: string; date: string };
+export type GroupSession = { id: string; join_code: string; host_user_id: string; host_name: string; date: string; is_ended: boolean };
 export type LeaderboardEntry = { user_id: string; display_name: string; points: number };
 
 export async function getOrCreateMyGroupSession(displayName: string): Promise<GroupSession | null> {
@@ -55,7 +55,7 @@ export async function joinGroupSessionByCode(code: string, displayName: string):
   const user = await getCurrentUser();
   if (!user) return null;
   const today = new Date().toISOString().slice(0, 10);
-  const { data: session } = await supabase.from('group_sessions').select('*').eq('join_code', code.toUpperCase().trim()).eq('date', today).maybeSingle();
+  const { data: session } = await supabase.from('group_sessions').select('*').eq('join_code', code.toUpperCase().trim()).eq('date', today).eq('is_ended', false).maybeSingle();
   if (!session) return null;
   await supabase.from('group_session_members').upsert(
     { session_id: session.id, user_id: user.id, display_name: displayName },
@@ -94,6 +94,10 @@ export async function leaveGroupSession(sessionId: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
   await supabase.from('group_session_members').delete().eq('session_id', sessionId).eq('user_id', user.id);
+}
+
+export async function endGroupSession(sessionId: string): Promise<void> {
+  await supabase.from('group_sessions').update({ is_ended: true }).eq('id', sessionId);
 }
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
