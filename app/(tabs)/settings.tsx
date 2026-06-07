@@ -323,7 +323,7 @@ export default function SettingsScreen() {
         </Card>
 
         {/* Grades */}
-        <Card label="Grades" bgColor={C.accentSoft}>
+        <Card label="Grades">
           <View style={styles.gradeDisplay}>
             <View style={styles.gradeItem}>
               <Text style={styles.gradeEyebrow}>Level</Text>
@@ -344,7 +344,7 @@ export default function SettingsScreen() {
         </Card>
 
         {/* Data */}
-        <Card label="Data" bgColor={C.amberBg}>
+        <Card label="Data">
           <SettingsRow
             label="Clear Today's Session"
             sublabel="Re-log today's climbing session"
@@ -359,7 +359,7 @@ export default function SettingsScreen() {
         </Card>
 
         {/* Danger */}
-        <Card label="Danger Zone" bgColor={C.claySoft}>
+        <Card label="Danger Zone">
           <SettingsRow
             label="Clear All Data"
             sublabel="Permanently delete everything"

@@ -303,7 +303,7 @@ export default function CalendarScreen() {
 
         {/* Goal Date */}
         {goalDate ? (
-          <Card label="Project Goal" bgColor={C.goalBg}>
+          <Card label="Project Goal">
             <View style={styles.goalInner}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.goalDate}>{formatGoalDate(goalDate)}</Text>
@@ -315,9 +315,9 @@ export default function CalendarScreen() {
               <View style={styles.goalActions}>
                 <TouchableOpacity
                   onPress={() => { setGoalPickerMonth(new Date()); setShowGoalModal(true); }}
-                  style={[styles.goalBtn, { borderColor: C.goalBorder }]}
+                  style={[styles.goalBtn, { borderColor: C.borderLight }]}
                 >
-                  <Text style={[styles.goalBtnText, { color: C.goal }]}>Edit</Text>
+                  <Text style={[styles.goalBtnText, { color: C.dust }]}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleClearGoalDate}
@@ -343,11 +343,10 @@ export default function CalendarScreen() {
           const pr = projectReadiness;
           const isReady = pr.primaryFactor === 'ready';
           const accentColor = isReady ? C.green : pr.primaryFactor === 'health' ? C.red : C.amber;
-          const bgColor = showProjectedProgress ? (isReady ? C.greenBg : pr.primaryFactor === 'health' ? C.redBg : C.amberBg) : C.surface;
           const dateStr = pr.recommendedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
           const progressBarW = `${Math.round(pr.progressRate * 100)}%`;
           return (
-            <Card bgColor={bgColor}>
+            <Card>
               {/* Header row with toggle */}
               <TouchableOpacity
                 onPress={toggleProjectedProgress}
@@ -377,7 +376,7 @@ export default function CalendarScreen() {
                       </Text>
                     </View>
                     {!isReady && (
-                      <View style={{ alignItems: 'center', justifyContent: 'center', width: 62, height: 62, borderRadius: 16, backgroundColor: C.surface, marginLeft: 12, shadowColor: '#2B2118', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 }}>
+                      <View style={{ alignItems: 'center', justifyContent: 'center', width: 62, height: 62, borderRadius: 16, backgroundColor: C.surfaceAlt, marginLeft: 12, shadowColor: '#2B2118', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 }}>
                         <Text style={{ fontSize: 22, fontWeight: '900', color: accentColor, lineHeight: 26 }}>{pr.totalDays}</Text>
                         <Text style={{ fontSize: 9, fontWeight: '700', color: accentColor, letterSpacing: 0.5 }}>DAYS</Text>
                       </View>
@@ -884,8 +883,8 @@ function makeStyles(C) {
     goalBtn: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: C.surface },
     goalBtnText: { fontSize: 12, fontWeight: '800' },
 
-    setGoalBtn: { marginHorizontal: 16, marginBottom: 14, borderRadius: 16, height: 52, justifyContent: 'center', alignItems: 'center', backgroundColor: C.plumSoft },
-    setGoalBtnText: { color: C.plumText, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+    setGoalBtn: { marginHorizontal: 16, marginBottom: 14, borderRadius: 24, height: 52, justifyContent: 'center', alignItems: 'center', backgroundColor: C.surface, shadowColor: '#2B2118', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3 },
+    setGoalBtnText: { color: C.dust, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
 
     calendarInner: { padding: 16, paddingTop: 14 },
     monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
