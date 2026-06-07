@@ -3,11 +3,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { editStore } from '../../lib/editStore';
-import { Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ShareCardModal from '../../components/ShareCardModal';
 import { scheduleRecoveryReminder } from '../../notifications';
 import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession, type ClimbEntry, type GradeEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
+import { addClimbToGroupSession, getGroupLeaderboard, getOrCreateMyGroupSession, joinGroupSessionByCode, leaveGroupSession, supabase, type GroupSession, type LeaderboardEntry } from '../../lib/supabase';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13+'];
 const ATTEMPT_OPTIONS = ['Flash', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
@@ -120,22 +121,95 @@ export default function SessionScreen() {
   const [showHoldPicker, setShowHoldPicker] = useState(false);
   const [showMovementPicker, setShowMovementPicker] = useState(false);
 
+  // Group session
+  const [myGroupSession, setMyGroupSession] = useState<GroupSession | null>(null);
+  const [activeGroupSession, setActiveGroupSession] = useState<GroupSession | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [joinCodeInput, setJoinCodeInput] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
+  const groupChannelRef = useRef<any>(null);
+
   useFocusEffect(useCallback(() => {
     const editDate = editStore.sessionDate;
     editStore.sessionDate = null;
     const date = editDate || getTodayDate();
     const editing = !!editDate;
-    // Preserve in-progress unsaved work when switching tabs
     if (!editDate && hasUnsavedProgress.current) return;
     setTargetDate(date);
     setIsEditing(editing);
     loadProfile();
     loadSession(date);
+    initGroupSession();
+    return () => {
+      if (groupChannelRef.current) supabase.removeChannel(groupChannelRef.current);
+    };
   }, []));
 
   const loadProfile = async () => {
     const profile = await getProfile();
     if (profile) setMaxGrade(profile.maxGrade);
+  };
+
+  const initGroupSession = async () => {
+    const profile = await getProfile();
+    const name = profile?.name || 'Climber';
+    const mine = await getOrCreateMyGroupSession(name);
+    setMyGroupSession(mine);
+    if (mine) {
+      setActiveGroupSession(prev => prev ?? mine);
+      const sessionId = mine.id;
+      refreshLeaderboard(sessionId);
+      subscribeToGroup(sessionId);
+    }
+  };
+
+  const refreshLeaderboard = async (sessionId: string) => {
+    const lb = await getGroupLeaderboard(sessionId);
+    setLeaderboard(lb);
+  };
+
+  const subscribeToGroup = (sessionId: string) => {
+    if (groupChannelRef.current) supabase.removeChannel(groupChannelRef.current);
+    groupChannelRef.current = supabase
+      .channel(`group_${sessionId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_session_climbs', filter: `session_id=eq.${sessionId}` },
+        () => refreshLeaderboard(sessionId))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_session_members', filter: `session_id=eq.${sessionId}` },
+        () => refreshLeaderboard(sessionId))
+      .subscribe();
+  };
+
+  const handleJoinGroup = async () => {
+    if (!joinCodeInput.trim()) return;
+    setJoinLoading(true);
+    setJoinError('');
+    const profile = await getProfile();
+    const name = profile?.name || 'Climber';
+    const session = await joinGroupSessionByCode(joinCodeInput, name);
+    if (session) {
+      setActiveGroupSession(session);
+      refreshLeaderboard(session.id);
+      subscribeToGroup(session.id);
+      setJoinCodeInput('');
+    } else {
+      setJoinError("Code not found — make sure it's today's code");
+    }
+    setJoinLoading(false);
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!activeGroupSession || !myGroupSession) return;
+    await leaveGroupSession(activeGroupSession.id);
+    setActiveGroupSession(myGroupSession);
+    refreshLeaderboard(myGroupSession.id);
+    subscribeToGroup(myGroupSession.id);
+  };
+
+  const handleShareGroupCode = async () => {
+    if (!myGroupSession) return;
+    Haptics.selectionAsync();
+    await Share.share({ message: `Join my Crux climbing group! Enter code ${myGroupSession.join_code} in the Session tab.` });
   };
 
   const loadSession = async (date: string) => {
@@ -169,6 +243,9 @@ export default function SessionScreen() {
     const sends = draftAttempts === 'Flash' ? 1 : draftSent ? 1 : 0;
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setClimbs(prev => [...prev, { id, grade: draftGrade, attempts: attNum, sends, holdTypes: draftHoldTypes, movementTypes: draftMovementTypes }]);
+    if (sends > 0 && activeGroupSession) {
+      addClimbToGroupSession(activeGroupSession.id, draftGrade).catch(() => {});
+    }
   };
 
   const removeClimbEntry = (id: string) => {
@@ -266,6 +343,71 @@ export default function SessionScreen() {
             )}
           </View>
         </View>
+
+        {/* Group Session Card */}
+        {myGroupSession && (
+          <Card label="Group Session">
+            <View style={styles.groupInner}>
+              {/* Code + share row */}
+              <View style={styles.groupCodeRow}>
+                <View>
+                  <Text style={styles.groupCodeLabel}>Your Code</Text>
+                  <Text style={styles.groupCodeValue}>{myGroupSession.join_code}</Text>
+                </View>
+                <TouchableOpacity style={styles.groupShareBtn} onPress={handleShareGroupCode}>
+                  <Text style={styles.groupShareBtnText}>Share Code</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Leaderboard */}
+              {leaderboard.length > 0 && (
+                <View style={styles.leaderboard}>
+                  <Text style={styles.leaderboardTitle}>
+                    {activeGroupSession?.id !== myGroupSession.id ? `${activeGroupSession?.host_name}'s Group` : 'Leaderboard'}{leaderboard.length > 1 ? ` · ${leaderboard.length} climbers` : ''}
+                  </Text>
+                  {leaderboard.map((entry, idx) => (
+                    <View key={entry.user_id} style={[styles.leaderboardRow, idx === 0 && { backgroundColor: C.amberBg }]}>
+                      <View style={[styles.leaderboardRankBadge, idx === 0 && { backgroundColor: C.amber }]}>
+                        <Text style={[styles.leaderboardRankText, idx === 0 && { color: '#fff' }]}>{idx + 1}</Text>
+                      </View>
+                      <Text style={styles.leaderboardName} numberOfLines={1}>{entry.display_name}</Text>
+                      <Text style={[styles.leaderboardPoints, idx === 0 && { color: C.amber }]}>{entry.points} pts</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Join or Leave */}
+              {activeGroupSession?.id !== myGroupSession.id ? (
+                <TouchableOpacity style={styles.leaveGroupBtn} onPress={handleLeaveGroup}>
+                  <Text style={styles.leaveGroupBtnText}>Leave {activeGroupSession?.host_name}'s group</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.joinRow}>
+                  <TextInput
+                    style={styles.joinInput}
+                    value={joinCodeInput}
+                    onChangeText={v => { setJoinCodeInput(v.toUpperCase()); setJoinError(''); }}
+                    placeholder="Friend's code"
+                    placeholderTextColor={C.dust}
+                    autoCapitalize="characters"
+                    maxLength={6}
+                    returnKeyType="done"
+                    onSubmitEditing={handleJoinGroup}
+                  />
+                  <TouchableOpacity
+                    style={[styles.joinBtn, joinLoading && { opacity: 0.5 }]}
+                    onPress={handleJoinGroup}
+                    disabled={joinLoading}
+                  >
+                    <Text style={styles.joinBtnText}>Join</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {joinError ? <Text style={styles.joinError}>{joinError}</Text> : null}
+            </View>
+          </Card>
+        )}
 
         {/* Rest Day Block */}
         {isRestDay && !locked && (
@@ -709,5 +851,27 @@ function makeStyles(C) {
     stickyFooter: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 90, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.hairline },
     saveBtn: { backgroundColor: C.ink, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
     saveBtnText: { color: C.surface, fontSize: 15, fontWeight: '800', letterSpacing: 0.4 },
+
+    // Group Session
+    groupInner: { padding: 16, gap: 14 },
+    groupCodeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    groupCodeLabel: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+    groupCodeValue: { fontSize: 28, fontWeight: '900', color: C.ink, letterSpacing: 3 },
+    groupShareBtn: { backgroundColor: C.accentSoft, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9 },
+    groupShareBtnText: { fontSize: 12, fontWeight: '800', color: C.accentText, letterSpacing: 0.3 },
+    leaderboard: { gap: 6 },
+    leaderboardTitle: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2 },
+    leaderboardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surfaceAlt, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+    leaderboardRankBadge: { width: 22, height: 22, borderRadius: 6, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+    leaderboardRankText: { fontSize: 11, fontWeight: '800', color: C.dust },
+    leaderboardName: { flex: 1, fontSize: 14, fontWeight: '700', color: C.ink },
+    leaderboardPoints: { fontSize: 14, fontWeight: '800', color: C.accentText },
+    joinRow: { flexDirection: 'row', gap: 8 },
+    joinInput: { flex: 1, backgroundColor: C.surfaceAlt, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontWeight: '800', color: C.ink, letterSpacing: 2 },
+    joinBtn: { backgroundColor: C.ink, borderRadius: 12, paddingHorizontal: 18, justifyContent: 'center', alignItems: 'center' },
+    joinBtnText: { fontSize: 13, fontWeight: '800', color: C.surface },
+    joinError: { fontSize: 11, color: C.red, fontWeight: '600', textAlign: 'center' },
+    leaveGroupBtn: { backgroundColor: C.claySoft, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
+    leaveGroupBtnText: { fontSize: 12, fontWeight: '700', color: C.clayText },
   });
 }
