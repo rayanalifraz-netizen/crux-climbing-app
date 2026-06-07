@@ -1,15 +1,47 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import Constants from 'expo-constants';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Animated, Image, Linking, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import 'react-native-reanimated';
 import { ThemeProvider as AppThemeProvider } from '../context/ThemeContext';
 import { configureNotifications } from '../notifications';
 
 configureNotifications();
+
+function isNewerVersion(store: string, current: string): boolean {
+  const a = store.split('.').map(Number);
+  const b = current.split('.').map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x > y) return true;
+    if (x < y) return false;
+  }
+  return false;
+}
+
+async function checkAppStoreVersion(
+  setAvailable: (v: boolean) => void,
+  setUrl: (v: string) => void,
+  bannerOpacity: Animated.Value,
+) {
+  try {
+    const res = await fetch('https://itunes.apple.com/lookup?bundleId=com.cruxapp.crux');
+    const data = await res.json();
+    const result = data.results?.[0];
+    if (!result) return;
+    const current = Constants.expoConfig?.version ?? '0.0.0';
+    if (isNewerVersion(result.version, current)) {
+      setUrl(result.trackViewUrl);
+      setAvailable(true);
+      Animated.timing(bannerOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }
+  } catch {}
+}
 
 async function checkForUpdate(setUpdateReady: (v: boolean) => void, bannerOpacity: Animated.Value) {
   try {
@@ -57,11 +89,15 @@ function CustomSplash({ onDone }: { onDone: () => void }) {
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
   const [updateReady, setUpdateReady] = useState(false);
+  const [storeUpdateAvailable, setStoreUpdateAvailable] = useState(false);
+  const [storeUrl, setStoreUrl] = useState('');
   const bannerOpacity = useRef(new Animated.Value(0)).current;
+  const storeBannerOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
     checkForUpdate(setUpdateReady, bannerOpacity);
+    checkAppStoreVersion(setStoreUpdateAvailable, setStoreUrl, storeBannerOpacity);
   }, []);
 
   return (
@@ -90,6 +126,26 @@ export default function RootLayout() {
             onPress={() => {
               Animated.timing(bannerOpacity, { toValue: 0, duration: 250, useNativeDriver: true })
                 .start(() => setUpdateReady(false));
+            }}
+            style={styles.updateBannerClose}
+          >
+            <Text style={styles.updateBannerCloseText}>✕</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+      {storeUpdateAvailable && (
+        <Animated.View style={[styles.updateBanner, { opacity: storeBannerOpacity, bottom: updateReady ? 160 : 110 }]}>
+          <Text style={styles.updateBannerText}>New version available</Text>
+          <TouchableOpacity
+            onPress={() => Linking.openURL(storeUrl).catch(() => {})}
+            style={styles.updateBannerBtn}
+          >
+            <Text style={styles.updateBannerBtnText}>Update →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              Animated.timing(storeBannerOpacity, { toValue: 0, duration: 250, useNativeDriver: true })
+                .start(() => setStoreUpdateAvailable(false));
             }}
             style={styles.updateBannerClose}
           >
