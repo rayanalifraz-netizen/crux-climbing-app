@@ -128,6 +128,7 @@ export default function SessionScreen() {
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [joinError, setJoinError] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
+  const [groupInitDone, setGroupInitDone] = useState(false);
   const groupChannelRef = useRef<any>(null);
 
   useFocusEffect(useCallback(() => {
@@ -152,15 +153,20 @@ export default function SessionScreen() {
   };
 
   const initGroupSession = async () => {
-    const profile = await getProfile();
-    const name = profile?.name || 'Climber';
-    const mine = await getOrCreateMyGroupSession(name);
-    setMyGroupSession(mine);
-    if (mine) {
-      setActiveGroupSession(prev => prev ?? mine);
-      const sessionId = mine.id;
-      refreshLeaderboard(sessionId);
-      subscribeToGroup(sessionId);
+    try {
+      const profile = await getProfile();
+      const name = profile?.name || 'Climber';
+      const mine = await getOrCreateMyGroupSession(name);
+      setMyGroupSession(mine);
+      if (mine) {
+        setActiveGroupSession(prev => prev ?? mine);
+        refreshLeaderboard(mine.id);
+        subscribeToGroup(mine.id);
+      }
+    } catch (e) {
+      console.error('initGroupSession error:', e);
+    } finally {
+      setGroupInitDone(true);
     }
   };
 
@@ -347,69 +353,75 @@ export default function SessionScreen() {
         </View>
 
         {/* Group Session Card */}
-        {myGroupSession && (
-          <Card label="Group Session">
-            <View style={styles.groupInner}>
-              {/* Code + share row */}
-              <View style={styles.groupCodeRow}>
-                <View>
-                  <Text style={styles.groupCodeLabel}>Your Code</Text>
-                  <Text style={styles.groupCodeValue}>{myGroupSession.join_code}</Text>
-                </View>
-                <TouchableOpacity style={styles.groupShareBtn} onPress={handleShareGroupCode}>
-                  <Text style={styles.groupShareBtnText}>Share Code</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Leaderboard */}
-              {leaderboard.length > 0 && (
-                <View style={styles.leaderboard}>
-                  <Text style={styles.leaderboardTitle}>
-                    {activeGroupSession?.id !== myGroupSession.id ? `${activeGroupSession?.host_name}'s Group` : 'Leaderboard'}{leaderboard.length > 1 ? ` · ${leaderboard.length} climbers` : ''}
-                  </Text>
-                  {leaderboard.map((entry, idx) => (
-                    <View key={entry.user_id} style={[styles.leaderboardRow, idx === 0 && { backgroundColor: C.amberBg }]}>
-                      <View style={[styles.leaderboardRankBadge, idx === 0 && { backgroundColor: C.amber }]}>
-                        <Text style={[styles.leaderboardRankText, idx === 0 && { color: '#fff' }]}>{idx + 1}</Text>
-                      </View>
-                      <Text style={styles.leaderboardName} numberOfLines={1}>{entry.display_name}</Text>
-                      <Text style={[styles.leaderboardPoints, idx === 0 && { color: C.amber }]}>{entry.points} pts</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Join or Leave */}
-              {activeGroupSession?.id !== myGroupSession.id ? (
-                <TouchableOpacity style={styles.leaveGroupBtn} onPress={handleLeaveGroup}>
-                  <Text style={styles.leaveGroupBtnText}>Leave {activeGroupSession?.host_name}'s group</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.joinRow}>
-                  <TextInput
-                    style={styles.joinInput}
-                    value={joinCodeInput}
-                    onChangeText={v => { setJoinCodeInput(v.toUpperCase()); setJoinError(''); }}
-                    placeholder="Friend's code"
-                    placeholderTextColor={C.dust}
-                    autoCapitalize="characters"
-                    maxLength={6}
-                    returnKeyType="done"
-                    onSubmitEditing={handleJoinGroup}
-                  />
-                  <TouchableOpacity
-                    style={[styles.joinBtn, joinLoading && { opacity: 0.5 }]}
-                    onPress={handleJoinGroup}
-                    disabled={joinLoading}
-                  >
-                    <Text style={styles.joinBtnText}>Join</Text>
+        <Card label="Group Session">
+          <View style={styles.groupInner}>
+            {!groupInitDone ? (
+              <Text style={styles.groupStatusText}>Connecting…</Text>
+            ) : !myGroupSession ? (
+              <Text style={styles.groupStatusText}>Sign in to use group sessions</Text>
+            ) : (
+              <>
+                {/* Code + share row */}
+                <View style={styles.groupCodeRow}>
+                  <View>
+                    <Text style={styles.groupCodeLabel}>Your Code</Text>
+                    <Text style={styles.groupCodeValue}>{myGroupSession.join_code}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.groupShareBtn} onPress={handleShareGroupCode}>
+                    <Text style={styles.groupShareBtnText}>Share Code</Text>
                   </TouchableOpacity>
                 </View>
-              )}
-              {joinError ? <Text style={styles.joinError}>{joinError}</Text> : null}
-            </View>
-          </Card>
-        )}
+
+                {/* Leaderboard */}
+                {leaderboard.length > 0 && (
+                  <View style={styles.leaderboard}>
+                    <Text style={styles.leaderboardTitle}>
+                      {activeGroupSession?.id !== myGroupSession.id ? `${activeGroupSession?.host_name}'s Group` : 'Leaderboard'}{leaderboard.length > 1 ? ` · ${leaderboard.length} climbers` : ''}
+                    </Text>
+                    {leaderboard.map((entry, idx) => (
+                      <View key={entry.user_id} style={[styles.leaderboardRow, idx === 0 && { backgroundColor: C.amberBg }]}>
+                        <View style={[styles.leaderboardRankBadge, idx === 0 && { backgroundColor: C.amber }]}>
+                          <Text style={[styles.leaderboardRankText, idx === 0 && { color: '#fff' }]}>{idx + 1}</Text>
+                        </View>
+                        <Text style={styles.leaderboardName} numberOfLines={1}>{entry.display_name}</Text>
+                        <Text style={[styles.leaderboardPoints, idx === 0 && { color: C.amber }]}>{entry.points} pts</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Join or Leave */}
+                {activeGroupSession && activeGroupSession.id !== myGroupSession.id ? (
+                  <TouchableOpacity style={styles.leaveGroupBtn} onPress={handleLeaveGroup}>
+                    <Text style={styles.leaveGroupBtnText}>Leave {activeGroupSession.host_name}'s group</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.joinRow}>
+                    <TextInput
+                      style={styles.joinInput}
+                      value={joinCodeInput}
+                      onChangeText={v => { setJoinCodeInput(v.toUpperCase()); setJoinError(''); }}
+                      placeholder="Friend's code"
+                      placeholderTextColor={C.dust}
+                      autoCapitalize="characters"
+                      maxLength={6}
+                      returnKeyType="done"
+                      onSubmitEditing={handleJoinGroup}
+                    />
+                    <TouchableOpacity
+                      style={[styles.joinBtn, joinLoading && { opacity: 0.5 }]}
+                      onPress={handleJoinGroup}
+                      disabled={joinLoading}
+                    >
+                      <Text style={styles.joinBtnText}>Join</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {joinError ? <Text style={styles.joinError}>{joinError}</Text> : null}
+              </>
+            )}
+          </View>
+        </Card>
 
         {/* Rest Day Block */}
         {isRestDay && !locked && (
@@ -855,6 +867,7 @@ function makeStyles(C) {
     saveBtnText: { color: C.surface, fontSize: 15, fontWeight: '800', letterSpacing: 0.4 },
 
     // Group Session
+    groupStatusText: { color: C.dust, fontSize: 13, fontWeight: '600', textAlign: 'center', paddingVertical: 8 },
     groupInner: { padding: 16, gap: 14 },
     groupCodeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     groupCodeLabel: { fontSize: 9, fontWeight: '800', color: C.dust, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
