@@ -18,9 +18,10 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 
 const GRADE_LIST = ['VB','V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12','V13+'];
 
-export function gradeToPoints(grade: string): number {
-  const idx = GRADE_LIST.indexOf(grade);
-  return idx >= 0 ? idx + 1 : 1;
+export function gradeToPoints(grade: string, attempts: number, isFlash: boolean): number {
+  const base = Math.max(1, GRADE_LIST.indexOf(grade) + 1);
+  const multiplier = isFlash ? 2 : attempts <= 4 ? 1.5 : 1;
+  return Math.round(base * multiplier);
 }
 
 function generateJoinCode(): string {
@@ -75,10 +76,10 @@ export async function getGroupLeaderboard(sessionId: string): Promise<Leaderboar
     .sort((a, b) => b.points - a.points);
 }
 
-export async function addClimbToGroupSession(sessionId: string, grade: string): Promise<void> {
+export async function addClimbToGroupSession(sessionId: string, grade: string, points: number): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
-  await supabase.from('group_session_climbs').insert({ session_id: sessionId, user_id: user.id, grade, points: gradeToPoints(grade) });
+  await supabase.from('group_session_climbs').insert({ session_id: sessionId, user_id: user.id, grade, points });
 }
 
 export async function removeClimbFromGroupSession(sessionId: string, grade: string): Promise<void> {

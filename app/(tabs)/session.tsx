@@ -8,7 +8,7 @@ import ShareCardModal from '../../components/ShareCardModal';
 import { scheduleRecoveryReminder } from '../../notifications';
 import { copyMediaToStorage, getCheckIns, getProfile, getSessions, getTodayDate, saveSession, type ClimbEntry, type GradeEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
-import { addClimbToGroupSession, getGroupLeaderboard, getOrCreateMyGroupSession, joinGroupSessionByCode, leaveGroupSession, supabase, type GroupSession, type LeaderboardEntry } from '../../lib/supabase';
+import { addClimbToGroupSession, getGroupLeaderboard, getOrCreateMyGroupSession, gradeToPoints, joinGroupSessionByCode, leaveGroupSession, supabase, type GroupSession, type LeaderboardEntry } from '../../lib/supabase';
 
 const V_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13+'];
 const ATTEMPT_OPTIONS = ['Flash', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
@@ -244,7 +244,9 @@ export default function SessionScreen() {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setClimbs(prev => [...prev, { id, grade: draftGrade, attempts: attNum, sends, holdTypes: draftHoldTypes, movementTypes: draftMovementTypes }]);
     if (sends > 0 && activeGroupSession) {
-      addClimbToGroupSession(activeGroupSession.id, draftGrade).catch(() => {});
+      const isFlash = draftAttempts === 'Flash';
+      const pts = gradeToPoints(draftGrade, attNum, isFlash);
+      addClimbToGroupSession(activeGroupSession.id, draftGrade, pts).catch(() => {});
     }
   };
 
