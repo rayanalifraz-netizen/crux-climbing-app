@@ -82,12 +82,15 @@ export async function addClimbToGroupSession(sessionId: string, grade: string, p
   await supabase.from('group_session_climbs').insert({ session_id: sessionId, user_id: user.id, grade, points });
 }
 
-export async function removeClimbFromGroupSession(sessionId: string, grade: string): Promise<void> {
+export async function removeClimbFromGroupSession(sessionId: string, grade: string, points: number): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
-  // Remove the most recent matching climb
-  const { data } = await supabase.from('group_session_climbs').select('id').eq('session_id', sessionId).eq('user_id', user.id).eq('grade', grade).order('logged_at', { ascending: false }).limit(1);
-  if (data?.[0]) await supabase.from('group_session_climbs').delete().eq('id', data[0].id);
+  // Remove the most recent climb matching grade + points (flash and repeat sends of the same grade score differently)
+  const { data } = await supabase.from('group_session_climbs').select('id').eq('session_id', sessionId).eq('user_id', user.id).eq('grade', grade).eq('points', points).order('logged_at', { ascending: false }).limit(1);
+  if (data?.[0]) {
+    const { error } = await supabase.from('group_session_climbs').delete().eq('id', data[0].id);
+    if (error) console.error('removeClimbFromGroupSession error:', error);
+  }
 }
 
 export type GroupResultEntry = { user_id: string; display_name: string; points: number; climbs: { grade: string; points: number }[] };

@@ -193,7 +193,7 @@ export default function SessionScreen() {
     if (groupChannelRef.current) supabase.removeChannel(groupChannelRef.current);
     groupChannelRef.current = supabase
       .channel(`group_${sessionId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_session_climbs', filter: `session_id=eq.${sessionId}` },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_session_climbs', filter: `session_id=eq.${sessionId}` },
         () => refreshLeaderboard(sessionId))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_session_members', filter: `session_id=eq.${sessionId}` },
         () => refreshLeaderboard(sessionId))
@@ -312,7 +312,9 @@ export default function SessionScreen() {
     hasUnsavedProgress.current = true;
     const climb = climbs.find(c => c.id === id);
     if (climb && climb.sends > 0 && activeGroupSession && !activeGroupSession.is_ended) {
-      removeClimbFromGroupSession(activeGroupSession.id, climb.grade)
+      const isFlash = climb.attempts === 1 && climb.sends === 1;
+      const pts = gradeToPoints(climb.grade, climb.attempts, isFlash);
+      removeClimbFromGroupSession(activeGroupSession.id, climb.grade, pts)
         .then(() => refreshLeaderboard(activeGroupSession.id))
         .catch(() => {});
     }
