@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import { signOut as supabaseSignOut, syncCheckIn, syncProfile, syncSession } from './lib/supabase';
+import { signOut as supabaseSignOut, syncCheckIn, syncProfile, syncSession, type GroupResult } from './lib/supabase';
 
 export type GradeEntry = {
   attempts: number;
@@ -196,6 +196,18 @@ export const deleteCheckInByKey = async (dateKey: string): Promise<void> => {
   await set('checkins', JSON.stringify(existing));
 };
 
+// ─── Group Session Results ────────────────────────────────────────────────────
+// Cached copy of ended group sessions (winner + points), keyed by date
+
+export const getGroupResults = async (): Promise<Record<string, GroupResult[]>> => {
+  const data = await get('groupResults');
+  return data ? JSON.parse(data) : {};
+};
+
+export const saveGroupResults = async (results: Record<string, GroupResult[]>): Promise<void> => {
+  await set('groupResults', JSON.stringify(results));
+};
+
 // ─── Goal Date ────────────────────────────────────────────────────────────────
 
 export const saveGoalDate = async (dateStr: string): Promise<void> => {
@@ -249,7 +261,7 @@ export const clearAllData = async (): Promise<void> => {
   await FileSystem.deleteAsync(MEDIA_DIR, { idempotent: true }).catch(() => {});
   await AsyncStorage.multiRemove([
     'profile', 'goalDate', 'darkMode', 'alertSettings',
-    'onboardingComplete', 'sessions', 'checkins', 'reminderSettings', 'gradeSystem', 'injuryLog', 'bodyOverrides',
+    'onboardingComplete', 'sessions', 'checkins', 'reminderSettings', 'gradeSystem', 'injuryLog', 'bodyOverrides', 'groupResults',
   ]);
   await supabaseSignOut().catch(() => {});
 };

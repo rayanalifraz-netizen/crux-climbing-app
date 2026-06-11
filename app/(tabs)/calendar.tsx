@@ -5,8 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import ShareCardModal from '../../components/ShareCardModal';
-import { deleteGoalDate, getCheckIns, getGoalDate, getInjuryAlerts, getProfile, getSessions, saveGoalDate, type ClimbEntry } from '../../storage';
+import { deleteGoalDate, getCheckIns, getGoalDate, getGroupResults, getInjuryAlerts, getProfile, getSessions, saveGoalDate, saveGroupResults, type ClimbEntry } from '../../storage';
 import { gradeColor, gradeColorBg, toDisplayGrade, useTheme } from '../../context/ThemeContext';
+import { fetchMyGroupResults, type GroupResult } from '../../lib/supabase';
 import { V_GRADES, computeCHI, computeProjectReadiness } from '../../lib/scoring';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -188,6 +189,7 @@ export default function CalendarScreen() {
   const modalStyles = useMemo(() => makeModalStyles(C), [C]);
   const [sessions, setSessions] = useState({});
   const [checkIns, setCheckIns] = useState({});
+  const [groupResults, setGroupResults] = useState<Record<string, GroupResult[]>>({});
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [goalDate, setGoalDate] = useState(null);
@@ -219,13 +221,22 @@ export default function CalendarScreen() {
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
-    const [sessionData, checkInData, savedGoal, profile, injuryAlerts] = await Promise.all([
-      getSessions(), getCheckIns(), getGoalDate(), getProfile(), getInjuryAlerts(),
+    const [sessionData, checkInData, savedGoal, profile, injuryAlerts, cachedGroupResults] = await Promise.all([
+      getSessions(), getCheckIns(), getGoalDate(), getProfile(), getInjuryAlerts(), getGroupResults(),
     ]);
     setSessions(sessionData);
     setCheckIns(checkInData);
     setProfile(profile);
+    setGroupResults(cachedGroupResults);
     if (savedGoal) setGoalDate(savedGoal);
+
+    // Refresh group session results from Supabase in the background
+    fetchMyGroupResults().then(fresh => {
+      if (fresh) {
+        setGroupResults(fresh);
+        saveGroupResults(fresh).catch(() => {});
+      }
+    }).catch(() => {});
 
     if (profile?.projectGrade && profile?.maxGrade) {
       const chiData = computeCHI(sessionData, checkInData, injuryAlerts);
@@ -489,8 +500,9 @@ export default function CalendarScreen() {
                 const isSelected = selectedDate === dateStr;
                 const isToday = dateStr === todayStr;
                 const isGoalDay = dateStr === goalDate;
-                const dotColor = restDay ? C.green : session ? getResColor(C, session.res) : checkIn ? C.dust : null;
-                const hasActivity = restDay || !!session || !!checkIn;
+                const hasGroupResult = (groupResults[dateStr]?.length ?? 0) > 0;
+                const dotColor = restDay ? C.green : session ? getResColor(C, session.res) : (checkIn || hasGroupResult) ? C.dust : null;
+                const hasActivity = restDay || !!session || !!checkIn || hasGroupResult;
 
                 return (
                   <TouchableOpacity
@@ -714,6 +726,58 @@ export default function CalendarScreen() {
           </Card>
         )}
 
+        {/* Group Session Results */}
+        {selectedDate && (groupResults[selectedDate] || []).map(gr => {
+          const winner = gr.entries[0];
+          const summarizeClimbs = (climbs: { grade: string; points: number }[]) => {
+            const byGrade: Record<string, { count: number; pts: number }> = {};
+            climbs.forEach(c => {
+              const e = byGrade[c.grade] = byGrade[c.grade] || { count: 0, pts: 0 };
+              e.count += 1;
+              e.pts += c.points;
+            });
+            return Object.entries(byGrade)
+              .map(([g, e]) => `${toDisplayGrade(g, gradeSystem)}${e.count > 1 ? ` ×${e.count}` : ''} +${e.pts}`)
+              .join(' · ');
+          };
+          return (
+            <Card key={gr.id} label={`Group Session · ${gr.host_name}'s Group`} labelColor={C.amber} style={{ marginTop: 4 }}>
+              <View style={styles.detailInner}>
+                <View style={styles.groupWinnerRow}>
+                  <Text style={styles.groupWinnerEmoji}>🏆</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.detailSectionLabel}>Winner</Text>
+                    <Text style={styles.groupWinnerName}>{winner?.display_name}</Text>
+                  </View>
+                  <Text style={styles.groupWinnerPts}>{winner?.points} pts</Text>
+                </View>
+
+                <View style={styles.detailRule} />
+
+                <Text style={styles.detailSectionLabel}>Points Breakdown</Text>
+                <View style={styles.climbEntryList}>
+                  {gr.entries.map((entry, idx) => (
+                    <View key={entry.user_id} style={[styles.groupEntryRow, idx === 0 && { backgroundColor: C.amberBg }]}>
+                      <Text style={styles.groupEntryRank}>
+                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
+                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.groupEntryName, idx === 0 && { color: C.amberText }]} numberOfLines={1}>
+                          {entry.display_name}
+                        </Text>
+                        {entry.climbs.length > 0 && (
+                          <Text style={styles.groupEntryClimbs}>{summarizeClimbs(entry.climbs)}</Text>
+                        )}
+                      </View>
+                      <Text style={[styles.groupEntryPts, idx === 0 && { color: C.amber }]}>{entry.points} pts</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </Card>
+          );
+        })}
+
         {/* Check-in Summary */}
         {selectedDate && selectedCheckIn && !isRestDay && (
           <Card label="Check-in" labelColor={C.sageText} style={{ marginTop: 4 }}>
@@ -797,7 +861,7 @@ export default function CalendarScreen() {
           </View>
         )}
 
-        {selectedDate && !isRestDay && !selectedSession && !(selectedCheckIn?.mediaUris?.length) && (
+        {selectedDate && !isRestDay && !selectedSession && !(selectedCheckIn?.mediaUris?.length) && !(groupResults[selectedDate]?.length) && (
           <Card style={{ marginTop: 4 }}>
             <View style={styles.emptyDayInner}>
               <Text style={styles.emptyDayText}>No activity logged for this day</Text>
@@ -945,6 +1009,16 @@ function makeStyles(C) {
 
     emptyDayInner: { padding: 20, alignItems: 'center' },
     emptyDayText: { color: C.dust, fontSize: 12, fontWeight: '600' },
+
+    groupWinnerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+    groupWinnerEmoji: { fontSize: 30 },
+    groupWinnerName: { fontSize: 20, fontWeight: '800', color: C.ink, letterSpacing: -0.5 },
+    groupWinnerPts: { fontSize: 16, fontWeight: '800', color: C.amber },
+    groupEntryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surfaceAlt, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+    groupEntryRank: { fontSize: 14, width: 24, textAlign: 'center' },
+    groupEntryName: { fontSize: 13, fontWeight: '700', color: C.ink },
+    groupEntryClimbs: { fontSize: 10, color: C.dust, marginTop: 2, fontWeight: '600' },
+    groupEntryPts: { fontSize: 13, fontWeight: '800', color: C.accentText },
 
     shareCardBtn: { alignSelf: 'flex-end', borderRadius: 100, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 12 },
     shareCardBtnText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },

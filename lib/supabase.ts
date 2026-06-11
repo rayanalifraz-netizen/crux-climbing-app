@@ -90,6 +90,53 @@ export async function removeClimbFromGroupSession(sessionId: string, grade: stri
   if (data?.[0]) await supabase.from('group_session_climbs').delete().eq('id', data[0].id);
 }
 
+export type GroupResultEntry = { user_id: string; display_name: string; points: number; climbs: { grade: string; points: number }[] };
+export type GroupResult = { id: string; date: string; host_user_id: string; host_name: string; entries: GroupResultEntry[] };
+
+// All ended group sessions the current user was part of, keyed by date.
+// Returns null when signed out or on error so callers can keep their local cache.
+export async function fetchMyGroupResults(): Promise<Record<string, GroupResult[]> | null> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    const { data: memberships } = await supabase.from('group_session_members').select('session_id').eq('user_id', user.id);
+    const ids = (memberships || []).map(m => m.session_id);
+    if (ids.length === 0) return {};
+    const { data: sessions } = await supabase.from('group_sessions').select('*').in('id', ids).eq('is_ended', true);
+    if (!sessions?.length) return {};
+    const endedIds = sessions.map(s => s.id);
+    const [{ data: members }, { data: climbs }] = await Promise.all([
+      supabase.from('group_session_members').select('session_id, user_id, display_name').in('session_id', endedIds),
+      supabase.from('group_session_climbs').select('session_id, user_id, grade, points').in('session_id', endedIds),
+    ]);
+    const byDate: Record<string, GroupResult[]> = {};
+    sessions.forEach(s => {
+      const sClimbs = (climbs || []).filter(c => c.session_id === s.id);
+      const entries: GroupResultEntry[] = (members || [])
+        .filter(m => m.session_id === s.id)
+        .map(m => {
+          const mine = sClimbs.filter(c => c.user_id === m.user_id);
+          return {
+            user_id: m.user_id,
+            display_name: m.display_name,
+            points: mine.reduce((sum, c) => sum + c.points, 0),
+            climbs: mine.map(c => ({ grade: c.grade, points: c.points })),
+          };
+        })
+        .sort((a, b) => b.points - a.points);
+      if (entries.length > 1) {
+        (byDate[s.date] = byDate[s.date] || []).push({
+          id: s.id, date: s.date, host_user_id: s.host_user_id, host_name: s.host_name, entries,
+        });
+      }
+    });
+    return byDate;
+  } catch (e) {
+    console.error('fetchMyGroupResults error', e);
+    return null;
+  }
+}
+
 export async function leaveGroupSession(sessionId: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
